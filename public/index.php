@@ -9,6 +9,10 @@ switch ($ruta) {
         require __DIR__ . '/../app/vistas/catalogo.php';
         break;
 
+    case '/health':
+        require __DIR__ . '/../app/controladores/health.php';
+        break;
+
     default:
         http_response_code(404);
         require __DIR__ . '/../app/vistas/404.php';
