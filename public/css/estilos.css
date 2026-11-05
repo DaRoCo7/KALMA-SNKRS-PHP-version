@@ -1,0 +1,33 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #fafaf8;
+    color: #202020;
+    font-family: Arial, sans-serif;
+}
+
+.contenedor {
+    width: min(100% - 2rem, 68rem);
+    margin-inline: auto;
+}
+
+.cabecera {
+    padding-block: 1.25rem;
+    border-bottom: 1px solid #ddd;
+    background: white;
+}
+
+.marca {
+    color: inherit;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+}
+
+h1 {
+    margin-block: 2.5rem 1.5rem;
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+}
