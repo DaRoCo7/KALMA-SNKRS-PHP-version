@@ -1,5 +1,3 @@
-CREATE DATABASE kalma_snkrs;
-
 -- Tabla CATEGORIAS	
 
 CREATE TABLE public.categorias (
