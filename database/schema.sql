@@ -1,6 +1,5 @@
--- En este proyecto usamos BEGIN y COMMIT para que la creacion de las tablas
--- se ejecute en una transaccion y evitar que la base de datos se quede a medias
--- si ocurre algun error durante la ejecucion del esquema.
+-- En esta BBDD usaremos BEGIN y COMMIT para agrupar la creación de las tablas en una transacción para que, 
+--si falla una instrucción, podamos evitar dejar el esquema parcialmente creado.
 
 BEGIN;
 
@@ -306,5 +305,6 @@ CREATE INDEX idx_auditoria_usuario
 CREATE INDEX idx_auditoria_fecha
     ON public.auditoria (fecha_accion);
 COMMIT;
+
 -- Tabla RESERVAS
 -- No la usarems en este proyecto, ya está incluido en el otro
