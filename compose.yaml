@@ -15,6 +15,9 @@ services:
       # Scripts de arranque: Postgres solo los ejecuta si el volumen está vacío.
       # El número del nombre de destino fija el orden de ejecución (esquema, luego datos).
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/seeds/usuarios.sql:/docker-entrypoint-initdb.d/02_usuarios.sql:ro
+      - ./database/seeds/catalogo.sql:/docker-entrypoint-initdb.d/03_catalogo.sql:ro
+      - ./database/seeds/pedidos.sql:/docker-entrypoint-initdb.d/04_pedidos.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s

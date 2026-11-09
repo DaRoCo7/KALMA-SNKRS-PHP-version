@@ -105,66 +105,72 @@ CREATE TABLE marcas (
     pais   VARCHAR(60)
 );
 
+-- Color principal de cada producto (sirve para filtrar el catálogo por color)
 CREATE TABLE colores (
     id         INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     nombre     VARCHAR(50) NOT NULL UNIQUE,
     codigo_hex VARCHAR(7)  NOT NULL CHECK (codigo_hex ~ '^#[0-9A-Fa-f]{6}$')
 );
 
--- Modelo de zapatilla. El precio va aquí porque es el mismo para todas
--- las tallas y colores; las líneas de pedido copian el precio aplicado.
+-- Producto = modelo + combinación de colores (colorway), igual que en Nike.com:
+-- "Air Force 1 '07 White/White" y "Air Force 1 '07 Black/Black" son dos
+-- productos distintos, cada uno con su código de marca, su precio y su foto.
+--
+-- codigo_marca: código de estilo del fabricante (style code), ej. CW2288-111
+--   CW2288 = modelo (Air Force 1 '07)  ·  111 = combinación de colores (White/White)
+--   Es un dato real: va impreso en la etiqueta de la caja y en la lengüeta.
+--   NO es un RFID. Un RFID (EPC) identifica tallas o unidades y la marca no lo publica.
+--   Los colores de un mismo modelo comparten prefijo (CW2288-*), así que se pueden
+--   agrupar para mostrar "otros colores".
 CREATE TABLE productos (
     id                  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     categoria_id        INTEGER       NOT NULL REFERENCES categorias(id),
     marca_id            INTEGER       NOT NULL REFERENCES marcas(id),
-    nombre              VARCHAR(150)  NOT NULL,
+    color_id            INTEGER       NOT NULL REFERENCES colores(id),  -- color principal
+    nombre              VARCHAR(150)  NOT NULL,                         -- ej. Nike Air Force 1 '07
+    colorway            VARCHAR(100)  NOT NULL,                         -- colores según la marca, ej. White/White
+    codigo_marca        VARCHAR(10)   NOT NULL
+                        CHECK (codigo_marca ~ '^[A-Z0-9]{6}-[0-9]{3}$'),
     slug                VARCHAR(160)  NOT NULL UNIQUE
                         CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
-    referencia_marca    VARCHAR(30)   NOT NULL,   -- código de modelo del fabricante (style code)
     descripcion         TEXT,
-    precio              NUMERIC(10,2) NOT NULL CHECK (precio > 0),
+    precio              NUMERIC(10,2) NOT NULL CHECK (precio > 0),      -- igual para todas las tallas
     personalizable      BOOLEAN       NOT NULL DEFAULT false,
-    imagen              VARCHAR(255),             -- ruta relativa en public/img (pendiente de rediseño en el front)
+    imagen              VARCHAR(255),  -- ruta relativa en public/img (pendiente de rediseño en el front)
     activo              BOOLEAN       NOT NULL DEFAULT true,
     fecha_creacion      TIMESTAMPTZ   NOT NULL DEFAULT now(),
     fecha_actualizacion TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_productos_referencia UNIQUE (marca_id, referencia_marca)
+    -- Único dentro de cada marca: otra marca podría usar un código con el mismo formato
+    CONSTRAINT uq_productos_codigo_marca UNIQUE (marca_id, codigo_marca)
 );
 
 CREATE INDEX ix_productos_categoria ON productos (categoria_id);
 CREATE INDEX ix_productos_marca     ON productos (marca_id);
+CREATE INDEX ix_productos_color     ON productos (color_id);
 
 CREATE TRIGGER trg_productos_actualizacion
     BEFORE UPDATE ON productos
     FOR EACH ROW EXECUTE FUNCTION fn_tocar_fecha_actualizacion();
 
--- Variante = modelo + color + talla. Es la unidad que se vende y que tiene stock.
+-- Variante = producto + talla. Es lo que se vende y lo que tiene stock.
 --
--- RFID: cada variante lleva dos códigos EPC-96 (24 caracteres hexadecimales):
---   * rfid_tienda -> etiqueta que pone KALMA en almacén
---   * rfid_marca  -> etiqueta de origen que trae el fabricante
--- Los dos son UNIQUE en toda la tabla: al leer una etiqueta, la variante
--- queda identificada sin ambigüedad.
+-- rfid_tienda: etiqueta RFID que KALMA pone en almacén a cada talla.
+--   Formato EPC-96 en hexadecimal (24 caracteres). Es UNIQUE en toda la tabla:
+--   al leer una etiqueta, la variante queda identificada sin ambigüedad.
 CREATE TABLE variantes (
     id                  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     producto_id         INTEGER      NOT NULL REFERENCES productos(id),
-    color_id            INTEGER      NOT NULL REFERENCES colores(id),
     talla               NUMERIC(3,1) NOT NULL
                         CHECK (talla BETWEEN 34 AND 50 AND talla * 2 = trunc(talla * 2)),  -- admite medias tallas (42.5)
     stock               INTEGER      NOT NULL DEFAULT 0 CHECK (stock >= 0),
     stock_minimo        INTEGER      NOT NULL DEFAULT 3 CHECK (stock_minimo >= 0),
     rfid_tienda         VARCHAR(24)  NOT NULL UNIQUE CHECK (rfid_tienda ~ '^[0-9A-F]{24}$'),
-    rfid_marca          VARCHAR(24)  NOT NULL UNIQUE CHECK (rfid_marca  ~ '^[0-9A-F]{24}$'),
     activo              BOOLEAN      NOT NULL DEFAULT true,
     fecha_actualizacion TIMESTAMPTZ  NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_variantes_producto_color_talla UNIQUE (producto_id, color_id, talla),
-    -- La etiqueta de la tienda y la de la marca nunca pueden coincidir
-    CONSTRAINT ck_variantes_rfid_distintos CHECK (rfid_tienda <> rfid_marca)
+    CONSTRAINT uq_variantes_producto_talla UNIQUE (producto_id, talla)
 );
-
-CREATE INDEX ix_variantes_color ON variantes (color_id);
 
 CREATE TRIGGER trg_variantes_actualizacion
     BEFORE UPDATE ON variantes
@@ -226,7 +232,7 @@ CREATE TABLE lineas_pedido (
     variante_id             INTEGER       NOT NULL REFERENCES variantes(id),
     nombre_producto         VARCHAR(150)  NOT NULL,
     talla                   NUMERIC(3,1)  NOT NULL,
-    color                   VARCHAR(50)   NOT NULL,
+    color                   VARCHAR(100)  NOT NULL,   -- colorway del producto en el momento del pedido
     cantidad                INTEGER       NOT NULL CHECK (cantidad BETWEEN 1 AND 20),
     precio_unitario         NUMERIC(10,2) NOT NULL CHECK (precio_unitario >= 0),
     recargo_personalizacion NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (recargo_personalizacion >= 0),
@@ -319,3 +325,4 @@ CREATE TABLE consultas (
 );
 
 COMMIT;
+
