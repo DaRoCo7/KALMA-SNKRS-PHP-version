@@ -1,3 +1,8 @@
+-- En este proyecto usamos BEGIN y COMMIT para que la creacion de las tablas
+-- se ejecute en una transaccion y evitar que la base de datos se quede a medias
+-- si ocurre algun error durante la ejecucion del esquema.
+
+BEGIN;
 
 -- Tabla CATEGORIAS
 -- Aqui guardaremos las categorias de las zapatillas
@@ -300,7 +305,6 @@ CREATE INDEX idx_auditoria_usuario
 
 CREATE INDEX idx_auditoria_fecha
     ON public.auditoria (fecha_accion);
-
-
+COMMIT;
 -- Tabla RESERVAS
 -- No la usarems en este proyecto, ya está incluido en el otro
