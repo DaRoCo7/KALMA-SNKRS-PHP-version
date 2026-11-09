@@ -19,3 +19,7 @@ Thumbs.db
 
 # Dependencias PHP (si utilizamos Composer)
 /vendor/
+
+# Archivos de trabajo con IA (no se suben al repositorio)
+CLAUDE.md
+.claude/
