@@ -1,2 +1,21 @@
-
+# Variables de entorno y contraseñas
 /.env
+/.env.*
+
+# Permitimos compartir la plantilla
+!/.env.example
+
+# Archivos temporales
+*.log
+*.tmp
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Configuración de editores
+.idea/
+.vscode/
+
+# Dependencias PHP (si utilizamos Composer)
+/vendor/

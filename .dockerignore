@@ -1,0 +1,15 @@
+# No copiar credenciales
+.env
+.env.*
+!.env.example
+
+# No copiar Git
+.git
+.git/**
+
+# Archivos innecesarios
+.DS_Store
+Thumbs.db
+
+# Dependencias PHP
+vendor/
