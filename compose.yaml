@@ -12,6 +12,9 @@ services:
       - "127.0.0.1:${DB_PORT:-55432}:5432"
     volumes:
       - datos_postgres:/var/lib/postgresql/data
+      # Scripts de arranque: Postgres solo los ejecuta si el volumen está vacío.
+      # El número del nombre de destino fija el orden de ejecución (esquema, luego datos).
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
