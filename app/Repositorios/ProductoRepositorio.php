@@ -74,11 +74,14 @@ final class ProductoRepositorio
         return $consulta->fetch() ?: null;
     }
 
-    /** Tallas de un producto con su stock (el RFID es interno y no se publica) */
+    /**
+     * Tallas de un producto con su stock. El id de la variante es lo que el
+     * front envía al hacer un pedido; el RFID es interno y no se publica.
+     */
     public function tallas(int $productoId): array
     {
         $consulta = BaseDatos::conexion()->prepare(
-            'SELECT talla, stock FROM variantes WHERE producto_id = :id AND activo ORDER BY talla'
+            'SELECT id, talla, stock FROM variantes WHERE producto_id = :id AND activo ORDER BY talla'
         );
         $consulta->execute(['id' => $productoId]);
         return $consulta->fetchAll();

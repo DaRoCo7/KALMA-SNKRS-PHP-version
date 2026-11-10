@@ -47,9 +47,10 @@ final class CatalogoServicio
         $ficha = $this->resumen($producto);
         $ficha['descripcion'] = $producto['descripcion'];
         $ficha['tallas'] = array_map(static fn (array $t): array => [
-            'talla'      => (float) $t['talla'],
-            'stock'      => (int) $t['stock'],
-            'disponible' => (int) $t['stock'] > 0,
+            'variante_id' => (int) $t['id'],
+            'talla'       => (float) $t['talla'],
+            'stock'       => (int) $t['stock'],
+            'disponible'  => (int) $t['stock'] > 0,
         ], $this->productos->tallas($id));
         $ficha['stock_total'] = array_sum(array_column($ficha['tallas'], 'stock'));
         unset($ficha['tallas_disponibles']);

@@ -37,6 +37,20 @@ final class UsuarioRepositorio
         return $consulta->fetch() ?: null;
     }
 
+    /**
+     * Perfil comercial de un usuario cliente. null si la cuenta no es de un
+     * cliente (admin y almacén no tienen perfil ni pueden hacer pedidos).
+     */
+    public function perfilCliente(int $usuarioId): ?array
+    {
+        $consulta = BaseDatos::conexion()->prepare(
+            'SELECT id, tipo_cliente, razon_social, nif, telefono, direccion, codigo_postal, ciudad, provincia
+             FROM clientes WHERE usuario_id = :usuario_id'
+        );
+        $consulta->execute(['usuario_id' => $usuarioId]);
+        return $consulta->fetch() ?: null;
+    }
+
     public function emailRegistrado(string $email): bool
     {
         $consulta = BaseDatos::conexion()->prepare('SELECT 1 FROM usuarios WHERE lower(email) = lower(:email)');

@@ -15,6 +15,7 @@ declare(strict_types=1);
 
 use App\Controladores\Api\AuthController as ApiAuthController;
 use App\Controladores\Api\InicioController;
+use App\Controladores\Api\PedidoController;
 use App\Controladores\Api\UsuarioController;
 use App\Controladores\SaludController;
 use App\Controladores\Web\AuthController as WebAuthController;
@@ -65,6 +66,14 @@ $router->post('/api/logout', [ApiAuthController::class, 'logout'], [Autenticado:
 $router->get('/api/productos', [ApiCatalogoController::class, 'index']);
 $router->get('/api/productos/{slug}', [ApiCatalogoController::class, 'ver']);
 $router->get('/api/catalogo/filtros', [ApiCatalogoController::class, 'filtros']);
+
+// Pedidos propios del cliente. Que el pedido sea SUYO lo comprueba el servicio:
+// el de otro cliente responde 404, como si no existiera (protección IDOR)
+$pedidosPropios = [Autenticado::class, new RequierePermiso('pedidos.propios')];
+$router->get('/api/pedidos', [PedidoController::class, 'index'], $pedidosPropios);
+$router->post('/api/pedidos', [PedidoController::class, 'crear'], $pedidosPropios);
+$router->get('/api/pedidos/{codigo}', [PedidoController::class, 'ver'], $pedidosPropios);
+$router->post('/api/pedidos/{codigo}/cancelar', [PedidoController::class, 'cancelar'], $pedidosPropios);
 
 // Administración
 $router->get('/api/usuarios', [UsuarioController::class, 'index'], [
