@@ -14,6 +14,10 @@ services:
     environment:
       # En desarrollo, las respuestas de error 500 incluyen el motivo para depurar
       APP_ENTORNO: desarrollo
+      # Límites por IP más altos para repetir las pruebas de Postman sin bloquearse.
+      # El límite por cuenta (5 intentos de login cada 15 min) se mantiene igual.
+      LIMITE_LOGIN_IP: "1000"
+      LIMITE_REGISTRO_IP: "1000"
     volumes:
       - ./app:/var/www/html/app:ro
       - ./config:/var/www/html/config:ro

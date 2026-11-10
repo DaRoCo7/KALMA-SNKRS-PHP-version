@@ -1,0 +1,370 @@
+{
+  "info": {
+    "name": "KALMA SNKRS API",
+    "description": "Pruebas de la API de KALMA SNKRS (Sneaker Factory).\n\nUso: importar esta colección y el entorno `KALMA-SNKRS.postman_environment.json`, seleccionar el entorno y ejecutar la colección completa (Run collection). Las peticiones están ordenadas: cada carpeta deja la sesión preparada para la siguiente.\n\n- Las respuestas correctas tienen la forma `{\"datos\": ...}` y los errores `{\"error\": {\"codigo\", \"mensaje\", \"detalles\"}}`.\n- Las peticiones que modifican datos necesitan la cabecera `X-CSRF-Token`: el script de la colección la obtiene sola de `GET /api/sesion`.\n- Postman guarda la cookie de sesión `KALMA_SESION` automáticamente.\n- Usuarios de prueba (contraseña `Kalma2026!`): admin@kalma.test, almacen@kalma.test, cliente@kalma.test.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Protección CSRF: las peticiones que modifican datos llevan el token de la sesión actual.",
+          "// Si la petición ya trae la cabecera (por ejemplo, una prueba con un token falso), se respeta.",
+          "const metodosSeguros = ['GET', 'HEAD', 'OPTIONS'];",
+          "if (!metodosSeguros.includes(pm.request.method) && !pm.request.headers.has('X-CSRF-Token')) {",
+          "    pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/sesion'), (error, respuesta) => {",
+          "        if (!error) {",
+          "            pm.request.headers.upsert({ key: 'X-CSRF-Token', value: respuesta.json().datos.csrf_token });",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Sistema",
+      "item": [
+        {
+          "name": "Estado del servicio (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "description": "GET /health · Público. Contrato con Despliegue: 200 si la app y la base de datos están disponibles, 503 si la base de datos no responde."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('App y base de datos disponibles', () => {",
+            "    const cuerpo = pm.response.json();",
+            "    pm.expect(cuerpo.app).to.eql('disponible');",
+            "    pm.expect(cuerpo.base_datos).to.eql('disponible');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Inicio de la API (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api", "description": "GET /api · Público. Punto de entrada de la API." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Responde en JSON', () => pm.response.to.have.header('Content-Type', 'application/json; charset=utf-8'));",
+            "pm.test('Nombre de la API', () => pm.expect(pm.response.json().datos.api).to.eql('KALMA SNKRS'));"
+          ] } }]
+        },
+        {
+          "name": "Ruta inexistente (404 en JSON)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/no-existe", "description": "Los errores de /api siempre se devuelven en JSON." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+            "pm.test('Error en formato JSON', () => pm.expect(pm.response.json().error.codigo).to.eql(404));"
+          ] } }]
+        },
+        {
+          "name": "Método no permitido (405)",
+          "request": { "method": "DELETE", "url": "{{base_url}}/api", "description": "La ruta existe pero solo con GET: 405 con la cabecera Allow." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('405 Method Not Allowed', () => pm.response.to.have.status(405));",
+            "pm.test('Cabecera Allow: GET', () => pm.response.to.have.header('Allow', 'GET'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "2. Registro y sesión",
+      "item": [
+        {
+          "name": "Sesión anónima (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/sesion", "description": "GET /api/sesion · Público. Indica si hay sesión y devuelve el token CSRF." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const datos = pm.response.json().datos;",
+            "pm.test('Sin sesión iniciada', () => pm.expect(datos.autenticado).to.be.false);",
+            "pm.test('Token CSRF de 64 caracteres', () => pm.expect(datos.csrf_token).to.match(/^[0-9a-f]{64}$/));"
+          ] } }]
+        },
+        {
+          "name": "Registro con datos no válidos (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/registro",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"\",\n  \"apellidos\": \"Prueba\",\n  \"email\": \"no-es-un-email\",\n  \"password\": \"corta\",\n  \"tipo_cliente\": \"club\",\n  \"nif\": \"12345678A\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/registro · La validación del servidor devuelve todos los errores a la vez."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "const errores = pm.response.json().error.detalles.errores;",
+            "pm.test('Errores de cada campo', () => {",
+            "    pm.expect(errores).to.have.keys('nombre', 'email', 'password', 'nif', 'razon_social');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Registro de cliente (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/registro",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carla\",\n  \"apellidos\": \"Prueba Postman\",\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Zapas2026\",\n  \"tipo_cliente\": \"particular\",\n  \"telefono\": \"600 000 999\",\n  \"codigo_postal\": \"28001\",\n  \"ciudad\": \"Madrid\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/registro · Público (limitado por IP). Crea la cuenta y el perfil de cliente en una transacción e inicia la sesión."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// Email distinto en cada ejecución para poder repetir la colección",
+              "pm.collectionVariables.set('email_nuevo', `cliente.${Date.now()}@correo.test`);"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('Cabecera Location', () => pm.response.to.have.header('Location'));",
+              "const usuario = pm.response.json().datos.usuario;",
+              "pm.test('Cuenta con rol cliente', () => pm.expect(usuario.rol).to.eql('cliente'));",
+              "pm.test('Nunca devuelve la contraseña', () => pm.expect(usuario).to.not.have.any.keys('password', 'password_hash'));"
+            ] } }
+          ]
+        },
+        {
+          "name": "Registro con email repetido (409)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/registro",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carla\",\n  \"apellidos\": \"Duplicada\",\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Zapas2026\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "El email es único (sin distinguir mayúsculas): 409 Conflict."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }]
+        },
+        {
+          "name": "Cliente pide la lista de usuarios (403)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios", "description": "Un cliente no tiene el permiso usuarios.gestionar: 403 y queda en auditoría." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }]
+        },
+        {
+          "name": "Cerrar sesión (204)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/logout", "description": "POST /api/logout · Requiere sesión." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ] } }]
+        },
+        {
+          "name": "Sin sesión (401)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios", "description": "Ruta interna sin sesión iniciada: 401." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }]
+        },
+        {
+          "name": "Login con contraseña incorrecta (401)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Incorrecta1\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Cuenta recién registrada con contraseña incorrecta (así el contador de intentos de la cuenta empieza de cero en cada ejecución). El mensaje es el mismo exista o no el email, para no revelar qué cuentas hay."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+            "pm.test('Mensaje genérico', () => pm.expect(pm.response.json().error.mensaje).to.eql('Email o contraseña incorrectos'));"
+          ] } }]
+        },
+        {
+          "name": "Login de administración (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/login · Público (limitado por IP y por cuenta). Devuelve el usuario y un token CSRF nuevo."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Rol admin', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('admin'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "3. Usuarios (administración)",
+      "item": [
+        {
+          "name": "Listado paginado (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios?pagina=1&por_pagina=5", "description": "GET /api/usuarios · Permiso usuarios.gestionar (admin). Parámetros: pagina, por_pagina (máx. 50), rol." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const cuerpo = pm.response.json();",
+            "pm.test('Como mucho 5 usuarios', () => pm.expect(cuerpo.datos.length).to.be.at.most(5));",
+            "pm.test('Datos de paginación', () => pm.expect(cuerpo.paginacion).to.have.keys('pagina', 'por_pagina', 'total', 'paginas'));",
+            "pm.test('Sin hashes de contraseña', () => cuerpo.datos.forEach(u => pm.expect(u).to.not.have.property('password_hash')));"
+          ] } }]
+        },
+        {
+          "name": "Filtro por rol (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios?rol=almacen" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Solo personal de almacén', () => pm.response.json().datos.forEach(u => pm.expect(u.rol).to.eql('almacen')));"
+          ] } }]
+        },
+        {
+          "name": "Paginación no válida (400)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios?por_pagina=500", "description": "por_pagina tiene un máximo de 50." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "4. Catálogo",
+      "item": [
+        {
+          "name": "Listado paginado (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?pagina=1&por_pagina=4", "description": "GET /api/productos · Público. Parámetros: buscar, categoria, color, talla, precio_min, precio_max, personalizable, disponible, orden (novedades, precio_asc, precio_desc, nombre), pagina, por_pagina." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const cuerpo = pm.response.json();",
+            "pm.test('4 productos en la página', () => pm.expect(cuerpo.datos).to.have.lengthOf(4));",
+            "pm.test('Al menos 8 productos en total', () => pm.expect(cuerpo.paginacion.total).to.be.at.least(8));",
+            "pm.test('Precio, foto, color, tallas y stock', () => {",
+            "    pm.expect(cuerpo.datos[0]).to.include.keys('precio', 'imagen', 'color', 'tallas_disponibles', 'stock_total');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Filtros combinados: categoría y orden (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?categoria=3&orden=precio_desc" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const productos = pm.response.json().datos;",
+            "pm.test('Solo la categoría 3 (Jordan)', () => productos.forEach(p => pm.expect(p.categoria.id).to.eql(3)));",
+            "pm.test('Ordenados de mayor a menor precio', () => {",
+            "    for (let i = 1; i < productos.length; i++) pm.expect(productos[i - 1].precio).to.be.at.least(productos[i].precio);",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Búsqueda por texto y talla (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?buscar=dunk&talla=40" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.response.json().datos.forEach(p => {",
+            "    pm.test(`${p.codigo_marca}: es una Dunk con la talla 40`, () => {",
+            "        pm.expect(p.nombre).to.include('Dunk');",
+            "        pm.expect(p.tallas_disponibles).to.include(40);",
+            "    });",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Ficha de producto (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111", "description": "GET /api/productos/{slug} · Público. Tallas con stock, otros colores del mismo modelo y opciones de personalización." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const producto = pm.response.json().datos;",
+            "pm.test('Código de estilo de Nike', () => pm.expect(producto.codigo_marca).to.eql('CW2288-111'));",
+            "pm.test('Otro color del mismo modelo (CW2288-001)', () => {",
+            "    pm.expect(producto.otros_colores.map(c => c.codigo_marca)).to.include('CW2288-001');",
+            "});",
+            "pm.test('Tallas con stock', () => pm.expect(producto.tallas[0]).to.have.keys('talla', 'stock', 'disponible'));"
+          ] } }]
+        },
+        {
+          "name": "Producto inexistente (404)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/no-existe" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }]
+        },
+        {
+          "name": "Valores para los filtros (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/catalogo/filtros", "description": "GET /api/catalogo/filtros · Público. Categorías, colores, tallas, rango de precios y ordenaciones." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Todos los grupos de filtros', () => {",
+            "    pm.expect(pm.response.json().datos).to.have.keys('categorias', 'colores', 'tallas', 'precio', 'ordenes');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Filtros no válidos (400)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?talla=42.3&precio_min=200&precio_max=100&orden=raro" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "pm.test('Un error por cada filtro mal escrito', () => {",
+            "    pm.expect(pm.response.json().error.detalles.errores).to.have.keys('talla', 'precio_max', 'orden');",
+            "});"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "5. Seguridad",
+      "item": [
+        {
+          "name": "Token CSRF falso (403)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "header": [{ "key": "X-CSRF-Token", "value": "token-falso" }],
+            "description": "Una petición que modifica datos sin el token de la sesión se rechaza."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+            "pm.test('Motivo: CSRF', () => pm.expect(pm.response.json().error.mensaje).to.include('CSRF'));"
+          ] } }]
+        },
+        {
+          "name": "Fuerza bruta: sexto intento bloqueado (429)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email_ataque}}\",\n  \"password\": \"Incorrecta1\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Límite por cuenta: 5 intentos de login cada 15 minutos. El script previo hace 5 intentos fallidos contra un email inventado y esta petición (la sexta) recibe 429 con Retry-After."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// 5 intentos fallidos seguidos contra una cuenta inventada (no bloquea cuentas reales)",
+              "const base = pm.variables.replaceIn('{{base_url}}');",
+              "const email = `ataque.${Date.now()}@correo.test`;",
+              "pm.collectionVariables.set('email_ataque', email);",
+              "pm.sendRequest(base + '/api/sesion', (error, respuesta) => {",
+              "    const token = respuesta.json().datos.csrf_token;",
+              "    const intento = (quedan) => {",
+              "        if (quedan === 0) return;",
+              "        pm.sendRequest({",
+              "            url: base + '/api/login',",
+              "            method: 'POST',",
+              "            header: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },",
+              "            body: { mode: 'raw', raw: JSON.stringify({ email, password: 'Incorrecta1' }) }",
+              "        }, () => intento(quedan - 1));",
+              "    };",
+              "    intento(5);",
+              "});"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('429 Too Many Requests', () => pm.response.to.have.status(429));",
+              "pm.test('Cabecera Retry-After', () => pm.response.to.have.header('Retry-After'));"
+            ] } }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de administración (204)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/logout" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ] } }]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "email_nuevo", "value": "" },
+    { "key": "email_ataque", "value": "" }
+  ]
+}
