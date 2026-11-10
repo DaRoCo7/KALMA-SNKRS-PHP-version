@@ -35,7 +35,6 @@ $campo = static function (string $nombre, string $etiqueta, string $tipo = 'text
             <?php $campo('email', 'Email', 'email', 150, true); ?>
             <?php $campo('password', 'Contraseña (mínimo 8 caracteres, con letras y números)', 'password', 72, true); ?>
 
-            <?php $campo('nif', 'DNI o NIE', 'text', 15); ?>
             <?php $campo('telefono', 'Teléfono', 'tel', 20); ?>
             <?php $campo('direccion', 'Dirección', 'text', 200); ?>
             <?php $campo('codigo_postal', 'Código postal', 'text', 5); ?>

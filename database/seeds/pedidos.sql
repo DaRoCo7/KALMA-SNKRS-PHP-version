@@ -3,7 +3,8 @@
 --
 -- compose.yaml lo monta como /docker-entrypoint-initdb.d/04_pedidos.sql
 --
--- 24 pedidos ficticios de clientes particulares, en todos los estados.
+-- 24 pedidos ficticios de clientes particulares, en todos los estados,
+-- 7 de ellos personalizados (caja, bordado, cordones o certificado).
 -- A mano solo se escriben los datos de negocio (quién, qué, cuándo y en qué
 -- estado está). Todo lo demás se CALCULA para que sea coherente:
 --   * precio aplicado  -> precio del producto en el catálogo
@@ -103,6 +104,33 @@ INSERT INTO semilla_lineas VALUES
     ('SF-2026-000023', 'DH6927-111', 42,   1),
     ('SF-2026-000024', 'CW2288-001', 39,   1);
 
+-- Personalizaciones: qué opción lleva cada línea (pedido + zapatilla). El
+-- recargo de la opción es por par. Hay casos preparados para la defensa:
+--   * Unas Jordan con caja de coleccionista y certificado (SF-2026-000010): se
+--     permite porque no tocan la zapatilla; el bordado no se permitiría.
+--   * SF-2026-000021 (cliente@kalma.test, pendiente) lleva bordado: al
+--     cancelarlo en la demo se ve que el stock se repone igual.
+CREATE TEMP TABLE semilla_personalizacion (
+    codigo_pedido VARCHAR(20)  NOT NULL,
+    codigo_marca  VARCHAR(10)  NOT NULL,
+    opcion        VARCHAR(100) NOT NULL,
+    texto         VARCHAR(30)
+) ON COMMIT DROP;
+
+INSERT INTO semilla_personalizacion VALUES
+    ('SF-2026-000002', 'CW2288-111', 'Caja de coleccionista',        NULL),
+    ('SF-2026-000002', 'DD1391-100', 'Cordones de repuesto rojos',   NULL),
+    ('SF-2026-000004', 'DD1391-100', 'Nombre bordado en el talón',   'LUCÍA'),
+    ('SF-2026-000004', 'DD1391-100', 'Caja edición KALMA',           NULL),
+    ('SF-2026-000010', 'DZ5485-612', 'Caja de coleccionista',        NULL),
+    ('SF-2026-000010', 'DZ5485-612', 'Certificado de autenticidad',  NULL),
+    ('SF-2026-000013', 'DN3707-100', 'Certificado de autenticidad',  NULL),
+    ('SF-2026-000014', 'DD1391-103', 'Cordones de repuesto blancos', NULL),
+    ('SF-2026-000017', 'BQ6806-100', 'Caja edición KALMA',           NULL),
+    ('SF-2026-000017', 'BQ6806-100', 'Nombre bordado en el talón',   'ALEX'),
+    ('SF-2026-000021', 'CW2288-111', 'Nombre bordado en el talón',   'LUCÍA'),
+    ('SF-2026-000021', 'CW2288-111', 'Cordones de repuesto negros',  NULL);
+
 -- Recorrido normal de un pedido y cuánto tarda cada paso desde que se crea
 CREATE TEMP TABLE flujo_estados (estado, paso, desfase) ON COMMIT DROP AS
 VALUES ('pendiente',   1, interval '0'),
@@ -123,11 +151,12 @@ SELECT (SELECT id FROM usuarios WHERE email = 'admin@kalma.test')      AS admin_
 ALTER TABLE pedidos DISABLE TRIGGER trg_pedidos_actualizacion;
 
 -- -----------------------------------------------------------------------------
--- 2. Pedidos y líneas
+-- 2. Pedidos, líneas y personalizaciones
 -- -----------------------------------------------------------------------------
-INSERT INTO pedidos (codigo, cliente_id, estado, direccion_envio,
+INSERT INTO pedidos (codigo, cliente_id, estado, personalizado, direccion_envio,
                      codigo_seguimiento, notas, fecha_creacion, fecha_actualizacion)
 SELECT s.codigo, c.id, s.estado,
+       EXISTS (SELECT 1 FROM semilla_personalizacion sp WHERE sp.codigo_pedido = s.codigo),
        -- Copia de la dirección del cliente en el momento del pedido
        c.direccion || ', ' || c.codigo_postal || ' ' || c.ciudad || ' (' || c.provincia || ')',
        -- Solo los pedidos que ya salieron del almacén tienen número de seguimiento
@@ -146,6 +175,25 @@ JOIN pedidos p    ON p.codigo = sl.codigo_pedido
 JOIN productos pr ON pr.codigo_marca = sl.codigo_marca
 JOIN variantes v  ON v.producto_id = pr.id AND v.talla = sl.talla
 ORDER BY p.id, pr.id, v.talla;
+
+-- Cada opción se copia con el recargo que tiene hoy en el catálogo
+INSERT INTO linea_personalizacion (linea_id, opcion_id, texto, recargo_aplicado)
+SELECT l.id, o.id, sp.texto, o.recargo
+FROM semilla_personalizacion sp
+JOIN pedidos p                  ON p.codigo = sp.codigo_pedido
+JOIN productos pr               ON pr.codigo_marca = sp.codigo_marca
+JOIN variantes v                ON v.producto_id = pr.id
+JOIN lineas_pedido l            ON l.pedido_id = p.id AND l.variante_id = v.id
+JOIN opciones_personalizacion o ON o.nombre = sp.opcion
+ORDER BY l.id, o.id;
+
+-- Recargo por par de cada línea = suma de los recargos de sus opciones
+UPDATE lineas_pedido l
+SET recargo_personalizacion = s.recargo
+FROM (SELECT linea_id, sum(recargo_aplicado) AS recargo
+      FROM linea_personalizacion
+      GROUP BY linea_id) s
+WHERE l.id = s.linea_id;
 
 -- -----------------------------------------------------------------------------
 -- 3. Historial de estados: todos los pasos hasta el estado actual
@@ -288,6 +336,38 @@ BEGIN
     IF (SELECT count(*) FROM lineas_pedido) <> (SELECT count(*) FROM semilla_lineas) THEN
         RAISE EXCEPTION 'Faltan líneas: algún código de marca o talla no existe en el catálogo';
     END IF;
+    IF (SELECT count(*) FROM linea_personalizacion) <> (SELECT count(*) FROM semilla_personalizacion) THEN
+        RAISE EXCEPTION 'Faltan personalizaciones: alguna opción o línea no existe';
+    END IF;
+
+    -- Las mismas reglas que aplica PHP al crear un pedido: opción activa, el
+    -- bordado solo en productos personalizables, texto solo (y siempre) en las
+    -- opciones que lo llevan y sin pasar de su longitud, y una opción por tipo
+    IF EXISTS (SELECT 1 FROM linea_personalizacion lp
+               JOIN lineas_pedido l            ON l.id = lp.linea_id
+               JOIN variantes v                ON v.id = l.variante_id
+               JOIN productos pr               ON pr.id = v.producto_id
+               JOIN opciones_personalizacion o ON o.id = lp.opcion_id
+               WHERE NOT o.activo
+                  OR (o.afecta_zapatilla AND NOT pr.personalizable)
+                  OR (o.max_caracteres IS NULL) <> (lp.texto IS NULL)
+                  OR char_length(lp.texto) > o.max_caracteres) THEN
+        RAISE EXCEPTION 'Hay personalizaciones que no cumplen las reglas';
+    END IF;
+    IF EXISTS (SELECT 1 FROM linea_personalizacion lp
+               JOIN opciones_personalizacion o ON o.id = lp.opcion_id
+               GROUP BY lp.linea_id, o.tipo HAVING count(*) > 1) THEN
+        RAISE EXCEPTION 'Alguna línea tiene dos opciones del mismo tipo';
+    END IF;
+
+    -- personalizado = el pedido tiene alguna opción elegida
+    IF EXISTS (SELECT 1 FROM pedidos p
+               WHERE p.personalizado <> EXISTS (SELECT 1 FROM linea_personalizacion lp
+                                                JOIN lineas_pedido l ON l.id = lp.linea_id
+                                                WHERE l.pedido_id = p.id)) THEN
+        RAISE EXCEPTION 'La marca de pedido personalizado no coincide con sus líneas';
+    END IF;
+
     -- El total de cada pedido es la suma de sus líneas
     IF EXISTS (SELECT 1 FROM pedidos p
                WHERE p.total <> (SELECT sum(l.importe) FROM lineas_pedido l WHERE l.pedido_id = p.id)) THEN
@@ -309,10 +389,11 @@ BEGIN
         RAISE EXCEPTION 'El stock de alguna talla no cuadra con sus movimientos';
     END IF;
 
-    -- Mínimos del enunciado: 10 clientes y 20 pedidos en varios estados
+    -- Mínimos del enunciado: 10 clientes, 20 pedidos en varios estados y 5 personalizados
     IF (SELECT count(*) FROM clientes) < 10
        OR (SELECT count(*) FROM pedidos) < 20
-       OR (SELECT count(DISTINCT estado) FROM pedidos) < 4 THEN
+       OR (SELECT count(DISTINCT estado) FROM pedidos) < 4
+       OR (SELECT count(*) FROM pedidos WHERE personalizado) < 5 THEN
         RAISE EXCEPTION 'La semilla no cumple los mínimos del enunciado';
     END IF;
 END $$;

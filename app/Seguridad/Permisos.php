@@ -8,7 +8,10 @@ namespace App\Seguridad;
  * Matriz de permisos: qué puede hacer cada rol.
  *
  * - admin:   todo.
- * - almacen: control de stock y de pedidos (ver todos y avanzar su estado).
+ * - almacen: control de stock y logística de los pedidos (ver todos y
+ *            avanzarlos de confirmado a preparación, enviado y entregado).
+ *            Confirmar un pago o cancelar desde el área interna es decisión
+ *            de administración (pedidos.confirmar_cancelar).
  * - cliente: sus propios pedidos y su propio perfil. El catálogo es público y
  *            no necesita permiso.
  *
@@ -24,16 +27,18 @@ final class Permisos
 {
     /** Permisos que existen y qué permiten (sirve de documentación) */
     public const DESCRIPCIONES = [
-        'pedidos.propios'        => 'Crear, ver y cancelar sus propios pedidos',
-        'perfil.propio'          => 'Ver y editar sus propios datos',
-        'pedidos.ver_todos'      => 'Ver los pedidos de todos los clientes',
-        'pedidos.cambiar_estado' => 'Avanzar el estado de un pedido (confirmado, preparación, enviado...)',
-        'stock.gestionar'        => 'Consultar y ajustar el stock de las tallas',
-        'productos.gestionar'    => 'Dar de alta, editar y desactivar productos',
-        'usuarios.gestionar'     => 'Listar usuarios y gestionar cuentas',
-        'informes.ver'           => 'Ver el panel resumen y los informes',
-        'auditoria.ver'          => 'Consultar el registro de auditoría',
-        'datos.exportar'         => 'Exportar e importar pedidos en CSV o JSON',
+        'pedidos.propios'            => 'Crear, ver y cancelar sus propios pedidos',
+        'perfil.propio'              => 'Ver y editar sus propios datos',
+        'pedidos.ver_todos'          => 'Ver los pedidos de todos los clientes',
+        'pedidos.cambiar_estado'     => 'Avanzar la logística de un pedido: preparación, enviado y entregado',
+        'pedidos.confirmar_cancelar' => 'Confirmar el pago de un pedido o cancelarlo desde el área interna',
+        'stock.gestionar'            => 'Consultar y ajustar el stock de las tallas',
+        'productos.gestionar'        => 'Dar de alta, editar y desactivar productos, y cargar albaranes',
+        'usuarios.gestionar'         => 'Listar usuarios y gestionar cuentas',
+        'consultas.gestionar'        => 'Ver y responder las consultas del formulario de contacto',
+        'informes.ver'               => 'Ver el panel resumen y los informes',
+        'auditoria.ver'              => 'Consultar el registro de auditoría',
+        'datos.exportar'             => 'Exportar los pedidos en CSV o JSON',
     ];
 
     /** '*' = todos los permisos */

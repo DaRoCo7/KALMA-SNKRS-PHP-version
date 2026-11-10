@@ -12,7 +12,9 @@ namespace App\Nucleo;
  *
  *   $datos = (new Validador($entrada))->texto('nombre', 100)->email('email')->validar();
  *
- * Los campos opcionales que llegan vacíos quedan como null.
+ * Los campos opcionales que llegan vacíos quedan como null. En una edición
+ * parcial (PATCH) hay que quedarse solo con los campos que envió el cliente:
+ *   array_intersect_key($datos, $entrada)
  */
 final class Validador
 {
@@ -77,13 +79,53 @@ final class Validador
         return $this->guardar($campo, $valor, $error);
     }
 
-    /** DNI o NIE (opcional). Se guarda en mayúsculas y sin espacios ni guiones */
-    public function nif(string $campo): self
+    /** Número entero dentro de un rango. Admite 5 o "5"; rechaza 5.5, true o un array */
+    public function entero(string $campo, int $minimo, int $maximo, bool $obligatorio = true): self
     {
-        $valor = $this->leer($campo, false);
-        $valor = $valor === null ? null : strtoupper(str_replace([' ', '-'], '', $valor));
-        $error = ($valor !== null && !self::nifValido($valor)) ? 'DNI o NIE no válido' : null;
-        return $this->guardar($campo, $valor, $error);
+        $valor = $this->datos[$campo] ?? null;
+        if ($valor === null || $valor === '') {
+            return $this->guardar($campo, null, $obligatorio ? 'Obligatorio' : null);
+        }
+        $entero = is_bool($valor) || is_array($valor)
+            ? false
+            : filter_var($valor, FILTER_VALIDATE_INT, ['options' => ['min_range' => $minimo, 'max_range' => $maximo]]);
+
+        return $entero === false
+            ? $this->guardar($campo, null, "Número entero entre {$minimo} y {$maximo}")
+            : $this->guardar($campo, $entero, null);
+    }
+
+    /**
+     * Importe con hasta 2 decimales y punto decimal (119.99), dentro de un rango.
+     * Rechaza la coma decimal, "nan", "inf" y la notación científica.
+     */
+    public function importe(string $campo, float $minimo, float $maximo, bool $obligatorio = true): self
+    {
+        $valor = $this->datos[$campo] ?? null;
+        if ($valor === null || $valor === '') {
+            return $this->guardar($campo, null, $obligatorio ? 'Obligatorio' : null);
+        }
+        $texto = is_int($valor) || is_float($valor) ? (string) $valor : $valor;
+        $valido = is_string($texto) && preg_match('/^\d+(\.\d{1,2})?$/', $texto)
+            && (float) $texto >= $minimo && (float) $texto <= $maximo;
+
+        return $valido
+            ? $this->guardar($campo, (float) $texto, null)
+            : $this->guardar($campo, null, "Importe entre {$minimo} y {$maximo} con hasta 2 decimales (ej. 119.99)");
+    }
+
+    /** true/false (también 1/0 y "true"/"false"). Si no llega, se usa $porDefecto */
+    public function booleano(string $campo, ?bool $porDefecto = null): self
+    {
+        $valor = $this->datos[$campo] ?? null;
+        if ($valor === null || $valor === '') {
+            return $this->guardar($campo, $porDefecto, null);
+        }
+        $booleano = is_scalar($valor) ? filter_var($valor, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) : null;
+
+        return $booleano === null
+            ? $this->guardar($campo, null, 'Valores: true o false')
+            : $this->guardar($campo, $booleano, null);
     }
 
     /**
@@ -96,21 +138,6 @@ final class Validador
             throw HttpExcepcion::peticionIncorrecta('Hay datos no válidos', $this->errores);
         }
         return $this->limpios;
-    }
-
-    /**
-     * DNI (8 cifras + letra) o NIE (X, Y o Z + 7 cifras + letra) con su letra
-     * de control. Los clientes son particulares: no se admite CIF de empresa.
-     */
-    public static function nifValido(string $nif): bool
-    {
-        if (!preg_match('/^([XYZ]?)(\d{7,8})([A-Z])$/', $nif, $partes)) {
-            return false;
-        }
-        // NIE: X, Y y Z valen 0, 1 y 2 para calcular la letra
-        $numero = strtr($partes[1], 'XYZ', '012') . $partes[2];
-        return strlen($numero) === 8
-            && $partes[3] === 'TRWAGMYFPDXBNJZSQVHLCKE'[(int) $numero % 23];
     }
 
     /** Lee un campo como texto. Un array o un objeto donde se espera texto es un error */

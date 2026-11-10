@@ -80,3 +80,11 @@ $router->get('/api/usuarios', [UsuarioController::class, 'index'], [
     Autenticado::class,
     new RequierePermiso('usuarios.gestionar'),
 ]);
+
+// --- Módulos ------------------------------------------------------------------
+// Cada módulo (perfil, área interna, informes...) declara sus rutas en su propio
+// archivo de config/rutas/. Se cargan en orden alfabético: así un módulo nuevo
+// no obliga a tocar este archivo y cada parte del equipo trabaja en el suyo.
+foreach (glob(__DIR__ . '/rutas/*.php') ?: [] as $archivoRutas) {
+    require $archivoRutas;
+}

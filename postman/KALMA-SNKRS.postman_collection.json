@@ -90,14 +90,14 @@
             "method": "POST",
             "url": "{{base_url}}/api/registro",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"\",\n  \"apellidos\": \"Prueba\",\n  \"email\": \"no-es-un-email\",\n  \"password\": \"corta\",\n  \"nif\": \"12345678A\"\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"\",\n  \"apellidos\": \"Prueba\",\n  \"email\": \"no-es-un-email\",\n  \"password\": \"corta\",\n  \"codigo_postal\": \"2800\"\n}", "options": { "raw": { "language": "json" } } },
             "description": "POST /api/registro · La validación del servidor devuelve todos los errores a la vez."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
             "const errores = pm.response.json().error.detalles.errores;",
             "pm.test('Errores de cada campo', () => {",
-            "    pm.expect(errores).to.have.keys('nombre', 'email', 'password', 'nif');",
+            "    pm.expect(errores).to.have.keys('nombre', 'email', 'password', 'codigo_postal');",
             "});"
           ] } }]
         },
@@ -224,7 +224,7 @@
       "item": [
         {
           "name": "Listado paginado (200)",
-          "request": { "method": "GET", "url": "{{base_url}}/api/productos?pagina=1&por_pagina=4", "description": "GET /api/productos · Público. Parámetros: buscar, categoria, color, talla, precio_min, precio_max, disponible, orden (novedades, precio_asc, precio_desc, nombre), pagina, por_pagina." },
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?pagina=1&por_pagina=4", "description": "GET /api/productos · Público. Parámetros: buscar, categoria, color, talla, precio_min, precio_max, personalizable, disponible, orden (novedades, precio_asc, precio_desc, nombre), pagina, por_pagina." },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('200 OK', () => pm.response.to.have.status(200));",
             "const cuerpo = pm.response.json();",
@@ -262,7 +262,7 @@
         },
         {
           "name": "Ficha de producto (200)",
-          "request": { "method": "GET", "url": "{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111", "description": "GET /api/productos/{slug} · Público. Tallas con su variante_id y su stock, y otros colores del mismo modelo." },
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111", "description": "GET /api/productos/{slug} · Público. Tallas con su variante_id y su stock, otros colores del mismo modelo y las opciones de personalización que admite." },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('200 OK', () => pm.response.to.have.status(200));",
             "const producto = pm.response.json().datos;",
@@ -272,6 +272,27 @@
             "});",
             "pm.test('Tallas con stock y su variante_id (lo que se envía al pedir)', () => {",
             "    pm.expect(producto.tallas[0]).to.have.keys('variante_id', 'talla', 'stock', 'disponible');",
+            "});",
+            "pm.test('Personalizable: ofrece el bordado y las opciones de presentación', () => {",
+            "    pm.expect(producto.personalizable).to.be.true;",
+            "    pm.expect(producto.opciones_personalizacion.map(o => o.tipo)).to.include.members(['bordado', 'packaging', 'cordones', 'certificado']);",
+            "});",
+            "pm.test('La caja de madera está desactivada y no se ofrece', () => {",
+            "    pm.expect(producto.opciones_personalizacion.map(o => o.nombre)).to.not.include('Caja de madera grabada');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Las Jordan no ofrecen bordado (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/air-jordan-4-retro-dh6927-111", "description": "Las Jordan son reediciones de coleccionista: no son personalizables, así que la ficha no ofrece las opciones que modifican la zapatilla (el bordado). La caja, los cordones y el certificado sí." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const producto = pm.response.json().datos;",
+            "pm.test('No personalizable', () => pm.expect(producto.personalizable).to.be.false);",
+            "pm.test('Sin bordado, pero con caja', () => {",
+            "    const tipos = producto.opciones_personalizacion.map(o => o.tipo);",
+            "    pm.expect(tipos).to.not.include('bordado');",
+            "    pm.expect(tipos).to.include('packaging');",
             "});"
           ] } }]
         },
@@ -446,27 +467,77 @@
           ]
         },
         {
-          "name": "Crear pedido con dos líneas (201)",
+          "name": "Bordar unas Jordan (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{{cuerpo_jordan_bordado}}", "options": { "raw": { "language": "json" } } },
+            "description": "El bordado modifica la zapatilla y las Jordan no son personalizables. El script previo toma el id del bordado de la ficha de las Air Force 1 y una talla con stock de las Air Jordan 4."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "const base = pm.variables.replaceIn('{{base_url}}');",
+              "pm.sendRequest(base + '/api/productos/nike-air-force-1-07-cw2288-111', (e1, af1) => {",
+              "    const bordado = af1.json().datos.opciones_personalizacion.find(o => o.tipo === 'bordado');",
+              "    pm.sendRequest(base + '/api/productos/air-jordan-4-retro-dh6927-111', (e2, aj4) => {",
+              "        const talla = aj4.json().datos.tallas.find(t => t.stock > 0);",
+              "        pm.collectionVariables.set('cuerpo_jordan_bordado', JSON.stringify({",
+              "            lineas: [{ variante_id: talla.variante_id, cantidad: 1, personalizacion: [{ opcion_id: bordado.id, texto: 'MICHAEL' }] }]",
+              "        }));",
+              "    });",
+              "});"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('El error señala la opción de la línea', () => {",
+              "    pm.expect(pm.response.json().error.detalles.errores['lineas.0.personalizacion.0.opcion_id']).to.include('no admite');",
+              "});"
+            ] } }
+          ]
+        },
+        {
+          "name": "Opción desactivada: caja de madera (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"lineas\": [ { \"variante_id\": 1, \"cantidad\": 1, \"personalizacion\": [ { \"opcion_id\": 3 } ] } ]\n}", "options": { "raw": { "language": "json" } } },
+            "description": "La opción 3 es la «Caja de madera grabada», desactivada en la semilla (activo = false): aunque alguien escriba su id a mano, el servidor la rechaza."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "pm.test('Opción no disponible', () => {",
+            "    pm.expect(pm.response.json().error.detalles.errores['lineas.0.personalizacion.0.opcion_id']).to.include('no disponible');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Crear pedido personalizado con dos líneas (201)",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/api/pedidos",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{{cuerpo_pedido}}", "options": { "raw": { "language": "json" } } },
-            "description": "POST /api/pedidos · Permiso pedidos.propios. Cuerpo: {direccion_envio?, notas?, lineas: [{variante_id, cantidad}]}. Sin direccion_envio se usa la del perfil. Precio y total los calcula el servidor (aunque el navegador envíe un precio, se ignora). El script previo toma de la ficha dos tallas con stock."
+            "description": "POST /api/pedidos · Permiso pedidos.propios. Cuerpo: {direccion_envio?, notas?, lineas: [{variante_id, cantidad, personalizacion?: [{opcion_id, texto?}]}]}. Sin direccion_envio se usa la del perfil. Precio, recargos y total los calcula el servidor (aunque el navegador envíe un precio, se ignora). El script previo toma de la ficha dos tallas con stock, la caja edición KALMA y el bordado."
           },
           "event": [
             { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
               "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
               "    const ficha = respuesta.json().datos;",
               "    const tallas = ficha.tallas.filter(t => t.stock >= 2);",
+              "    const caja = ficha.opciones_personalizacion.find(o => o.nombre === 'Caja edición KALMA');",
+              "    const bordado = ficha.opciones_personalizacion.find(o => o.tipo === 'bordado');",
               "    pm.collectionVariables.set('precio', ficha.precio);",
+              "    pm.collectionVariables.set('recargo_caja', caja.recargo);",
+              "    pm.collectionVariables.set('recargo_bordado', bordado.recargo);",
               "    pm.collectionVariables.set('variante_1', tallas[0].variante_id);",
               "    pm.collectionVariables.set('stock_antes', tallas[0].stock);",
               "    pm.collectionVariables.set('cuerpo_pedido', JSON.stringify({",
               "        notas: 'Pedido de prueba desde Postman',",
               "        lineas: [",
-              "            { variante_id: tallas[0].variante_id, cantidad: 2, precio_unitario: 1 },",
-              "            { variante_id: tallas[1].variante_id, cantidad: 1 }",
+              "            { variante_id: tallas[0].variante_id, cantidad: 2, precio_unitario: 1, personalizacion: [{ opcion_id: caja.id }] },",
+              "            { variante_id: tallas[1].variante_id, cantidad: 1, personalizacion: [{ opcion_id: bordado.id, texto: 'LUCIA' }] }",
               "        ]",
               "    }));",
               "});"
@@ -476,10 +547,15 @@
               "const pedido = pm.response.json().datos;",
               "pm.collectionVariables.set('codigo_pedido', pedido.codigo);",
               "pm.test('Location apunta al pedido nuevo', () => pm.expect(pm.response.headers.get('Location')).to.eql('/api/pedidos/' + pedido.codigo));",
-              "pm.test('Estado pendiente', () => pm.expect(pedido.estado).to.eql('pendiente'));",
-              "pm.test('Total calculado en el servidor: 3 pares al precio del catálogo (el precio_unitario: 1 enviado se ignora)', () => {",
+              "pm.test('Pendiente y personalizado', () => {",
+              "    pm.expect(pedido.estado).to.eql('pendiente');",
+              "    pm.expect(pedido.personalizado).to.be.true;",
+              "});",
+              "pm.test('Total calculado en el servidor: 2 pares con caja + 1 par bordado (el precio_unitario: 1 enviado se ignora)', () => {",
               "    const precio = Number(pm.collectionVariables.get('precio'));",
-              "    pm.expect(pedido.total).to.eql(Math.round(3 * precio * 100) / 100);",
+              "    const caja = Number(pm.collectionVariables.get('recargo_caja'));",
+              "    const bordado = Number(pm.collectionVariables.get('recargo_bordado'));",
+              "    pm.expect(pedido.total).to.eql(Math.round((2 * (precio + caja) + precio + bordado) * 100) / 100);",
               "});",
               "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
               "    const variante = Number(pm.collectionVariables.get('variante_1'));",
@@ -493,13 +569,18 @@
         },
         {
           "name": "Ver el pedido creado (200)",
-          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos/{{codigo_pedido}}", "description": "GET /api/pedidos/{codigo} · Detalle con líneas e historial de estados." },
+          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos/{{codigo_pedido}}", "description": "GET /api/pedidos/{codigo} · Detalle con líneas, personalización e historial de estados." },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('200 OK', () => pm.response.to.have.status(200));",
             "const pedido = pm.response.json().datos;",
             "pm.test('Dos líneas con el precio del catálogo', () => {",
             "    pm.expect(pedido.lineas).to.have.lengthOf(2);",
             "    pedido.lineas.forEach(l => pm.expect(l.precio_unitario).to.eql(Number(pm.collectionVariables.get('precio'))));",
+            "});",
+            "pm.test('La segunda línea conserva el nombre bordado y su recargo', () => {",
+            "    const bordado = pedido.lineas[1].personalizacion[0];",
+            "    pm.expect(bordado.texto).to.eql('LUCIA');",
+            "    pm.expect(bordado.recargo).to.eql(Number(pm.collectionVariables.get('recargo_bordado')));",
             "});",
             "pm.test('Historial: creado como pendiente', () => pm.expect(pedido.historial[0].estado_nuevo).to.eql('pendiente'));",
             "pm.test('Se puede cancelar', () => pm.expect(pedido.se_puede_cancelar).to.be.true);"
@@ -556,6 +637,9 @@
     { "key": "cuerpo_pedido", "value": "" },
     { "key": "codigo_pedido", "value": "" },
     { "key": "precio", "value": "" },
+    { "key": "recargo_caja", "value": "" },
+    { "key": "recargo_bordado", "value": "" },
+    { "key": "cuerpo_jordan_bordado", "value": "" },
     { "key": "variante_1", "value": "" },
     { "key": "stock_antes", "value": "" }
   ]

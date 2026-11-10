@@ -63,6 +63,21 @@ final class CatalogoServicio
             'imagen'       => '/' . $c['imagen'],
         ], $this->productos->otrosColores($id, $producto['codigo_marca']));
 
+        // Solo las opciones que admite este modelo: las que tocan la zapatilla
+        // (el bordado) no se ofrecen si el producto no es personalizable
+        $aplicables = array_filter(
+            $this->productos->opcionesPersonalizacion(),
+            static fn (array $o): bool => !$o['afecta_zapatilla'] || $producto['personalizable']
+        );
+        $ficha['opciones_personalizacion'] = array_values(array_map(static fn (array $o): array => [
+            'id'             => (int) $o['id'],
+            'tipo'           => $o['tipo'],
+            'nombre'         => $o['nombre'],
+            'descripcion'    => $o['descripcion'],
+            'max_caracteres' => $o['max_caracteres'] === null ? null : (int) $o['max_caracteres'],   // null = sin texto
+            'recargo'        => (float) $o['recargo'],
+        ], $aplicables));
+
         return $ficha;
     }
 
@@ -93,6 +108,7 @@ final class CatalogoServicio
             'codigo_marca'       => $p['codigo_marca'],
             'slug'               => $p['slug'],
             'precio'             => (float) $p['precio'],
+            'personalizable'     => $p['personalizable'],
             'imagen'             => '/' . $p['imagen'],
             'categoria'          => ['id' => (int) $p['categoria_id'], 'nombre' => $p['categoria']],
             'color'              => ['nombre' => $p['color'], 'hex' => $p['codigo_hex']],
@@ -103,20 +119,21 @@ final class CatalogoServicio
 
     /**
      * ?buscar=jordan&categoria=3&color=4&talla=42.5&precio_min=100&precio_max=200
-     *  &disponible=1&orden=precio_asc
+     *  &personalizable=1&disponible=1&orden=precio_asc
      * @throws HttpExcepcion 400 con todos los parámetros no válidos
      */
     private function validarFiltros(array $query): array
     {
         // Cada filtro: cómo se convierte (null = no válido) y qué mensaje se devuelve si falla
         $reglas = [
-            'buscar'     => [$this->texto(...), 'Texto de hasta 60 caracteres'],
-            'categoria'  => [$this->identificador(...), 'Identificador numérico'],
-            'color'      => [$this->identificador(...), 'Identificador numérico'],
-            'talla'      => [$this->talla(...), 'Talla entre 34 y 50 (admite medias tallas, ej. 42.5)'],
-            'precio_min' => [$this->precio(...), 'Número mayor o igual que 0'],
-            'precio_max' => [$this->precio(...), 'Número mayor o igual que 0'],
-            'disponible' => [$this->booleano(...), 'Valores: 1/0 o true/false'],
+            'buscar'         => [$this->texto(...), 'Texto de hasta 60 caracteres'],
+            'categoria'      => [$this->identificador(...), 'Identificador numérico'],
+            'color'          => [$this->identificador(...), 'Identificador numérico'],
+            'talla'          => [$this->talla(...), 'Talla entre 34 y 50 (admite medias tallas, ej. 42.5)'],
+            'precio_min'     => [$this->precio(...), 'Número mayor o igual que 0'],
+            'precio_max'     => [$this->precio(...), 'Número mayor o igual que 0'],
+            'personalizable' => [$this->booleano(...), 'Valores: 1/0 o true/false'],
+            'disponible'     => [$this->booleano(...), 'Valores: 1/0 o true/false'],
         ];
 
         $filtros = [];

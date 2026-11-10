@@ -55,27 +55,25 @@ JOIN roles r ON r.codigo = u.rol
 ORDER BY u.alta::timestamptz;   -- los id siguen el orden de alta
 
 -- -----------------------------------------------------------------------------
--- Perfil de los clientes. Los DNI son ficticios pero tienen la letra de
--- control correcta, así que pasan la misma validación que hace PHP.
--- El DNI es opcional: Nerea Blanco no lo ha indicado (NULL permitido).
+-- Perfil de los clientes: teléfono y dirección de envío (todos ficticios)
 -- -----------------------------------------------------------------------------
-INSERT INTO clientes (usuario_id, nif, telefono, direccion, codigo_postal, ciudad, provincia)
-SELECT us.id, c.nif, c.telefono, c.direccion, c.cp, c.ciudad, c.provincia
+INSERT INTO clientes (usuario_id, telefono, direccion, codigo_postal, ciudad, provincia)
+SELECT us.id, c.telefono, c.direccion, c.cp, c.ciudad, c.provincia
 FROM (VALUES
-    ('cliente@kalma.test',        '50112233V', '600000101', 'Calle Mayor 12, 2º A',            '28013', 'Madrid',     'Madrid'),
-    ('marcos.gil@correo.test',    '20334455V', '600000102', 'Calle de Colón 8, 4º',            '46004', 'Valencia',   'Valencia'),
-    ('paula.romero@correo.test',  '28445566V', '600000103', 'Avenida de la Constitución 21',   '41001', 'Sevilla',    'Sevilla'),
-    ('javier.ortega@correo.test', '17556677H', '600000104', 'Paseo de la Independencia 5, 1º', '50001', 'Zaragoza',   'Zaragoza'),
-    ('irene.castro@correo.test',  '25667788H', '600000105', 'Calle Larios 3, 3º B',            '29005', 'Málaga',     'Málaga'),
-    ('daniel.vidal@correo.test',  '46778899G', '600000106', 'Carrer de Pelai 14, 2º 1ª',       '08001', 'Barcelona',  'Barcelona'),
-    ('sara.medina@correo.test',   '16889900B', '600000107', 'Gran Vía 40, 5º D',               '48011', 'Bilbao',     'Bizkaia'),
-    ('hugo.serrano@correo.test',  '12990011W', '600000108', 'Calle Santiago 9, 1º',            '47001', 'Valladolid', 'Valladolid'),
-    ('tomas.vera@correo.test',    '48101122A', '600000109', 'Calle Real 2',                    '30001', 'Murcia',     'Murcia'),
-    ('andres.lozano@correo.test', '51223344K', '600000110', 'Calle de Alcalá 150, 3º C',       '28028', 'Madrid',     'Madrid'),
-    ('elena.pascual@correo.test', '23667788Y', '600000111', 'Avenida de la Libertad 22, 1º',   '30009', 'Murcia',     'Murcia'),
-    ('ruben.cano@correo.test',    '30889911Z', '600000112', 'Calle Madrid 45, 2º B',           '28901', 'Getafe',     'Madrid'),
-    ('nerea.blanco@correo.test',  NULL,        '600000113', 'Rambla de Méndez Núñez 30, 4º',   '03002', 'Alicante',   'Alicante')
-) AS c(email, nif, telefono, direccion, cp, ciudad, provincia)
+    ('cliente@kalma.test',        '600000101', 'Calle Mayor 12, 2º A',            '28013', 'Madrid',     'Madrid'),
+    ('marcos.gil@correo.test',    '600000102', 'Calle de Colón 8, 4º',            '46004', 'Valencia',   'Valencia'),
+    ('paula.romero@correo.test',  '600000103', 'Avenida de la Constitución 21',   '41001', 'Sevilla',    'Sevilla'),
+    ('javier.ortega@correo.test', '600000104', 'Paseo de la Independencia 5, 1º', '50001', 'Zaragoza',   'Zaragoza'),
+    ('irene.castro@correo.test',  '600000105', 'Calle Larios 3, 3º B',            '29005', 'Málaga',     'Málaga'),
+    ('daniel.vidal@correo.test',  '600000106', 'Carrer de Pelai 14, 2º 1ª',       '08001', 'Barcelona',  'Barcelona'),
+    ('sara.medina@correo.test',   '600000107', 'Gran Vía 40, 5º D',               '48011', 'Bilbao',     'Bizkaia'),
+    ('hugo.serrano@correo.test',  '600000108', 'Calle Santiago 9, 1º',            '47001', 'Valladolid', 'Valladolid'),
+    ('tomas.vera@correo.test',    '600000109', 'Calle Real 2',                    '30001', 'Murcia',     'Murcia'),
+    ('andres.lozano@correo.test', '600000110', 'Calle de Alcalá 150, 3º C',       '28028', 'Madrid',     'Madrid'),
+    ('elena.pascual@correo.test', '600000111', 'Avenida de la Libertad 22, 1º',   '30009', 'Murcia',     'Murcia'),
+    ('ruben.cano@correo.test',    '600000112', 'Calle Madrid 45, 2º B',           '28901', 'Getafe',     'Madrid'),
+    ('nerea.blanco@correo.test',  '600000113', 'Rambla de Méndez Núñez 30, 4º',   '03002', 'Alicante',   'Alicante')
+) AS c(email, telefono, direccion, cp, ciudad, provincia)
 JOIN usuarios us ON lower(us.email) = lower(c.email)
 ORDER BY us.id;
 

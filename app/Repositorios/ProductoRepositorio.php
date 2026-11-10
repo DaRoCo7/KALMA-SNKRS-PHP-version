@@ -27,7 +27,7 @@ final class ProductoRepositorio
         [$where, $parametros] = $this->condiciones($filtros);
 
         $sql = <<<SQL
-            SELECT p.id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.precio, p.imagen,
+            SELECT p.id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.precio, p.personalizable, p.imagen,
                    c.id AS categoria_id, c.nombre AS categoria,
                    col.nombre AS color, col.codigo_hex,
                    s.stock_total, s.tallas
@@ -63,7 +63,7 @@ final class ProductoRepositorio
     {
         $consulta = BaseDatos::conexion()->prepare(
             'SELECT p.id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.descripcion, p.precio,
-                    p.imagen, c.id AS categoria_id, c.nombre AS categoria,
+                    p.personalizable, p.imagen, c.id AS categoria_id, c.nombre AS categoria,
                     col.nombre AS color, col.codigo_hex
              FROM productos p
              JOIN categorias c ON c.id = p.categoria_id
@@ -99,6 +99,15 @@ final class ProductoRepositorio
         );
         $consulta->execute(['id' => $productoId, 'codigo' => $codigoMarca]);
         return $consulta->fetchAll();
+    }
+
+    /** Opciones de personalización que se pueden elegir hoy (las desactivadas no salen) */
+    public function opcionesPersonalizacion(): array
+    {
+        return BaseDatos::conexion()->query(
+            'SELECT id, tipo, nombre, descripcion, afecta_zapatilla, max_caracteres, recargo
+             FROM opciones_personalizacion WHERE activo ORDER BY tipo, id'
+        )->fetchAll();
     }
 
     /** Valores para construir los filtros de la interfaz */
@@ -160,6 +169,11 @@ final class ProductoRepositorio
         if (isset($filtros['precio_max'])) {
             $sql[] = 'p.precio <= :precio_max';
             $parametros['precio_max'] = $filtros['precio_max'];
+        }
+        if (isset($filtros['personalizable'])) {
+            $sql[] = 'p.personalizable = :personalizable';
+            // PDO enviaría false como cadena vacía: se pasa como texto que PostgreSQL entiende
+            $parametros['personalizable'] = $filtros['personalizable'] ? 'true' : 'false';
         }
         if (!empty($filtros['disponible'])) {
             $sql[] = 'EXISTS (SELECT 1 FROM variantes v WHERE v.producto_id = p.id AND v.activo AND v.stock > 0)';

@@ -53,6 +53,20 @@ final class Respuesta
         return self::html(Vista::renderizar($plantilla, $datos), $estado);
     }
 
+    /**
+     * Archivo para descargar (exportaciones en CSV o JSON): el navegador lo
+     * guarda con ese nombre en vez de mostrarlo. El nombre lo pone siempre el
+     * servidor (nunca el usuario), así no se puede inyectar nada en la cabecera.
+     */
+    public static function descarga(string $contenido, string $tipo, string $nombreArchivo): self
+    {
+        return new self($contenido, 200, [
+            'Content-Type'        => $tipo,
+            'Content-Disposition' => 'attachment; filename="' . $nombreArchivo . '"',
+            'Cache-Control'       => 'no-store',
+        ]);
+    }
+
     /** 303: tras enviar un formulario, el navegador pasa a la nueva página con GET */
     public static function redireccion(string $url, int $estado = 303): self
     {

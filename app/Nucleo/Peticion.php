@@ -129,6 +129,26 @@ final class Peticion
     }
 
     /**
+     * Cuerpo de la petición como texto de un tipo concreto (ej. un albarán en
+     * text/csv). Se aplica el mismo límite de tamaño que al JSON.
+     *
+     * @throws HttpExcepcion 413 demasiado grande · 415 si no es del tipo esperado · 400 si viene vacío
+     */
+    public function texto(string $tipoEsperado): string
+    {
+        if (strlen($this->cuerpo) > self::TAMANO_MAXIMO) {
+            throw HttpExcepcion::demasiadoGrande();
+        }
+        if (!str_contains($this->cabecera('content-type') ?? '', $tipoEsperado)) {
+            throw HttpExcepcion::tipoNoSoportado("El cuerpo debe enviarse como {$tipoEsperado}");
+        }
+        if (trim($this->cuerpo) === '') {
+            throw HttpExcepcion::peticionIncorrecta('El cuerpo está vacío');
+        }
+        return $this->cuerpo;
+    }
+
+    /**
      * Datos enviados por el cliente, vengan de la API (JSON) o de un formulario.
      *
      * @return array<string, mixed>

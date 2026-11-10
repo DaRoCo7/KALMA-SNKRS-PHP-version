@@ -88,7 +88,7 @@ Si Nginx corta una petición por exceso (rate limiting), responde `429` con el m
   |---|---|---|
   | `01_schema.sql` | `database/schema.sql` | Tablas, restricciones, índices y triggers |
   | `02_usuarios.sql` | `database/seeds/usuarios.sql` | Roles, usuarios, clientes y consultas |
-  | `03_catalogo.sql` | `database/seeds/catalogo.sql` | Marca, categorías, colores, productos y tallas con su stock inicial |
+  | `03_catalogo.sql` | `database/seeds/catalogo.sql` | Marca, categorías, colores, productos, tallas con su stock inicial y opciones de personalización |
   | `04_pedidos.sql` | `database/seeds/pedidos.sql` | Pedidos, líneas, historial y movimientos de stock |
 
 - **Los scripts de arranque solo se ejecutan con el volumen vacío.** Con datos, se ignoran.
@@ -162,7 +162,7 @@ El pedido `SF-2026-000022` es de otro cliente: sirve para demostrar que `cliente
 
 - Los cuerpos de las peticiones se envían como `application/json` (máximo 1 MB).
 - Fechas en ISO 8601 con zona horaria (`2026-11-08T19:15:00+01:00`). Importes como número con decimales.
-- **Precios y totales los calcula siempre el servidor.** El front no envía precios (si los envía, se ignoran).
+- **Precios, recargos y totales los calcula siempre el servidor.** El front no envía precios (si los envía, se ignoran).
 
 ### 9.2 Sesión y CSRF
 
@@ -194,13 +194,22 @@ Permisos: ver la matriz en `app/Seguridad/Permisos.php` (admin tiene todos).
 
 | Método | Ruta | Respuestas |
 |---|---|---|
-| GET | `/api/productos?buscar&categoria&color&talla&precio_min&precio_max&disponible&orden&pagina&por_pagina` | 200, 400 |
+| GET | `/api/productos?buscar&categoria&color&talla&precio_min&precio_max&personalizable&disponible&orden&pagina&por_pagina` | 200, 400 |
 | GET | `/api/productos/{slug}` | 200, 404 |
 | GET | `/api/catalogo/filtros` | 200 |
 | POST | `/api/consultas` | 201, 400, 429 |
 
 `orden`: `novedades` (por defecto), `precio_asc`, `precio_desc`, `nombre`.
 Cada talla de la ficha trae `variante_id`, `talla`, `stock` y `disponible`: el `variante_id` es lo que se envía al hacer un pedido.
+La ficha incluye `opciones_personalizacion` con las opciones que admite ese modelo (`id`, `tipo`, `nombre`, `descripcion`,
+`max_caracteres` y `recargo` por par). Si `max_caracteres` no es `null`, la opción lleva texto (el nombre bordado).
+
+| Tipo | Opciones | Regla |
+|---|---|---|
+| `packaging` | Caja edición KALMA, caja de coleccionista | Una por línea |
+| `bordado` | Nombre bordado en el talón (hasta 12 letras) | Solo en productos `personalizable` (no Air Max ni Jordan) |
+| `cordones` | Cordones de repuesto negros, blancos o rojos | Una por línea |
+| `certificado` | Certificado de autenticidad | — |
 
 **Área del cliente**
 
@@ -219,12 +228,15 @@ Cuerpo de `POST /api/pedidos`:
   "direccion_envio": "Calle Ficticia 1, 28001 Madrid",
   "notas": "Opcional",
   "lineas": [
-    { "variante_id": 12, "cantidad": 2 },
-    { "variante_id": 30, "cantidad": 1 }
+    { "variante_id": 12, "cantidad": 2,
+      "personalizacion": [ { "opcion_id": 1 } ] },
+    { "variante_id": 30, "cantidad": 1,
+      "personalizacion": [ { "opcion_id": 4, "texto": "LUCIA" }, { "opcion_id": 5 } ] }
   ]
 }
 ```
 - Entre 1 y 20 líneas, de 1 a 20 pares por línea y una línea por talla.
+- `personalizacion` es opcional: una opción de cada tipo como máximo. El recargo es por par y lo suma el servidor.
 - Si se omite `direccion_envio`, se usa la del perfil del cliente.
 - 409 sin stock: `detalles.sin_stock` lista cada talla con lo pedido y lo disponible.
 

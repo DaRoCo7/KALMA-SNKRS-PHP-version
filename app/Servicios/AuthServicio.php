@@ -41,7 +41,7 @@ final class AuthServicio
      * Alta de un cliente nuevo (cuenta + perfil de cliente).
      *
      * @return array usuario creado (sin hash)
-     * @throws HttpExcepcion 400 datos no válidos · 409 email o DNI ya registrados
+     * @throws HttpExcepcion 400 datos no válidos · 409 email ya registrado
      */
     public function registrar(array $entrada, ?string $ip): array
     {
@@ -50,7 +50,6 @@ final class AuthServicio
             ->texto('apellidos', 150)
             ->email('email')
             ->contrasena('password')
-            ->nif('nif')
             ->patron('telefono', '/^\+?[0-9 ]{9,20}$/', 'Teléfono no válido')
             ->texto('direccion', 200, obligatorio: false)
             ->patron('codigo_postal', '/^[0-9]{5}$/', 'Código postal de 5 cifras')
@@ -70,11 +69,9 @@ final class AuthServicio
                 return $id;
             });
         } catch (\PDOException $error) {
-            // 23505 = clave única repetida: dos registros simultáneos con el mismo email o DNI
+            // 23505 = clave única repetida: dos registros simultáneos con el mismo email
             if ($error->getCode() === '23505') {
-                throw HttpExcepcion::conflicto(
-                    str_contains($error->getMessage(), 'nif') ? 'Ya existe un cliente con ese DNI o NIE' : 'Ya existe una cuenta con ese email'
-                );
+                throw HttpExcepcion::conflicto('Ya existe una cuenta con ese email');
             }
             throw $error;
         }

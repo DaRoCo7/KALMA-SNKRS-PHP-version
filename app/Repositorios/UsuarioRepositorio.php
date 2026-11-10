@@ -44,7 +44,7 @@ final class UsuarioRepositorio
     public function perfilCliente(int $usuarioId): ?array
     {
         $consulta = BaseDatos::conexion()->prepare(
-            'SELECT id, nif, telefono, direccion, codigo_postal, ciudad, provincia
+            'SELECT id, telefono, direccion, codigo_postal, ciudad, provincia
              FROM clientes WHERE usuario_id = :usuario_id'
         );
         $consulta->execute(['usuario_id' => $usuarioId]);
@@ -81,11 +81,10 @@ final class UsuarioRepositorio
         $id = (int) $usuario->fetchColumn();
 
         $pdo->prepare(
-            'INSERT INTO clientes (usuario_id, nif, telefono, direccion, codigo_postal, ciudad, provincia)
-             VALUES (:usuario_id, :nif, :telefono, :direccion, :codigo_postal, :ciudad, :provincia)'
+            'INSERT INTO clientes (usuario_id, telefono, direccion, codigo_postal, ciudad, provincia)
+             VALUES (:usuario_id, :telefono, :direccion, :codigo_postal, :ciudad, :provincia)'
         )->execute([
             'usuario_id'    => $id,
-            'nif'           => $datos['nif'],
             'telefono'      => $datos['telefono'],
             'direccion'     => $datos['direccion'],
             'codigo_postal' => $datos['codigo_postal'],

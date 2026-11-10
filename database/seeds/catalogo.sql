@@ -38,13 +38,16 @@ INSERT INTO colores (nombre, codigo_hex) VALUES
 -- (el enunciado pide un mínimo de 8 modelos)
 -- -----------------------------------------------------------------------------
 INSERT INTO productos (categoria_id, marca_id, color_id, nombre, colorway, codigo_marca,
-                       slug, descripcion, precio, imagen,
+                       slug, descripcion, precio, personalizable, imagen,
                        fecha_creacion, fecha_actualizacion)
 SELECT cat.id, m.id, col.id, p.nombre, p.colorway, p.codigo,
        -- Slug a partir del nombre y el código: "Nike Air Force 1 '07" + "CW2288-111"
        -- -> nike-air-force-1-07-cw2288-111 (sin escribirlo a mano, sin errores)
        trim(BOTH '-' FROM regexp_replace(lower(p.nombre || ' ' || p.codigo), '[^a-z0-9]+', '-', 'g')),
        p.descripcion, p.precio,
+       -- Solo se borda la piel lisa de los Lifestyle. Las Air Max son de malla y
+       -- ante, y las Jordan son reediciones de coleccionista: bordarlas les quita valor
+       p.categoria = 'Lifestyle',
        'img/productos/' || lower(p.codigo) || '.webp',   -- las fotos llegan en la fase de front
        '2026-06-15 08:00+02', '2026-06-15 08:00+02'
 FROM (VALUES
@@ -132,6 +135,20 @@ FROM variantes v
 JOIN usuarios u ON u.email = 'almacen@kalma.test'
 WHERE v.stock > 0
 ORDER BY v.id;
+
+-- -----------------------------------------------------------------------------
+-- Opciones de personalización (recargo por par). La caja de madera está
+-- desactivada para probar que el servidor rechaza opciones no disponibles.
+-- -----------------------------------------------------------------------------
+INSERT INTO opciones_personalizacion (tipo, nombre, descripcion, afecta_zapatilla, max_caracteres, recargo, activo) VALUES
+    ('packaging',   'Caja edición KALMA',           'Caja negra mate con el logo de KALMA en relieve',                         false, NULL, 12.00, true),
+    ('packaging',   'Caja de coleccionista',        'Caja con frontal transparente para exponer el par',                       false, NULL, 25.00, true),
+    ('packaging',   'Caja de madera grabada',       'Edición limitada agotada',                                                false, NULL, 40.00, false),
+    ('bordado',     'Nombre bordado en el talón',   'Hasta 12 letras bordadas en el talón de cada zapatilla',                  true,  12,   15.00, true),
+    ('cordones',    'Cordones de repuesto negros',  'Un par de cordones extra en la caja',                                     false, NULL,  5.00, true),
+    ('cordones',    'Cordones de repuesto blancos', 'Un par de cordones extra en la caja',                                     false, NULL,  5.00, true),
+    ('cordones',    'Cordones de repuesto rojos',   'Un par de cordones extra en la caja',                                     false, NULL,  5.00, true),
+    ('certificado', 'Certificado de autenticidad',  'Tarjeta con el código de estilo del modelo y la etiqueta RFID de la talla', false, NULL,  9.00, true);
 
 -- -----------------------------------------------------------------------------
 -- Auditoría: alta de cada producto por la administradora

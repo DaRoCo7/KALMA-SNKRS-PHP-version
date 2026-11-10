@@ -25,7 +25,7 @@ final class CatalogoController
         return Respuesta::json($this->catalogo->listar($peticion->query, $paginacion));
     }
 
-    /** GET /api/productos/{slug} · ficha con tallas, stock y otros colores del mismo modelo */
+    /** GET /api/productos/{slug} · ficha con tallas, stock, otros colores y opciones de personalización */
     public function ver(Peticion $peticion): Respuesta
     {
         return Respuesta::json(['datos' => $this->catalogo->ver((string) $peticion->parametro('slug'))]);
