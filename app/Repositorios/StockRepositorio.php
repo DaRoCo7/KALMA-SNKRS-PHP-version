@@ -39,7 +39,7 @@ final class StockRepositorio
 
         $consulta = BaseDatos::conexion()->prepare(
             'SELECT v.id, v.producto_id, v.talla, v.stock, v.activo,
-                    p.nombre, p.colorway, p.precio, p.personalizable, p.activo AS producto_activo
+                    p.nombre, p.colorway, p.precio, p.activo AS producto_activo
              FROM variantes v
              JOIN productos p ON p.id = v.producto_id
              WHERE v.id = ANY(CAST(:ids AS integer[]))

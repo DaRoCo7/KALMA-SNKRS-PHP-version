@@ -11,7 +11,6 @@ use App\Nucleo\Paginacion;
 use App\Nucleo\Validador;
 use App\Repositorios\AuditoriaRepositorio;
 use App\Repositorios\PedidoRepositorio;
-use App\Repositorios\ProductoRepositorio;
 use App\Repositorios\StockRepositorio;
 use App\Repositorios\UsuarioRepositorio;
 
@@ -20,7 +19,7 @@ use App\Repositorios\UsuarioRepositorio;
  * vender dos veces la misma unidad, controlar los cambios de estado, reponer el
  * stock al cancelar y dejar cada operación en el historial y en la auditoría.
  *
- * La comprobación de las líneas (formato, precios, personalización) está en
+ * La comprobación de las líneas (formato, existencia y precio) está en
  * LineasPedido. Este servicio recibe el usuario de la sesión como array, pero no
  * sabe nada de HTTP: eso es cosa de los controladores.
  */
@@ -49,7 +48,6 @@ final class PedidoServicio
         private readonly PedidoRepositorio $pedidos = new PedidoRepositorio(),
         private readonly StockRepositorio $stock = new StockRepositorio(),
         private readonly UsuarioRepositorio $usuarios = new UsuarioRepositorio(),
-        private readonly ProductoRepositorio $productos = new ProductoRepositorio(),
         private readonly AuditoriaRepositorio $auditoria = new AuditoriaRepositorio(),
         private readonly LineasPedido $lineasPedido = new LineasPedido(),
     ) {
@@ -92,25 +90,18 @@ final class PedidoServicio
             ]);
         $notas = $datos['notas'] ?? null;
 
-        // Catálogo de opciones de personalización activas, indexado por id
-        $opciones = array_column($this->productos->opcionesPersonalizacion(), null, 'id');
-
         // 2. Las escrituras van en una transacción: si algo falla no queda ni el
         //    pedido a medias ni stock descontado
         try {
-            $nuevo = BaseDatos::transaccion(function () use ($usuario, $cliente, $lineas, $opciones, $direccion, $notas, $ip): array {
+            $nuevo = BaseDatos::transaccion(function () use ($usuario, $cliente, $lineas, $direccion, $notas, $ip): array {
                 // Bloquear las tallas ANTES de leer su stock (ver StockRepositorio)
                 $variantes = $this->stock->bloquearVariantes(array_column($lineas, 'variante_id'));
-                $preparadas = $this->lineasPedido->preparar($lineas, $variantes, $opciones);
+                $preparadas = $this->lineasPedido->preparar($lineas, $variantes);
 
-                $personalizado = array_filter($preparadas, static fn (array $l): bool => $l['personalizacion'] !== []) !== [];
-                $pedido = $this->pedidos->crear($cliente['id'], $direccion, $notas, $personalizado);
+                $pedido = $this->pedidos->crear($cliente['id'], $direccion, $notas);
 
                 foreach ($preparadas as $linea) {
-                    $lineaId = $this->pedidos->agregarLinea($pedido['id'], $linea);
-                    foreach ($linea['personalizacion'] as $opcion) {
-                        $this->pedidos->agregarPersonalizacion($lineaId, $opcion['opcion_id'], $opcion['texto'], $opcion['recargo']);
-                    }
+                    $this->pedidos->agregarLinea($pedido['id'], $linea);
                     $this->stock->mover(
                         $linea['variante_id'], -$linea['cantidad'], 'venta',
                         $pedido['id'], $usuario['id'], "Pedido {$pedido['codigo']}"
@@ -264,14 +255,18 @@ final class PedidoServicio
             ?? throw HttpExcepcion::prohibido('Solo las cuentas de cliente tienen pedidos propios');
     }
 
-    /** "Calle Mayor 3, 28013 Madrid, Madrid" o null si el perfil no tiene dirección */
+    /**
+     * "Calle Mayor 12, 2º A, 28013 Madrid (Madrid)", el mismo formato que los
+     * pedidos de la semilla, o null si el perfil no tiene dirección.
+     */
     private function direccionDelPerfil(array $cliente): ?string
     {
         if ($cliente['direccion'] === null) {
             return null;
         }
         $localidad = trim(($cliente['codigo_postal'] ?? '') . ' ' . ($cliente['ciudad'] ?? ''));
-        return implode(', ', array_filter([$cliente['direccion'], $localidad, $cliente['provincia']]));
+        $direccion = implode(', ', array_filter([$cliente['direccion'], $localidad]));
+        return $cliente['provincia'] === null ? $direccion : "{$direccion} ({$cliente['provincia']})";
     }
 
     /** @throws HttpExcepcion 404 */
@@ -340,38 +335,33 @@ final class PedidoServicio
             'id'             => (int) $p['id'],
             'codigo'         => $p['codigo'],
             'estado'         => $p['estado'],
-            'personalizado'  => $p['personalizado'],
             'total'          => (float) $p['total'],
             'fecha_creacion' => self::fecha($p['fecha_creacion']),
             'cliente'        => [
-                'id'           => (int) $p['cliente_id'],
-                'nombre'       => trim("{$p['cliente_nombre']} {$p['cliente_apellidos']}"),
-                'email'        => $p['cliente_email'],
-                'tipo'         => $p['tipo_cliente'],
-                'razon_social' => $p['razon_social'],
+                'id'     => (int) $p['cliente_id'],
+                'nombre' => trim("{$p['cliente_nombre']} {$p['cliente_apellidos']}"),
+                'email'  => $p['cliente_email'],
             ],
         ];
     }
 
     /**
-     * Pedido completo: cabecera, líneas con su personalización e historial.
+     * Pedido completo: cabecera, líneas e historial de estados.
      * En la vista del cliente el historial dice qué rol hizo cada cambio, pero
      * no el nombre de la persona del almacén o de administración.
      */
     private function detalle(array $p, bool $vistaCliente): array
     {
         $lineas = array_map(static fn (array $l): array => [
-            'variante_id'             => (int) $l['variante_id'],
-            'producto'                => $l['nombre_producto'],
-            'color'                   => $l['color'],
-            'slug'                    => $l['slug'],
-            'imagen'                  => '/' . $l['imagen'],
-            'talla'                   => (float) $l['talla'],
-            'cantidad'                => (int) $l['cantidad'],
-            'precio_unitario'         => (float) $l['precio_unitario'],
-            'recargo_personalizacion' => (float) $l['recargo_personalizacion'],
-            'importe'                 => (float) $l['importe'],
-            'personalizacion'         => json_decode($l['personalizacion'], true),
+            'variante_id'     => (int) $l['variante_id'],
+            'producto'        => $l['nombre_producto'],
+            'color'           => $l['color'],
+            'slug'            => $l['slug'],
+            'imagen'          => '/' . $l['imagen'],
+            'talla'           => (float) $l['talla'],
+            'cantidad'        => (int) $l['cantidad'],
+            'precio_unitario' => (float) $l['precio_unitario'],
+            'importe'         => (float) $l['importe'],
         ], $this->pedidos->lineas($p['id']));
 
         $historial = array_map(static fn (array $h): array => [

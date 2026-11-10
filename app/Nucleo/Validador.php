@@ -60,7 +60,7 @@ final class Validador
         return $this->guardar($campo, $valor, $error);
     }
 
-    /** Valor de una lista cerrada (ej. tipo_cliente). Si no llega, se usa $porDefecto */
+    /** Valor de una lista cerrada (ej. el estado de un pedido). Si no llega, se usa $porDefecto */
     public function opcion(string $campo, array $permitidas, ?string $porDefecto = null): self
     {
         $valor = $this->leer($campo, $porDefecto === null) ?? $porDefecto;
@@ -77,27 +77,13 @@ final class Validador
         return $this->guardar($campo, $valor, $error);
     }
 
-    /** DNI, NIE o CIF (opcional). Se guarda en mayúsculas y sin espacios ni guiones */
+    /** DNI o NIE (opcional). Se guarda en mayúsculas y sin espacios ni guiones */
     public function nif(string $campo): self
     {
         $valor = $this->leer($campo, false);
         $valor = $valor === null ? null : strtoupper(str_replace([' ', '-'], '', $valor));
-        $error = ($valor !== null && !self::nifValido($valor)) ? 'DNI, NIE o CIF no válido' : null;
+        $error = ($valor !== null && !self::nifValido($valor)) ? 'DNI o NIE no válido' : null;
         return $this->guardar($campo, $valor, $error);
-    }
-
-    /**
-     * Regla que relaciona varios campos ya validados.
-     * Ej.: la razón social es obligatoria si el cliente es un club o un equipo.
-     *
-     * @param callable(array<string, mixed>): bool $regla
-     */
-    public function comprobar(callable $regla, string $campo, string $mensaje): self
-    {
-        if (!isset($this->errores[$campo]) && !$regla($this->limpios)) {
-            $this->errores[$campo] = $mensaje;
-        }
-        return $this;
     }
 
     /**
@@ -112,16 +98,19 @@ final class Validador
         return $this->limpios;
     }
 
-    /** DNI y NIE con su letra de control; CIF solo por formato */
+    /**
+     * DNI (8 cifras + letra) o NIE (X, Y o Z + 7 cifras + letra) con su letra
+     * de control. Los clientes son particulares: no se admite CIF de empresa.
+     */
     public static function nifValido(string $nif): bool
     {
-        if (preg_match('/^([XYZ]?)(\d{7,8})([A-Z])$/', $nif, $partes)) {
-            // NIE: X, Y y Z valen 0, 1 y 2 para calcular la letra
-            $numero = strtr($partes[1], 'XYZ', '012') . $partes[2];
-            return strlen($numero) === 8
-                && $partes[3] === 'TRWAGMYFPDXBNJZSQVHLCKE'[(int) $numero % 23];
+        if (!preg_match('/^([XYZ]?)(\d{7,8})([A-Z])$/', $nif, $partes)) {
+            return false;
         }
-        return (bool) preg_match('/^[ABCDEFGHJNPQRSUVW]\d{7}[0-9A-J]$/', $nif);
+        // NIE: X, Y y Z valen 0, 1 y 2 para calcular la letra
+        $numero = strtr($partes[1], 'XYZ', '012') . $partes[2];
+        return strlen($numero) === 8
+            && $partes[3] === 'TRWAGMYFPDXBNJZSQVHLCKE'[(int) $numero % 23];
     }
 
     /** Lee un campo como texto. Un array o un objeto donde se espera texto es un error */

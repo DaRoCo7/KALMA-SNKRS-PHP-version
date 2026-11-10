@@ -44,7 +44,7 @@ final class UsuarioRepositorio
     public function perfilCliente(int $usuarioId): ?array
     {
         $consulta = BaseDatos::conexion()->prepare(
-            'SELECT id, tipo_cliente, razon_social, nif, telefono, direccion, codigo_postal, ciudad, provincia
+            'SELECT id, nif, telefono, direccion, codigo_postal, ciudad, provincia
              FROM clientes WHERE usuario_id = :usuario_id'
         );
         $consulta->execute(['usuario_id' => $usuarioId]);
@@ -59,7 +59,7 @@ final class UsuarioRepositorio
     }
 
     /**
-     * Crea la cuenta (usuarios) y el perfil comercial (clientes).
+     * Crea la cuenta (usuarios) y el perfil del cliente (clientes).
      * Debe llamarse dentro de BaseDatos::transaccion(): son dos tablas y, si
      * falla la segunda, no puede quedar una cuenta sin perfil.
      */
@@ -81,14 +81,10 @@ final class UsuarioRepositorio
         $id = (int) $usuario->fetchColumn();
 
         $pdo->prepare(
-            'INSERT INTO clientes (usuario_id, tipo_cliente, razon_social, nif, telefono,
-                                   direccion, codigo_postal, ciudad, provincia)
-             VALUES (:usuario_id, :tipo_cliente, :razon_social, :nif, :telefono,
-                     :direccion, :codigo_postal, :ciudad, :provincia)'
+            'INSERT INTO clientes (usuario_id, nif, telefono, direccion, codigo_postal, ciudad, provincia)
+             VALUES (:usuario_id, :nif, :telefono, :direccion, :codigo_postal, :ciudad, :provincia)'
         )->execute([
             'usuario_id'    => $id,
-            'tipo_cliente'  => $datos['tipo_cliente'],
-            'razon_social'  => $datos['razon_social'],
             'nif'           => $datos['nif'],
             'telefono'      => $datos['telefono'],
             'direccion'     => $datos['direccion'],

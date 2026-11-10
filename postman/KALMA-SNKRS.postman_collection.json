@@ -90,14 +90,14 @@
             "method": "POST",
             "url": "{{base_url}}/api/registro",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"\",\n  \"apellidos\": \"Prueba\",\n  \"email\": \"no-es-un-email\",\n  \"password\": \"corta\",\n  \"tipo_cliente\": \"club\",\n  \"nif\": \"12345678A\"\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"\",\n  \"apellidos\": \"Prueba\",\n  \"email\": \"no-es-un-email\",\n  \"password\": \"corta\",\n  \"nif\": \"12345678A\"\n}", "options": { "raw": { "language": "json" } } },
             "description": "POST /api/registro · La validación del servidor devuelve todos los errores a la vez."
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
             "const errores = pm.response.json().error.detalles.errores;",
             "pm.test('Errores de cada campo', () => {",
-            "    pm.expect(errores).to.have.keys('nombre', 'email', 'password', 'nif', 'razon_social');",
+            "    pm.expect(errores).to.have.keys('nombre', 'email', 'password', 'nif');",
             "});"
           ] } }]
         },
@@ -107,7 +107,7 @@
             "method": "POST",
             "url": "{{base_url}}/api/registro",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carla\",\n  \"apellidos\": \"Prueba Postman\",\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Zapas2026\",\n  \"tipo_cliente\": \"particular\",\n  \"telefono\": \"600 000 999\",\n  \"codigo_postal\": \"28001\",\n  \"ciudad\": \"Madrid\"\n}", "options": { "raw": { "language": "json" } } },
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carla\",\n  \"apellidos\": \"Prueba Postman\",\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Zapas2026\",\n  \"telefono\": \"600 000 999\",\n  \"codigo_postal\": \"28001\",\n  \"ciudad\": \"Madrid\"\n}", "options": { "raw": { "language": "json" } } },
             "description": "POST /api/registro · Público (limitado por IP). Crea la cuenta y el perfil de cliente en una transacción e inicia la sesión."
           },
           "event": [
@@ -224,7 +224,7 @@
       "item": [
         {
           "name": "Listado paginado (200)",
-          "request": { "method": "GET", "url": "{{base_url}}/api/productos?pagina=1&por_pagina=4", "description": "GET /api/productos · Público. Parámetros: buscar, categoria, color, talla, precio_min, precio_max, personalizable, disponible, orden (novedades, precio_asc, precio_desc, nombre), pagina, por_pagina." },
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?pagina=1&por_pagina=4", "description": "GET /api/productos · Público. Parámetros: buscar, categoria, color, talla, precio_min, precio_max, disponible, orden (novedades, precio_asc, precio_desc, nombre), pagina, por_pagina." },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('200 OK', () => pm.response.to.have.status(200));",
             "const cuerpo = pm.response.json();",
@@ -262,7 +262,7 @@
         },
         {
           "name": "Ficha de producto (200)",
-          "request": { "method": "GET", "url": "{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111", "description": "GET /api/productos/{slug} · Público. Tallas con stock, otros colores del mismo modelo y opciones de personalización." },
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111", "description": "GET /api/productos/{slug} · Público. Tallas con su variante_id y su stock, y otros colores del mismo modelo." },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('200 OK', () => pm.response.to.have.status(200));",
             "const producto = pm.response.json().datos;",
@@ -446,29 +446,27 @@
           ]
         },
         {
-          "name": "Crear pedido con dos líneas, una personalizada (201)",
+          "name": "Crear pedido con dos líneas (201)",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/api/pedidos",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{{cuerpo_pedido}}", "options": { "raw": { "language": "json" } } },
-            "description": "POST /api/pedidos · Permiso pedidos.propios. Cuerpo: {direccion_envio?, notas?, lineas: [{variante_id, cantidad, personalizacion?: [{opcion_id, texto?}]}]}. Sin direccion_envio se usa la del perfil. Precio, recargo y total los calcula el servidor. El script previo toma dos tallas con stock y la opción «dorsal» de la ficha."
+            "description": "POST /api/pedidos · Permiso pedidos.propios. Cuerpo: {direccion_envio?, notas?, lineas: [{variante_id, cantidad}]}. Sin direccion_envio se usa la del perfil. Precio y total los calcula el servidor (aunque el navegador envíe un precio, se ignora). El script previo toma de la ficha dos tallas con stock."
           },
           "event": [
             { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
               "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
               "    const ficha = respuesta.json().datos;",
               "    const tallas = ficha.tallas.filter(t => t.stock >= 2);",
-              "    const dorsal = ficha.opciones_personalizacion.find(o => o.tipo === 'dorsal');",
               "    pm.collectionVariables.set('precio', ficha.precio);",
-              "    pm.collectionVariables.set('recargo_dorsal', dorsal.recargo);",
               "    pm.collectionVariables.set('variante_1', tallas[0].variante_id);",
               "    pm.collectionVariables.set('stock_antes', tallas[0].stock);",
               "    pm.collectionVariables.set('cuerpo_pedido', JSON.stringify({",
               "        notas: 'Pedido de prueba desde Postman',",
               "        lineas: [",
-              "            { variante_id: tallas[0].variante_id, cantidad: 2 },",
-              "            { variante_id: tallas[1].variante_id, cantidad: 1, personalizacion: [{ opcion_id: dorsal.id, texto: '10' }] }",
+              "            { variante_id: tallas[0].variante_id, cantidad: 2, precio_unitario: 1 },",
+              "            { variante_id: tallas[1].variante_id, cantidad: 1 }",
               "        ]",
               "    }));",
               "});"
@@ -478,14 +476,10 @@
               "const pedido = pm.response.json().datos;",
               "pm.collectionVariables.set('codigo_pedido', pedido.codigo);",
               "pm.test('Location apunta al pedido nuevo', () => pm.expect(pm.response.headers.get('Location')).to.eql('/api/pedidos/' + pedido.codigo));",
-              "pm.test('Pendiente y personalizado', () => {",
-              "    pm.expect(pedido.estado).to.eql('pendiente');",
-              "    pm.expect(pedido.personalizado).to.be.true;",
-              "});",
-              "pm.test('Total calculado en el servidor: 2 pares + 1 par con dorsal', () => {",
+              "pm.test('Estado pendiente', () => pm.expect(pedido.estado).to.eql('pendiente'));",
+              "pm.test('Total calculado en el servidor: 3 pares al precio del catálogo (el precio_unitario: 1 enviado se ignora)', () => {",
               "    const precio = Number(pm.collectionVariables.get('precio'));",
-              "    const recargo = Number(pm.collectionVariables.get('recargo_dorsal'));",
-              "    pm.expect(pedido.total).to.eql(Math.round((2 * precio + precio + recargo) * 100) / 100);",
+              "    pm.expect(pedido.total).to.eql(Math.round(3 * precio * 100) / 100);",
               "});",
               "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
               "    const variante = Number(pm.collectionVariables.get('variante_1'));",
@@ -499,13 +493,13 @@
         },
         {
           "name": "Ver el pedido creado (200)",
-          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos/{{codigo_pedido}}", "description": "GET /api/pedidos/{codigo} · Detalle con líneas, personalización e historial de estados." },
+          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos/{{codigo_pedido}}", "description": "GET /api/pedidos/{codigo} · Detalle con líneas e historial de estados." },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('200 OK', () => pm.response.to.have.status(200));",
             "const pedido = pm.response.json().datos;",
-            "pm.test('Dos líneas, la segunda con dorsal', () => {",
+            "pm.test('Dos líneas con el precio del catálogo', () => {",
             "    pm.expect(pedido.lineas).to.have.lengthOf(2);",
-            "    pm.expect(pedido.lineas[1].personalizacion[0].texto).to.eql('10');",
+            "    pedido.lineas.forEach(l => pm.expect(l.precio_unitario).to.eql(Number(pm.collectionVariables.get('precio'))));",
             "});",
             "pm.test('Historial: creado como pendiente', () => pm.expect(pedido.historial[0].estado_nuevo).to.eql('pendiente'));",
             "pm.test('Se puede cancelar', () => pm.expect(pedido.se_puede_cancelar).to.be.true);"
@@ -562,7 +556,6 @@
     { "key": "cuerpo_pedido", "value": "" },
     { "key": "codigo_pedido", "value": "" },
     { "key": "precio", "value": "" },
-    { "key": "recargo_dorsal", "value": "" },
     { "key": "variante_1", "value": "" },
     { "key": "stock_antes", "value": "" }
   ]

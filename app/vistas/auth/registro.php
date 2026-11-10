@@ -20,7 +20,6 @@ $campo = static function (string $nombre, string $etiqueta, string $tipo = 'text
             <?php endif; ?>
     <?php
 };
-$tipoActual = $datos['tipo_cliente'] ?? 'particular';
 ?>
         <h1>Crear cuenta</h1>
 
@@ -36,15 +35,7 @@ $tipoActual = $datos['tipo_cliente'] ?? 'particular';
             <?php $campo('email', 'Email', 'email', 150, true); ?>
             <?php $campo('password', 'Contraseña (mínimo 8 caracteres, con letras y números)', 'password', 72, true); ?>
 
-            <label for="tipo_cliente">Tipo de cliente</label>
-            <select id="tipo_cliente" name="tipo_cliente">
-                <?php foreach (['particular' => 'Particular', 'club' => 'Club', 'equipo' => 'Equipo'] as $valor => $texto): ?>
-                    <option value="<?= $valor ?>"<?= $tipoActual === $valor ? ' selected' : '' ?>><?= $texto ?></option>
-                <?php endforeach; ?>
-            </select>
-
-            <?php $campo('razon_social', 'Nombre del club o equipo', 'text', 150); ?>
-            <?php $campo('nif', 'DNI, NIE o CIF', 'text', 15); ?>
+            <?php $campo('nif', 'DNI o NIE', 'text', 15); ?>
             <?php $campo('telefono', 'Teléfono', 'tel', 20); ?>
             <?php $campo('direccion', 'Dirección', 'text', 200); ?>
             <?php $campo('codigo_postal', 'Código postal', 'text', 5); ?>

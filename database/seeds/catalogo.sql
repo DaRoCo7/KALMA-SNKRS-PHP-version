@@ -38,53 +38,53 @@ INSERT INTO colores (nombre, codigo_hex) VALUES
 -- (el enunciado pide un mínimo de 8 modelos)
 -- -----------------------------------------------------------------------------
 INSERT INTO productos (categoria_id, marca_id, color_id, nombre, colorway, codigo_marca,
-                       slug, descripcion, precio, personalizable, imagen,
+                       slug, descripcion, precio, imagen,
                        fecha_creacion, fecha_actualizacion)
 SELECT cat.id, m.id, col.id, p.nombre, p.colorway, p.codigo,
        -- Slug a partir del nombre y el código: "Nike Air Force 1 '07" + "CW2288-111"
        -- -> nike-air-force-1-07-cw2288-111 (sin escribirlo a mano, sin errores)
        trim(BOTH '-' FROM regexp_replace(lower(p.nombre || ' ' || p.codigo), '[^a-z0-9]+', '-', 'g')),
-       p.descripcion, p.precio, p.personalizable,
+       p.descripcion, p.precio,
        'img/productos/' || lower(p.codigo) || '.webp',   -- las fotos llegan en la fase de front
        '2026-06-15 08:00+02', '2026-06-15 08:00+02'
 FROM (VALUES
     (1,  'Lifestyle', 'Blanco', 'Nike Air Force 1 ''07',        'White/White',
-         'CW2288-111', 119.99, true,
+         'CW2288-111', 119.99,
          'El clásico de baloncesto de 1982 en su versión más icónica: piel blanca de arriba abajo, perforaciones en la puntera y amortiguación Nike Air.'),
     (2,  'Lifestyle', 'Negro',  'Nike Air Force 1 ''07',        'Black/Black',
-         'CW2288-001', 119.99, true,
+         'CW2288-001', 119.99,
          'El Air Force 1 en negro total: piel, mediasuela y suela negras con la misma amortiguación Nike Air del modelo original.'),
     (3,  'Lifestyle', 'Negro',  'Nike Dunk Low Retro',          'White/Black-White',
-         'DD1391-100', 119.99, true,
+         'DD1391-100', 119.99,
          'Apodada «Panda». La Dunk nació en 1985 como zapatilla de baloncesto universitario y esta combinación blanca y negra es una de las más vendidas de los últimos años.'),
     (4,  'Lifestyle', 'Gris',   'Nike Dunk Low Retro',          'White/Grey Fog',
-         'DD1391-103', 119.99, true,
+         'DD1391-103', 119.99,
          'Apodada «Grey Fog»: piel blanca con refuerzos en gris niebla. Una Dunk sobria para el día a día.'),
     (5,  'Air Max',   'Rojo',   'Nike Air Max 90',              'White/Black-Cool Grey-Radiant Red',
-         'CT1685-100', 149.99, false,
+         'CT1685-100', 149.99,
          'Reedición de 2020 del «Infrared» original de 1990: malla blanca, refuerzos gris y negro y detalles en rojo infrarrojo junto a la cámara de aire visible.'),
     (6,  'Air Max',   'Plata',  'Nike Air Max 97 OG',           'Metallic Silver/University Red-Black-White',
-         'DM0028-002', 189.99, false,
+         'DM0028-002', 189.99,
          'Reedición de 2022 del «Silver Bullet»: líneas plateadas inspiradas en los trenes bala japoneses y cámara Air de longitud completa.'),
     (7,  'Air Max',   'Rojo',   'Nike Air Max 1 ''86 OG',       'White/University Red-Light Neutral Grey',
-         'DQ3989-100', 159.99, false,
+         'DQ3989-100', 159.99,
          'Edición «Big Bubble» del Air Max Day 2023, que recupera la cámara de aire más grande del modelo original de 1986.'),
     (8,  'Lifestyle', 'Blanco', 'Nike Blazer Mid ''77 Vintage', 'White/Black',
-         'BQ6806-100', 109.99, true,
+         'BQ6806-100', 109.99,
          'Diseño de baloncesto de los años 70: piel blanca, Swoosh negro y mediasuela con acabado envejecido.'),
     (9,  'Lifestyle', 'Azul',   'Nike Cortez Leather',          'White/Varsity Blue/Varsity Red',
-         'DM4044-108', 99.99,  true,
+         'DM4044-108', 99.99,
          'La zapatilla de running con la que empezó Nike en 1972, en piel blanca con Swoosh azul y detalles en rojo.'),
     (10, 'Jordan',    'Rojo',   'Air Jordan 1 Retro High OG',   'Varsity Red/Black/Sail/Muslin',
-         'DZ5485-612', 180.00, false,
+         'DZ5485-612', 180.00,
          'Apodada «Lost & Found» (2022): el colorido Chicago con piel craquelada y tonos envejecidos, como un par olvidado en el almacén de una tienda de los 80.'),
     (11, 'Jordan',    'Blanco', 'Air Jordan 3 Retro',           'Summit White/Fire Red/Black/Cement Grey',
-         'DN3707-100', 209.99, false,
+         'DN3707-100', 209.99,
          'Apodada «White Cement Reimagined» (2023): piel blanca, estampado de elefante en gris cemento y mediasuela envejecida por el 35 aniversario del modelo.'),
     (12, 'Jordan',    'Gris',   'Air Jordan 4 Retro',           'White/Black-Neutral Grey',
-         'DH6927-111', 199.99, false,
+         'DH6927-111', 199.99,
          'Apodada «Military Black» (2022): los bloques de color del «Military Blue» de 1989 en negro y gris neutro sobre piel blanca.')
-) AS p(orden, categoria, color, nombre, colorway, codigo, precio, personalizable, descripcion)
+) AS p(orden, categoria, color, nombre, colorway, codigo, precio, descripcion)
 JOIN categorias cat ON cat.nombre = p.categoria
 JOIN colores col    ON col.nombre = p.color
 JOIN marcas m       ON m.nombre = 'Nike'
@@ -132,20 +132,6 @@ FROM variantes v
 JOIN usuarios u ON u.email = 'almacen@kalma.test'
 WHERE v.stock > 0
 ORDER BY v.id;
-
--- -----------------------------------------------------------------------------
--- Opciones de personalización (recargo por par). La suela translúcida está
--- desactivada para probar que el servidor rechaza opciones no disponibles.
--- -----------------------------------------------------------------------------
-INSERT INTO opciones_personalizacion (tipo, nombre, requiere_texto, recargo, activo) VALUES
-    ('color_suela',    'Suela de goma natural',                  false, 10.00, true),
-    ('color_suela',    'Suela negra',                            false, 10.00, true),
-    ('color_suela',    'Suela translúcida',                      false, 12.00, false),
-    ('color_cordones', 'Cordones rojos',                         false,  5.00, true),
-    ('color_cordones', 'Cordones con los colores del club',      false,  5.00, true),
-    ('texto',          'Nombre bordado en el talón',             true,  15.00, true),
-    ('dorsal',         'Dorsal en la lengüeta',                  true,  10.00, true),
-    ('logo',           'Escudo del club o equipo en el lateral', false, 25.00, true);
 
 -- -----------------------------------------------------------------------------
 -- Auditoría: alta de cada producto por la administradora

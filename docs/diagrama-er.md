@@ -1,6 +1,6 @@
 # Diagrama entidad/relación · KALMA SNKRS
 
-Modelo de datos de [`database/schema.sql`](../database/schema.sql): PostgreSQL 17 con 17 tablas.
+Modelo de datos de [`database/schema.sql`](../database/schema.sql): PostgreSQL 17 con 15 tablas.
 
 ```mermaid
 erDiagram
@@ -21,8 +21,6 @@ erDiagram
     %% ---------- Pedidos ----------
     pedidos ||--o{ lineas_pedido : "contiene"
     variantes ||..o{ lineas_pedido : "se pide en"
-    lineas_pedido ||--o{ linea_personalizacion : "lleva"
-    opciones_personalizacion ||..o{ linea_personalizacion : "elegida en"
     pedidos ||--o{ historial_estados_pedido : "registra"
     usuarios |o..o{ historial_estados_pedido : "cambia estado"
 
@@ -53,9 +51,7 @@ erDiagram
     clientes {
         int id PK
         int usuario_id FK, UK "1 a 1 con usuarios"
-        varchar tipo_cliente "particular, club o equipo"
-        varchar razon_social "obligatoria si es club o equipo"
-        varchar nif UK
+        varchar nif UK "DNI o NIE"
         varchar telefono
         varchar direccion
         varchar codigo_postal
@@ -88,7 +84,6 @@ erDiagram
         varchar slug UK
         text descripcion
         numeric precio
-        bool personalizable
         varchar imagen
         bool activo
         timestamptz fecha_creacion
@@ -104,20 +99,11 @@ erDiagram
         bool activo
         timestamptz fecha_actualizacion
     }
-    opciones_personalizacion {
-        int id PK
-        varchar tipo "suela, cordones, texto, dorsal, logo"
-        varchar nombre "único junto con tipo"
-        bool requiere_texto
-        numeric recargo
-        bool activo
-    }
     pedidos {
         int id PK
         varchar codigo UK "ej. SF-2026-000001"
         int cliente_id FK
         varchar estado "pendiente a entregado, o cancelado"
-        bool personalizado
         numeric total
         varchar direccion_envio "copia al hacer el pedido"
         varchar codigo_seguimiento UK
@@ -134,15 +120,7 @@ erDiagram
         varchar color "copia del colorway"
         int cantidad "de 1 a 20"
         numeric precio_unitario "precio aplicado"
-        numeric recargo_personalizacion
-        numeric importe "columna generada"
-    }
-    linea_personalizacion {
-        int id PK
-        int linea_id FK
-        int opcion_id FK "única dentro de la línea"
-        varchar texto "nombre o dorsal"
-        numeric recargo_aplicado
+        numeric importe "columna generada: cantidad x precio"
     }
     historial_estados_pedido {
         int id PK
@@ -207,8 +185,6 @@ Leyenda: `||` exactamente uno · `|o` cero o uno · `o{` cero o muchos. La líne
 | variantes → productos | N : 1 | `variantes.producto_id` | NO ACTION |
 | lineas_pedido → pedidos | N : 1 (el servicio exige al menos 1 línea) | `lineas_pedido.pedido_id` | CASCADE |
 | lineas_pedido → variantes | N : 1 | `lineas_pedido.variante_id` | NO ACTION |
-| linea_personalizacion → lineas_pedido | N : 1 | `linea_personalizacion.linea_id` | CASCADE |
-| linea_personalizacion → opciones_personalizacion | N : 1 | `linea_personalizacion.opcion_id` | NO ACTION |
 | historial_estados_pedido → pedidos | N : 1 | `historial_estados_pedido.pedido_id` | CASCADE |
 | historial_estados_pedido → usuarios | N : 0..1 | `historial_estados_pedido.usuario_id` | SET NULL |
 | movimientos_stock → variantes | N : 1 | `movimientos_stock.variante_id` | NO ACTION |
@@ -223,20 +199,18 @@ Leyenda: `||` exactamente uno · `|o` cero o uno · `o{` cero o muchos. La líne
 **Usuarios y acceso**
 - **roles**: los perfiles (admin, almacen, cliente) están en una tabla con FK en lugar de un CHECK, así que añadir un rol no obliga a cambiar el esquema. La matriz de permisos está en el middleware PHP.
 - **usuarios**: datos de acceso comunes a clientes y personal. Solo guarda el hash de la contraseña, y el email es único sin distinguir mayúsculas.
-- **clientes**: perfil comercial 1:1 separado del acceso. Solo los clientes tienen NIF y dirección, así el personal interno no deja columnas vacías. Distingue particular, club y equipo.
+- **clientes**: perfil 1:1 separado del acceso. Solo los clientes tienen DNI y dirección, así el personal interno no deja columnas vacías. KALMA vende a particulares, así que no hay tipos de cliente ni razón social.
 
 **Catálogo**
 - **categorias**: agrupa el catálogo (Lifestyle, Air Max, Jordan) para poder filtrar.
 - **marcas**: evita repetir la marca en cada producto y permite que el código de estilo sea único por marca.
 - **colores**: color principal normalizado (nombre y hex) para el filtro por color.
-- **productos**: un modelo en una combinación de colores, como en Nike.com, con su código de estilo real, su precio, su foto y si admite personalización.
+- **productos**: un modelo en una combinación de colores, como en Nike.com, con su código de estilo real, su precio y su foto.
 - **variantes**: producto + talla. Es lo que se vende y lo que tiene stock. Su `CHECK (stock >= 0)` es la última defensa contra la sobreventa. Aquí va también la etiqueta RFID de la tienda.
-- **opciones_personalizacion**: catálogo de personalizaciones válidas con su recargo. El servidor valida contra esta tabla en lugar de aceptar texto libre.
 
 **Pedidos**
 - **pedidos**: cabecera del pedido: cliente, estado (con CHECK), total y una copia de la dirección de envío del momento de la compra.
 - **lineas_pedido**: detalle del pedido con una copia del nombre, la talla, el color y el precio aplicado. El importe es una columna generada y la misma variante no se repite dentro de un pedido.
-- **linea_personalizacion**: opciones elegidas en cada línea de un pedido personalizado, con el texto (nombre o dorsal) y el recargo que se aplicó.
 - **historial_estados_pedido**: guarda cada transición de estado (estado anterior y nuevo, quién y cuándo), tal como pide el enunciado.
 - **movimientos_stock**: guarda cada cambio de stock (entrada, venta, cancelación, ajuste) con el stock resultante, para poder reconstruir y auditar el inventario.
 

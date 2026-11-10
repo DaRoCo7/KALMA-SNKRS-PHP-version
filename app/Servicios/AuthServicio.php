@@ -38,10 +38,10 @@ final class AuthServicio
     }
 
     /**
-     * Alta de un cliente nuevo (cuenta + perfil comercial).
+     * Alta de un cliente nuevo (cuenta + perfil de cliente).
      *
      * @return array usuario creado (sin hash)
-     * @throws HttpExcepcion 400 datos no válidos · 409 email o NIF ya registrados
+     * @throws HttpExcepcion 400 datos no válidos · 409 email o DNI ya registrados
      */
     public function registrar(array $entrada, ?string $ip): array
     {
@@ -50,19 +50,12 @@ final class AuthServicio
             ->texto('apellidos', 150)
             ->email('email')
             ->contrasena('password')
-            ->opcion('tipo_cliente', ['particular', 'club', 'equipo'], 'particular')
-            ->texto('razon_social', 150, obligatorio: false)
             ->nif('nif')
             ->patron('telefono', '/^\+?[0-9 ]{9,20}$/', 'Teléfono no válido')
             ->texto('direccion', 200, obligatorio: false)
             ->patron('codigo_postal', '/^[0-9]{5}$/', 'Código postal de 5 cifras')
             ->texto('ciudad', 100, obligatorio: false)
             ->texto('provincia', 100, obligatorio: false)
-            ->comprobar(
-                fn (array $d): bool => ($d['tipo_cliente'] ?? 'particular') === 'particular' || ($d['razon_social'] ?? null) !== null,
-                'razon_social',
-                'Obligatoria para clubes y equipos'
-            )
             ->validar();
 
         if ($this->usuarios->emailRegistrado($datos['email'])) {
@@ -73,16 +66,14 @@ final class AuthServicio
             // Dos tablas (usuarios + clientes) y la auditoría: todo o nada
             $id = BaseDatos::transaccion(function () use ($datos, $ip): int {
                 $id = $this->usuarios->crearCliente($datos, password_hash($datos['password'], PASSWORD_DEFAULT));
-                $this->auditoria->registrar($id, 'usuario.registrar', 'usuario', $id, 'exito', [
-                    'rol' => 'cliente', 'tipo_cliente' => $datos['tipo_cliente'],
-                ], $ip);
+                $this->auditoria->registrar($id, 'usuario.registrar', 'usuario', $id, 'exito', ['rol' => 'cliente'], $ip);
                 return $id;
             });
         } catch (\PDOException $error) {
-            // 23505 = clave única repetida: dos registros simultáneos con el mismo email o NIF
+            // 23505 = clave única repetida: dos registros simultáneos con el mismo email o DNI
             if ($error->getCode() === '23505') {
                 throw HttpExcepcion::conflicto(
-                    str_contains($error->getMessage(), 'nif') ? 'Ya existe un cliente con ese NIF' : 'Ya existe una cuenta con ese email'
+                    str_contains($error->getMessage(), 'nif') ? 'Ya existe un cliente con ese DNI o NIE' : 'Ya existe una cuenta con ese email'
                 );
             }
             throw $error;

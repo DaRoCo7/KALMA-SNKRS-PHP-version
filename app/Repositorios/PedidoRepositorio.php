@@ -7,17 +7,16 @@ namespace App\Repositorios;
 use App\Nucleo\BaseDatos;
 
 /**
- * Acceso a datos de pedidos, sus líneas, su personalización y su historial.
+ * Acceso a datos de pedidos, sus líneas y su historial.
  * Solo SQL: las reglas (quién puede ver qué, qué estados se permiten) están
  * en PedidoServicio.
  */
 final class PedidoRepositorio
 {
     /** Datos del pedido y de su cliente, comunes al detalle y al listado */
-    private const COLUMNAS = 'p.id, p.codigo, p.estado, p.personalizado, p.total, p.direccion_envio,
+    private const COLUMNAS = 'p.id, p.codigo, p.estado, p.total, p.direccion_envio,
         p.codigo_seguimiento, p.notas, p.fecha_creacion, p.fecha_actualizacion, p.cliente_id,
-        u.nombre AS cliente_nombre, u.apellidos AS cliente_apellidos, u.email AS cliente_email,
-        c.tipo_cliente, c.razon_social';
+        u.nombre AS cliente_nombre, u.apellidos AS cliente_apellidos, u.email AS cliente_email';
 
     private const DESDE = 'FROM pedidos p
         JOIN clientes c ON c.id = p.cliente_id
@@ -32,21 +31,20 @@ final class PedidoRepositorio
      *
      * @return array{id: int, codigo: string}
      */
-    public function crear(int $clienteId, string $direccionEnvio, ?string $notas, bool $personalizado): array
+    public function crear(int $clienteId, string $direccionEnvio, ?string $notas): array
     {
         $pdo = BaseDatos::conexion();
 
         $insertar = $pdo->prepare(
-            'INSERT INTO pedidos (codigo, cliente_id, personalizado, direccion_envio, notas)
-             VALUES (:provisional, :cliente_id, :personalizado, :direccion, :notas)
+            'INSERT INTO pedidos (codigo, cliente_id, direccion_envio, notas)
+             VALUES (:provisional, :cliente_id, :direccion, :notas)
              RETURNING id'
         );
         $insertar->execute([
-            'provisional'   => 'TMP' . bin2hex(random_bytes(8)),   // 19 caracteres, cabe en VARCHAR(20)
-            'cliente_id'    => $clienteId,
-            'personalizado' => $personalizado ? 'true' : 'false',  // PDO enviaría false como cadena vacía
-            'direccion'     => $direccionEnvio,
-            'notas'         => $notas,
+            'provisional' => 'TMP' . bin2hex(random_bytes(8)),   // 19 caracteres, cabe en VARCHAR(20)
+            'cliente_id'  => $clienteId,
+            'direccion'   => $direccionEnvio,
+            'notas'       => $notas,
         ]);
         $id = (int) $insertar->fetchColumn();
 
@@ -71,10 +69,8 @@ final class PedidoRepositorio
     public function agregarLinea(int $pedidoId, array $linea): int
     {
         $consulta = BaseDatos::conexion()->prepare(
-            'INSERT INTO lineas_pedido (pedido_id, variante_id, nombre_producto, talla, color, cantidad,
-                                        precio_unitario, recargo_personalizacion)
-             VALUES (:pedido_id, :variante_id, :nombre_producto, :talla, :color, :cantidad,
-                     :precio_unitario, :recargo)
+            'INSERT INTO lineas_pedido (pedido_id, variante_id, nombre_producto, talla, color, cantidad, precio_unitario)
+             VALUES (:pedido_id, :variante_id, :nombre_producto, :talla, :color, :cantidad, :precio_unitario)
              RETURNING id'
         );
         $consulta->execute([
@@ -85,23 +81,8 @@ final class PedidoRepositorio
             'color'           => $linea['color'],
             'cantidad'        => $linea['cantidad'],
             'precio_unitario' => $linea['precio_unitario'],
-            'recargo'         => $linea['recargo_personalizacion'],
         ]);
         return (int) $consulta->fetchColumn();
-    }
-
-    /** Opción de personalización elegida en una línea, con el recargo que se aplicó */
-    public function agregarPersonalizacion(int $lineaId, int $opcionId, ?string $texto, float $recargo): void
-    {
-        BaseDatos::conexion()->prepare(
-            'INSERT INTO linea_personalizacion (linea_id, opcion_id, texto, recargo_aplicado)
-             VALUES (:linea_id, :opcion_id, :texto, :recargo)'
-        )->execute([
-            'linea_id'  => $lineaId,
-            'opcion_id' => $opcionId,
-            'texto'     => $texto,
-            'recargo'   => $recargo,
-        ]);
     }
 
     /** El total es la suma de los importes de las líneas: lo calcula la BD, no PHP ni el navegador */
@@ -164,26 +145,17 @@ final class PedidoRepositorio
         return $consulta->fetch() ?: null;
     }
 
-    /** Líneas con su personalización (en JSON) y el slug e imagen del producto para enlazarlo */
+    /** Líneas del pedido, con el slug y la imagen del producto para poder enlazarlo */
     public function lineas(int $pedidoId): array
     {
         $consulta = BaseDatos::conexion()->prepare(
-            "SELECT l.id, l.variante_id, l.nombre_producto, l.color, l.talla, l.cantidad,
-                    l.precio_unitario, l.recargo_personalizacion, l.importe, pr.slug, pr.imagen,
-                    COALESCE((
-                        SELECT json_agg(json_build_object(
-                                   'opcion_id', o.id, 'tipo', o.tipo, 'nombre', o.nombre,
-                                   'texto', lp.texto, 'recargo', lp.recargo_aplicado
-                               ) ORDER BY o.tipo, o.id)
-                        FROM linea_personalizacion lp
-                        JOIN opciones_personalizacion o ON o.id = lp.opcion_id
-                        WHERE lp.linea_id = l.id
-                    ), '[]') AS personalizacion
+            'SELECT l.id, l.variante_id, l.nombre_producto, l.color, l.talla, l.cantidad,
+                    l.precio_unitario, l.importe, pr.slug, pr.imagen
              FROM lineas_pedido l
              JOIN variantes v  ON v.id = l.variante_id
              JOIN productos pr ON pr.id = v.producto_id
              WHERE l.pedido_id = :id
-             ORDER BY l.id"
+             ORDER BY l.id'
         );
         $consulta->execute(['id' => $pedidoId]);
         return $consulta->fetchAll();

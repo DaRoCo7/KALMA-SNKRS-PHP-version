@@ -4,8 +4,8 @@
 -- compose.yaml lo monta como /docker-entrypoint-initdb.d/02_usuarios.sql
 -- (se ejecuta después del esquema y antes del catálogo).
 --
--- Todas las personas, clubes y equipos son FICTICIOS. Los emails usan el
--- dominio reservado .test para que nunca puedan ser direcciones reales.
+-- Todas las personas son FICTICIAS. Los emails usan el dominio reservado
+-- .test para que nunca puedan ser direcciones reales.
 --
 -- Usuarios de prueba (uno por perfil, documentados en el README):
 --   admin@kalma.test    -> administrador
@@ -36,7 +36,7 @@ FROM (VALUES
     ('admin',   'Laura',   'Martín Correa',    'admin@kalma.test',                '$2y$10$2KXGTxp2CFt9FWHj/l2BaO5hiNw8la6fJNwKpORN6QEQKrucH58vm', true,  '2026-01-12 09:00+01'),
     ('almacen', 'Carlos',  'Rivas Peña',       'almacen@kalma.test',              '$2y$10$OixLZSaVM/UjxBE3T5u9/OSlGu4tZa.QfGNzxiFjNLtcwxcmsl8RG', true,  '2026-01-12 09:30+01'),
     ('almacen', 'Marta',   'León Gallego',     'marta.leon@kalma.test',           '$2y$10$am19naX3y6/paOIMCrk9Pu14NTB49YJXGdgRpnmR/tDA7Yf4UafY2', true,  '2026-02-02 10:00+01'),
-    -- Clientes particulares
+    -- Clientes
     ('cliente', 'Lucía',   'Fernández Ruiz',   'cliente@kalma.test',              '$2y$10$mW11FhHfWQQu4rQPTW125eADUkAPAyCm1u.Uwm7BPgSrv/rdfv1WK', true,  '2026-03-04 18:12+01'),
     ('cliente', 'Marcos',  'Gil Navarro',      'marcos.gil@correo.test',          '$2y$10$Bkg1VYPvJMfvtGZaLQ15DOZ0oN294/PhvvbGyaMhCaaBCf.iGCw3C', true,  '2026-03-15 21:40+01'),
     ('cliente', 'Paula',   'Romero Sanz',      'paula.romero@correo.test',        '$2y$10$0vBL3DnLtPb9Zr6twM0kWOUjsuyDoDpraVQCwPWSjwM7pHCygGGfi', true,  '2026-04-02 12:05+02'),
@@ -46,38 +46,36 @@ FROM (VALUES
     ('cliente', 'Sara',    'Medina Ibáñez',    'sara.medina@correo.test',         '$2y$10$FdukyFg85bdIvYOa32LP4ucO3mYcJ/8HFBeuW64fi3qbFSRf5Eyy6', true,  '2026-06-08 16:02+02'),
     ('cliente', 'Hugo',    'Serrano Prieto',   'hugo.serrano@correo.test',        '$2y$10$l1lXKtXc1wQaeOFgsQeFteaPNZCPGYnPLAJ2yA.Dg7WNzZzURQLKC', true,  '2026-06-21 22:15+02'),
     ('cliente', 'Tomás',   'Vera Aguilar',     'tomas.vera@correo.test',          '$2y$10$XO2fTlF2ERAPHIyLCXnCMOEMvR6LX3pxCt4.HfhoqGff.mzpYMF4e', false, '2026-04-11 11:11+02'),
-    -- Clubes y equipos (la persona de contacto es quien tiene la cuenta)
-    ('cliente', 'Andrés',  'Lozano Rey',       'cd.lasencinas@correo.test',       '$2y$10$Fs1MhlbcbyyCuRDgEdNzH.cCxReGf8J5oyAS759DEKE8xtDvK.GLK', true,  '2026-03-28 09:15+01'),
-    ('cliente', 'Elena',   'Pascual Vega',     'cb.riberanorte@correo.test',      '$2y$10$KKxnSPsGEv./ef83QfL0UuTVmcIy/rXXTMMCS6r6BImrLIK5YEpS6', true,  '2026-05-12 13:30+02'),
-    ('cliente', 'Rubén',   'Cano Fuentes',     'urbanrunners.sur@correo.test',    '$2y$10$IWhBjV7R2mVupvYg83ZDn.5uHGfFvUycCvecCxfQJDQH/0jwwOEb2', true,  '2026-06-02 20:45+02'),
-    ('cliente', 'Nerea',   'Blanco Soler',     'asfalto.crew@correo.test',        '$2y$10$wuEMoo.Jf2GdLhcaQKchQOq0YECelSqAQP.1/ywVkVS0mxEq9CmI2', true,  '2026-06-30 18:00+02')
+    ('cliente', 'Andrés',  'Lozano Rey',       'andres.lozano@correo.test',       '$2y$10$Fs1MhlbcbyyCuRDgEdNzH.cCxReGf8J5oyAS759DEKE8xtDvK.GLK', true,  '2026-03-28 09:15+01'),
+    ('cliente', 'Elena',   'Pascual Vega',     'elena.pascual@correo.test',       '$2y$10$KKxnSPsGEv./ef83QfL0UuTVmcIy/rXXTMMCS6r6BImrLIK5YEpS6', true,  '2026-05-12 13:30+02'),
+    ('cliente', 'Rubén',   'Cano Fuentes',     'ruben.cano@correo.test',          '$2y$10$IWhBjV7R2mVupvYg83ZDn.5uHGfFvUycCvecCxfQJDQH/0jwwOEb2', true,  '2026-06-02 20:45+02'),
+    ('cliente', 'Nerea',   'Blanco Soler',     'nerea.blanco@correo.test',        '$2y$10$wuEMoo.Jf2GdLhcaQKchQOq0YECelSqAQP.1/ywVkVS0mxEq9CmI2', true,  '2026-06-30 18:00+02')
 ) AS u(rol, nombre, apellidos, email, hash, activo, alta)
 JOIN roles r ON r.codigo = u.rol
 ORDER BY u.alta::timestamptz;   -- los id siguen el orden de alta
 
 -- -----------------------------------------------------------------------------
--- Perfil comercial de los clientes. Los NIF son ficticios pero tienen la letra
--- de control correcta, así que pasan la misma validación que hará PHP.
--- El equipo Asfalto Crew no es una entidad legal: no tiene NIF (NULL permitido).
+-- Perfil de los clientes. Los DNI son ficticios pero tienen la letra de
+-- control correcta, así que pasan la misma validación que hace PHP.
+-- El DNI es opcional: Nerea Blanco no lo ha indicado (NULL permitido).
 -- -----------------------------------------------------------------------------
-INSERT INTO clientes (usuario_id, tipo_cliente, razon_social, nif, telefono,
-                      direccion, codigo_postal, ciudad, provincia)
-SELECT us.id, c.tipo, c.razon_social, c.nif, c.telefono, c.direccion, c.cp, c.ciudad, c.provincia
+INSERT INTO clientes (usuario_id, nif, telefono, direccion, codigo_postal, ciudad, provincia)
+SELECT us.id, c.nif, c.telefono, c.direccion, c.cp, c.ciudad, c.provincia
 FROM (VALUES
-    ('cliente@kalma.test',           'particular', NULL,                           '50112233V', '600000101', 'Calle Mayor 12, 2º A',            '28013', 'Madrid',     'Madrid'),
-    ('marcos.gil@correo.test',       'particular', NULL,                           '20334455V', '600000102', 'Calle de Colón 8, 4º',            '46004', 'Valencia',   'Valencia'),
-    ('paula.romero@correo.test',     'particular', NULL,                           '28445566V', '600000103', 'Avenida de la Constitución 21',   '41001', 'Sevilla',    'Sevilla'),
-    ('javier.ortega@correo.test',    'particular', NULL,                           '17556677H', '600000104', 'Paseo de la Independencia 5, 1º', '50001', 'Zaragoza',   'Zaragoza'),
-    ('irene.castro@correo.test',     'particular', NULL,                           '25667788H', '600000105', 'Calle Larios 3, 3º B',            '29005', 'Málaga',     'Málaga'),
-    ('daniel.vidal@correo.test',     'particular', NULL,                           '46778899G', '600000106', 'Carrer de Pelai 14, 2º 1ª',       '08001', 'Barcelona',  'Barcelona'),
-    ('sara.medina@correo.test',      'particular', NULL,                           '16889900B', '600000107', 'Gran Vía 40, 5º D',               '48011', 'Bilbao',     'Bizkaia'),
-    ('hugo.serrano@correo.test',     'particular', NULL,                           '12990011W', '600000108', 'Calle Santiago 9, 1º',            '47001', 'Valladolid', 'Valladolid'),
-    ('tomas.vera@correo.test',       'particular', NULL,                           '48101122A', '600000109', 'Calle Real 2',                    '30001', 'Murcia',     'Murcia'),
-    ('cd.lasencinas@correo.test',    'club',       'Club Deportivo Las Encinas',   'G81234569', '910000201', 'Calle del Polideportivo 1',       '28031', 'Madrid',     'Madrid'),
-    ('cb.riberanorte@correo.test',   'club',       'Club Baloncesto Ribera Norte', 'G30234561', '968000202', 'Avenida Juan Carlos I 15',        '30008', 'Murcia',     'Murcia'),
-    ('urbanrunners.sur@correo.test', 'equipo',     'Urban Runners Sur',            'G88345673', '910000203', 'Calle Madrid 45',                 '28901', 'Getafe',     'Madrid'),
-    ('asfalto.crew@correo.test',     'equipo',     'Asfalto Crew',                 NULL,               '965000204', 'Rambla de Méndez Núñez 30',       '03002', 'Alicante',   'Alicante')
-) AS c(email, tipo, razon_social, nif, telefono, direccion, cp, ciudad, provincia)
+    ('cliente@kalma.test',        '50112233V', '600000101', 'Calle Mayor 12, 2º A',            '28013', 'Madrid',     'Madrid'),
+    ('marcos.gil@correo.test',    '20334455V', '600000102', 'Calle de Colón 8, 4º',            '46004', 'Valencia',   'Valencia'),
+    ('paula.romero@correo.test',  '28445566V', '600000103', 'Avenida de la Constitución 21',   '41001', 'Sevilla',    'Sevilla'),
+    ('javier.ortega@correo.test', '17556677H', '600000104', 'Paseo de la Independencia 5, 1º', '50001', 'Zaragoza',   'Zaragoza'),
+    ('irene.castro@correo.test',  '25667788H', '600000105', 'Calle Larios 3, 3º B',            '29005', 'Málaga',     'Málaga'),
+    ('daniel.vidal@correo.test',  '46778899G', '600000106', 'Carrer de Pelai 14, 2º 1ª',       '08001', 'Barcelona',  'Barcelona'),
+    ('sara.medina@correo.test',   '16889900B', '600000107', 'Gran Vía 40, 5º D',               '48011', 'Bilbao',     'Bizkaia'),
+    ('hugo.serrano@correo.test',  '12990011W', '600000108', 'Calle Santiago 9, 1º',            '47001', 'Valladolid', 'Valladolid'),
+    ('tomas.vera@correo.test',    '48101122A', '600000109', 'Calle Real 2',                    '30001', 'Murcia',     'Murcia'),
+    ('andres.lozano@correo.test', '51223344K', '600000110', 'Calle de Alcalá 150, 3º C',       '28028', 'Madrid',     'Madrid'),
+    ('elena.pascual@correo.test', '23667788Y', '600000111', 'Avenida de la Libertad 22, 1º',   '30009', 'Murcia',     'Murcia'),
+    ('ruben.cano@correo.test',    '30889911Z', '600000112', 'Calle Madrid 45, 2º B',           '28901', 'Getafe',     'Madrid'),
+    ('nerea.blanco@correo.test',  NULL,        '600000113', 'Rambla de Méndez Núñez 30, 4º',   '03002', 'Alicante',   'Alicante')
+) AS c(email, nif, telefono, direccion, cp, ciudad, provincia)
 JOIN usuarios us ON lower(us.email) = lower(c.email)
 ORDER BY us.id;
 
@@ -86,7 +84,7 @@ ORDER BY us.id;
 -- -----------------------------------------------------------------------------
 INSERT INTO auditoria (usuario_id, tipo_evento, entidad, entidad_id, resultado, detalle, fecha)
 SELECT u.id, 'usuario.registrar', 'usuario', u.id, 'exito',
-       jsonb_build_object('rol', r.codigo, 'tipo_cliente', c.tipo_cliente),
+       jsonb_build_object('rol', r.codigo),
        u.fecha_creacion
 FROM usuarios u
 JOIN roles r    ON r.id = u.rol_id
@@ -99,8 +97,8 @@ INSERT INTO consultas (nombre, email, asunto, mensaje, estado, fecha_consulta) V
     ('Álvaro Muñoz',  'alvaro.munoz@correo.test', 'Tallas de Air Jordan 1',
      '¿Las Air Jordan 1 High OG tallan igual que las Air Force 1? Uso un 43.',
      'respondida', '2026-09-14 11:20+02'),
-    ('Club Hockey Meseta', 'hockey.meseta@correo.test', 'Pedido para un equipo',
-     'Somos 18 jugadores y queremos Air Force 1 con el número de cada uno. ¿Hacéis descuento por volumen?',
+    ('Rocío Gallardo', 'rocio.gallardo@correo.test', 'Reposición de Air Jordan 1',
+     'Las Air Jordan 1 «Lost & Found» aparecen agotadas en la talla 42. ¿Vais a recibir más pares?',
      'pendiente', '2026-11-03 17:45+01'),
     ('Carmen Ríos',   'carmen.rios@correo.test',  'Cambio de talla',
      'Me llegaron unas Dunk Low en 39 y necesito un 40. ¿Cómo hago el cambio?',
