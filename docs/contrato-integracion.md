@@ -156,7 +156,7 @@ El pedido `SF-2026-000022` es de otro cliente: sirve para demostrar que `cliente
   | 404 | La ruta o el recurso no existen (o no son tuyos) | — |
   | 405 | Método no permitido en esa ruta | `{"permitidos": "GET, POST"}` |
   | 409 | Choca con el estado actual (sin stock, estado que no permite el cambio, email repetido) | Según el caso |
-  | 413 / 415 | Cuerpo demasiado grande / no es `application/json` | — |
+  | 413 / 415 | Cuerpo demasiado grande / no es del tipo esperado (`application/json`, o `text/csv` en el albarán) | — |
   | 429 | Demasiadas peticiones (cabecera `Retry-After`) | `{"reintentar_en_segundos": 900}` |
   | 500 | Error interno | `{"referencia": "a1b2c3d4"}` |
 
@@ -197,7 +197,7 @@ Permisos: ver la matriz en `app/Seguridad/Permisos.php` (admin tiene todos).
 | GET | `/api/productos?buscar&categoria&color&talla&precio_min&precio_max&personalizable&disponible&orden&pagina&por_pagina` | 200, 400 |
 | GET | `/api/productos/{slug}` | 200, 404 |
 | GET | `/api/catalogo/filtros` | 200 |
-| POST | `/api/consultas` | 201, 400, 429 |
+| POST | `/api/consultas` | 201, 400, 429 (5 por IP y hora) |
 
 `orden`: `novedades` (por defecto), `precio_asc`, `precio_desc`, `nombre`.
 Cada talla de la ficha trae `variante_id`, `talla`, `stock` y `disponible`: el `variante_id` es lo que se envía al hacer un pedido.
@@ -215,8 +215,8 @@ La ficha incluye `opciones_personalizacion` con las opciones que admite ese mode
 
 | Método | Ruta | Permiso | Respuestas |
 |---|---|---|---|
-| GET | `/api/perfil` | `perfil.propio` | 200, 401 |
-| PATCH | `/api/perfil` | `perfil.propio` | 200, 400, 409 |
+| GET | `/api/perfil` | `perfil.propio` | 200, 401, 403 si la cuenta no es de cliente |
+| PATCH | `/api/perfil` | `perfil.propio` | 200, 400 (solo `nombre, apellidos, telefono, direccion, codigo_postal, ciudad, provincia`; email y contraseña no se editan) |
 | GET | `/api/pedidos?estado&pagina` | `pedidos.propios` | 200 (solo los suyos) |
 | POST | `/api/pedidos` | `pedidos.propios` | 201, 400, 409 sin stock |
 | GET | `/api/pedidos/{codigo}` | `pedidos.propios` | 200, 404 (también si el pedido es de otro cliente) |
@@ -244,24 +244,37 @@ Cuerpo de `POST /api/pedidos`:
 
 | Método | Ruta | Permiso | Respuestas |
 |---|---|---|---|
-| GET | `/api/gestion/resumen` | `informes.ver` | 200: pedidos por estado, unidades vendidas, modelos con menos stock |
-| GET | `/api/gestion/informes/{nombre}` | `informes.ver` | 200, 404 |
-| GET | `/api/gestion/pedidos?estado&buscar&pagina` | `pedidos.ver_todos` | 200 |
+| GET | `/api/gestion/resumen` | `informes.ver` | 200: pedidos por estado, unidades vendidas, ingresos, personalizados, tallas bajo mínimo, modelos con menos stock |
+| GET | `/api/gestion/informes/{nombre}?desde&hasta` | `informes.ver` | 200, 400, 404. Nombres: `ventas-por-modelo`, `ventas-por-mes`, `personalizaciones` (sin pedidos cancelados) |
+| GET | `/api/gestion/pedidos?estado&buscar&personalizado&pagina` | `pedidos.ver_todos` | 200, 400 |
 | GET | `/api/gestion/pedidos/{codigo}` | `pedidos.ver_todos` | 200, 404 |
-| PATCH | `/api/gestion/pedidos/{codigo}/estado` | `pedidos.cambiar_estado` | 200, 400, 404, 409 transición no válida |
-| GET | `/api/gestion/stock?bajo_minimo&buscar&pagina` | `stock.gestionar` | 200 |
+| PATCH | `/api/gestion/pedidos/{codigo}/estado` | `pedidos.cambiar_estado` (+ `pedidos.confirmar_cancelar` para confirmar o cancelar) | 200, 400, 403, 404, 409 transición no válida o seguimiento repetido |
+| GET | `/api/gestion/stock?buscar&bajo_minimo&producto_id&pagina` | `stock.gestionar` | 200, 400 (`buscar` admite también la etiqueta RFID) |
 | PATCH | `/api/gestion/variantes/{id}/stock` | `stock.gestionar` | 200, 400, 404, 409 si quedaría negativo |
-| GET | `/api/gestion/productos?pagina` | `productos.gestionar` | 200 (incluye desactivados) |
-| POST | `/api/gestion/productos` | `productos.gestionar` | 201, 400, 409 |
-| PATCH | `/api/gestion/productos/{id}` | `productos.gestionar` | 200, 400, 404, 409 |
+| GET | `/api/gestion/variantes/{id}/movimientos?pagina` | `stock.gestionar` | 200, 404 |
+| GET | `/api/gestion/productos?buscar&activo&pagina` | `productos.gestionar` | 200 (incluye desactivados) |
+| GET | `/api/gestion/productos/{id}` | `productos.gestionar` | 200 (con tallas y RFID), 404 |
+| POST | `/api/gestion/productos` | `productos.gestionar` | 201, 400, 409 código repetido |
+| PATCH | `/api/gestion/productos/{id}` | `productos.gestionar` | 200, 400, 404 (el código de Nike no se edita) |
 | DELETE | `/api/gestion/productos/{id}` | `productos.gestionar` | 204 (lo desactiva, no lo borra), 404 |
-| GET | `/api/gestion/auditoria?tipo&entidad&pagina` | `auditoria.ver` | 200 |
-| GET | `/api/gestion/exportar/pedidos?formato=csv\|json` | `datos.exportar` | 200 (descarga) |
-| POST | `/api/gestion/importar/...` | `datos.exportar` | 201, 400 con los errores de cada fila |
+| POST | `/api/gestion/albaranes?referencia` | `productos.gestionar` | 200 con el resumen, 400 con los errores de cada fila, 415 (cuerpo `text/csv`) |
+| GET | `/api/gestion/consultas?estado&pagina` | `consultas.gestionar` | 200, 400 |
+| PATCH | `/api/gestion/consultas/{id}` | `consultas.gestionar` | 200, 400, 404 |
+| GET | `/api/gestion/auditoria?tipo&entidad&resultado&usuario_id&pagina` | `auditoria.ver` | 200, 400 |
+| GET | `/api/gestion/exportar/pedidos?formato=csv\|json&estado&desde&hasta` | `datos.exportar` | 200 (descarga), 400 |
 | GET | `/api/usuarios?rol&pagina` | `usuarios.gestionar` | 200 |
 
 Estados de un pedido: `pendiente → confirmado → preparacion → enviado → entregado`.
 Se puede cancelar desde `pendiente` o `confirmado`; al cancelar se repone el stock una sola vez.
+En el área interna, el almacén lleva la logística (`confirmado → preparacion → enviado → entregado`); confirmar el pago
+y cancelar son de administración. Pasar a `enviado` exige `codigo_seguimiento`.
+
+**Albarán CSV** (`docs/ejemplos/albaran-ejemplo.csv`): cabecera `codigo_marca,nombre,colorway,categoria,color,precio,talla,cantidad`
+(separador `,` o `;`). Si la zapatilla existe solo se suma el stock; si la talla o la zapatilla no existen, se crean.
+`nombre, colorway, categoria, color, precio` solo hacen falta para las zapatillas nuevas. Todo o nada: con una fila mal
+se rechaza el archivo entero.
+
+**Exportación CSV**: una fila por línea de pedido, separador `;`, BOM UTF-8 y coma decimal (para Excel en español).
 
 ## 10. Páginas HTML
 

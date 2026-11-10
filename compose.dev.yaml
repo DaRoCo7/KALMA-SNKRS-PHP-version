@@ -18,6 +18,7 @@ services:
       # El límite por cuenta (5 intentos de login cada 15 min) se mantiene igual.
       LIMITE_LOGIN_IP: "1000"
       LIMITE_REGISTRO_IP: "1000"
+      LIMITE_CONSULTA_IP: "1000"
     volumes:
       - ./app:/var/www/html/app:ro
       - ./config:/var/www/html/config:ro
