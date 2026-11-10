@@ -324,5 +324,17 @@ CREATE TABLE consultas (
     fecha_consulta TIMESTAMPTZ   NOT NULL DEFAULT now()
 );
 
+-- Control de frecuencia (rate limiting): cuántos intentos lleva cada clave en
+-- su ventana de tiempo actual (ej. 5 intentos de login por cuenta cada 15 min).
+-- Está en la BD para que el límite lo compartan todos los procesos de Apache y
+-- no se pueda esquivar borrando las cookies. La clave es un hash SHA-256 de
+-- ámbito + IP o email: así esta tabla no guarda datos personales en claro.
+CREATE TABLE limites_peticiones (
+    clave          VARCHAR(64) PRIMARY KEY CHECK (clave ~ '^[0-9a-f]{64}$'),
+    ambito         VARCHAR(30) NOT NULL,          -- ej. login:ip, login:email, registro:ip
+    inicio_ventana TIMESTAMPTZ NOT NULL DEFAULT now(),
+    contador       INTEGER     NOT NULL DEFAULT 1 CHECK (contador > 0)
+);
+
 COMMIT;
 

@@ -63,6 +63,18 @@ final class HttpExcepcion extends \RuntimeException
         return new self(409, $mensaje, $detalles);
     }
 
+    /** 429: se ha superado el límite de intentos. Retry-After indica cuándo reintentar */
+    public static function demasiadasPeticiones(int $segundosEspera): self
+    {
+        $minutos = (int) ceil($segundosEspera / 60);
+        return new self(
+            429,
+            "Demasiados intentos. Vuelve a intentarlo dentro de {$minutos} min",
+            ['reintentar_en_segundos' => $segundosEspera],
+            ['Retry-After' => (string) $segundosEspera]
+        );
+    }
+
     /** 413: cuerpo de la petición demasiado grande */
     public static function demasiadoGrande(): self
     {

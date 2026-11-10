@@ -20,6 +20,7 @@ final class Peticion
      * @param array<string, string> $cabeceras   Cabeceras en minúsculas
      * @param array<string, mixed>  $formulario  Campos de un formulario HTML ($_POST)
      * @param array<string, string> $parametros  Parámetros de la ruta, ej. {id}
+     * @param string                $ip          IP real del cliente (para el rate limiting y la auditoría)
      */
     public function __construct(
         public readonly string $metodo,
@@ -29,6 +30,7 @@ final class Peticion
         private readonly string $cuerpo = '',
         private readonly array $formulario = [],
         public array $parametros = [],
+        public readonly string $ip = '0.0.0.0',
     ) {
     }
 
@@ -60,7 +62,18 @@ final class Peticion
             $cabeceras['content-type'] = (string) $_SERVER['CONTENT_TYPE'];
         }
 
-        return new self($metodo, $ruta, $_GET, $cabeceras, (string) file_get_contents('php://input'), $_POST);
+        // Detrás del proxy, REMOTE_ADDR es la IP de Nginx (red interna de Docker).
+        // Solo en ese caso nos fiamos de X-Real-IP, que Nginx rellena con la IP real;
+        // si la petición no viniera de una red privada, la cabecera se ignora.
+        $ip = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
+        $ipReal = $cabeceras['x-real-ip'] ?? '';
+        if (filter_var($ipReal, FILTER_VALIDATE_IP) && !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE)) {
+            $ip = $ipReal;
+        }
+
+        return new self(
+            $metodo, $ruta, $_GET, $cabeceras, (string) file_get_contents('php://input'), $_POST, ip: $ip
+        );
     }
 
     /** Las rutas que empiezan por /api responden siempre en JSON */
@@ -77,6 +90,12 @@ final class Peticion
     public function parametro(string $nombre): ?string
     {
         return $this->parametros[$nombre] ?? null;
+    }
+
+    /** Un campo concreto de un formulario HTML (ej. el token CSRF oculto) */
+    public function campoFormulario(string $nombre): mixed
+    {
+        return $this->formulario[$nombre] ?? null;
     }
 
     /**

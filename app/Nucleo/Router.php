@@ -15,6 +15,15 @@ final class Router
     /** @var list<array{metodo: string, patron: string, accion: callable|array, middlewares: array}> */
     private array $rutas = [];
 
+    /** @var list<Middleware|string> Middlewares que se ejecutan en todas las rutas */
+    private array $globales = [];
+
+    /** Añade un middleware común a todas las rutas (sesión, CSRF...) */
+    public function usar(Middleware|string $middleware): void
+    {
+        $this->globales[] = $middleware;
+    }
+
     public function get(string $ruta, callable|array $accion, array $middlewares = []): void
     {
         $this->agregar('GET', $ruta, $accion, $middlewares);
@@ -79,7 +88,8 @@ final class Router
             // Solo los grupos con nombre: {id} -> ['id' => '15']
             $peticion->parametros = array_filter($coincidencias, 'is_string', ARRAY_FILTER_USE_KEY);
 
-            return $this->ejecutar($ruta['accion'], $ruta['middlewares'], $peticion);
+            // Primero los globales y después los de la ruta
+            return $this->ejecutar($ruta['accion'], [...$this->globales, ...$ruta['middlewares']], $peticion);
         }
 
         if ($metodosDeLaRuta !== []) {

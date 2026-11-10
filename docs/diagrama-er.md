@@ -1,6 +1,6 @@
 # Diagrama entidad/relación · KALMA SNKRS
 
-Modelo de datos de [`database/schema.sql`](../database/schema.sql): PostgreSQL 17 con 16 tablas.
+Modelo de datos de [`database/schema.sql`](../database/schema.sql): PostgreSQL 17 con 17 tablas.
 
 ```mermaid
 erDiagram
@@ -184,6 +184,12 @@ erDiagram
         varchar estado "pendiente, respondida, cerrada"
         timestamptz fecha_consulta
     }
+    limites_peticiones {
+        varchar clave PK "hash SHA-256 de ámbito más IP o email"
+        varchar ambito "login:ip, login:email, registro:ip"
+        timestamptz inicio_ventana
+        int contador
+    }
 ```
 
 Leyenda: `||` exactamente uno · `|o` cero o uno · `o{` cero o muchos. La línea continua indica una entidad dependiente (`ON DELETE CASCADE`); la discontinua, una referencia.
@@ -210,7 +216,7 @@ Leyenda: `||` exactamente uno · `|o` cero o uno · `o{` cero o muchos. La líne
 | movimientos_stock → usuarios | N : 0..1 | `movimientos_stock.usuario_id` | SET NULL |
 | auditoria → usuarios | N : 0..1 | `auditoria.usuario_id` | SET NULL |
 
-`consultas` no tiene relaciones: la puede enviar un visitante anónimo.
+`consultas` no tiene relaciones: la puede enviar un visitante anónimo. `limites_peticiones` tampoco: sus claves son hashes, no referencias a otras tablas.
 
 ## Justificación de las tablas
 
@@ -237,6 +243,7 @@ Leyenda: `||` exactamente uno · `|o` cero o uno · `o{` cero o muchos. La líne
 **Control**
 - **auditoria**: eventos de negocio con usuario, fecha, tipo, entidad y resultado. El detalle es JSONB y nunca guarda contraseñas ni tokens.
 - **consultas**: formulario de contacto público. No tiene FK porque lo puede enviar un visitante anónimo.
+- **limites_peticiones**: contadores del rate limiting (ej. 5 intentos de login por cuenta cada 15 minutos). Vive en la BD para que el límite lo compartan todos los procesos de Apache y no se pueda esquivar borrando cookies. Guarda hashes en vez de IPs o emails en claro.
 
 ## Códigos de producto: `codigo_marca` no es `rfid_tienda`
 
