@@ -1,12 +1,15 @@
 <?php
-$titulo = 'Catálogo de zapatillas';
+/**
+ * Página del catálogo.
+ * @var string $titulo
+ */
 ?>
 <!doctype html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= $titulo ?> | KALMA SNKRS</title>
+    <title><?= e($titulo) ?> | KALMA SNKRS</title>
     <link rel="stylesheet" href="/css/estilos.css">
 </head>
 <body>
@@ -17,7 +20,7 @@ $titulo = 'Catálogo de zapatillas';
     </header>
 
     <main class="contenedor">
-        <h1><?= $titulo ?></h1>
+        <h1><?= e($titulo) ?></h1>
     </main>
 </body>
 </html>

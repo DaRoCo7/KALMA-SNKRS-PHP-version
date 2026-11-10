@@ -1,0 +1,20 @@
+# =============================================================================
+# Ajustes SOLO para desarrollo (el despliegue no usa este archivo).
+#
+# Monta el código del proyecto dentro del contenedor: guardas un archivo PHP,
+# recargas el navegador y ves el cambio sin reconstruir la imagen.
+#
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+#
+# vendor/ no se monta: se usa el autoload que Composer generó dentro de la imagen
+# (las clases nuevas se encuentran igualmente por PSR-4).
+# =============================================================================
+services:
+  app:
+    environment:
+      # En desarrollo, las respuestas de error 500 incluyen el motivo para depurar
+      APP_ENTORNO: desarrollo
+    volumes:
+      - ./app:/var/www/html/app:ro
+      - ./config:/var/www/html/config:ro
+      - ./public:/var/www/html/public:ro

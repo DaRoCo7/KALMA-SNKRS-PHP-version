@@ -1,19 +1,32 @@
 <?php
 
-$ruta = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+declare(strict_types=1);
 
-switch ($ruta) {
-    case '/':
-    case '/catalogo':
-    case '/catalogo/':
-        require __DIR__ . '/../app/vistas/catalogo.php';
-        break;
+/*
+ * Front controller: TODAS las peticiones entran por aquí (ver public/.htaccess).
+ *
+ *   petición -> Router -> [middlewares] -> Controlador -> Servicio -> Repositorio -> PostgreSQL
+ *                                               └─> Respuesta (página HTML o JSON) -> navegador
+ */
 
-    case '/health':
-        require __DIR__ . '/../app/controladores/health.php';
-        break;
+use App\Nucleo\ManejadorErrores;
+use App\Nucleo\Peticion;
+use App\Nucleo\Router;
 
-    default:
-        http_response_code(404);
-        require __DIR__ . '/../app/vistas/404.php';
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+ManejadorErrores::registrar();
+
+$router = new Router();
+require dirname(__DIR__) . '/config/rutas.php';
+
+$peticion = Peticion::desdeGlobales();
+
+try {
+    $respuesta = $router->despachar($peticion);
+} catch (Throwable $error) {
+    // Cualquier error acaba en una respuesta controlada (HTML o JSON) sin trazas
+    $respuesta = ManejadorErrores::aRespuesta($error, $peticion);
 }
+
+$respuesta->enviar();
