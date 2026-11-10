@@ -42,7 +42,10 @@ final class PedidoController
     /** GET /api/pedidos/{codigo} · detalle con líneas e historial (404 si no es tuyo) */
     public function ver(Peticion $peticion): Respuesta
     {
-        return Respuesta::json(['datos' => $this->pedidos->verPropio(Sesion::usuario(), (string) $peticion->parametro('codigo'))]);
+        // La IP va a la auditoría si el código es de otro cliente (intento IDOR)
+        return Respuesta::json(['datos' => $this->pedidos->verPropio(
+            Sesion::usuario(), (string) $peticion->parametro('codigo'), $peticion->ip
+        )]);
     }
 
     /**

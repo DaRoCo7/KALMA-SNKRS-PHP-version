@@ -206,7 +206,7 @@ final class PedidoRepositorio
     /**
      * Listado paginado, del más reciente al más antiguo.
      *
-     * @param array{cliente_id?: int, estado?: string, buscar?: string} $filtros
+     * @param array{cliente_id?: int, estado?: string, buscar?: string, personalizado?: bool} $filtros
      */
     public function listar(array $filtros, int $limite, int $desplazamiento): array
     {
@@ -253,6 +253,11 @@ final class PedidoRepositorio
             $patron = '%' . addcslashes($filtros['buscar'], '%_\\') . '%';
             $sql[] = '(p.codigo ILIKE :buscar_codigo OR u.email ILIKE :buscar_email)';
             $parametros += ['buscar_codigo' => $patron, 'buscar_email' => $patron];
+        }
+        if (isset($filtros['personalizado'])) {
+            // Columna guardada al crear el pedido: filtra sin recorrer las líneas
+            $sql[] = 'p.personalizado = :personalizado';
+            $parametros['personalizado'] = $filtros['personalizado'] ? 'true' : 'false';
         }
 
         return [implode(' AND ', $sql), $parametros];

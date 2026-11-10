@@ -14,6 +14,7 @@ use App\Repositorios\PedidoRepositorio;
 use App\Repositorios\ProductoRepositorio;
 use App\Repositorios\StockRepositorio;
 use App\Repositorios\UsuarioRepositorio;
+use App\Seguridad\Permisos;
 
 /**
  * Reglas de negocio de los pedidos: crear un pedido descontando el stock sin
@@ -41,6 +42,42 @@ final class PedidoServicio
         'entregado'   => [],
         'cancelado'   => [],
     ];
+
+    /**
+     * SEPARACIÓN DE FUNCIONES en el área interna (regla decidida para KALMA).
+     *
+     * El almacén lleva la LOGÍSTICA: mueve las cajas de confirmado a preparación,
+     * enviado y entregado. Los dos cambios que tienen que ver con el DINERO los
+     * decide administración:
+     *   - confirmado: alguien ha comprobado que el pago ha llegado. Si el almacén
+     *     pudiera confirmar, podría preparar y enviar un pedido sin cobrarlo.
+     *   - cancelado:  anula la venta, repone el stock y obliga a devolver el pago.
+     *
+     * La ruta PATCH /api/gestion/pedidos/{codigo}/estado solo exige
+     * pedidos.cambiar_estado (lo tienen almacén y admin). Para estos dos destinos
+     * el servicio exige ADEMÁS el permiso de esta tabla. Se comprueba aquí y no en
+     * la ruta porque depende del CUERPO de la petición (el estado al que se quiere
+     * pasar), y el middleware de permisos solo conoce la ruta.
+     *
+     * Destino => permiso extra. Un destino que no aparece no necesita nada más.
+     * (La clienta cancela SUS pedidos por otra vía: cancelarPropio.)
+     */
+    private const PERMISO_EXTRA_POR_DESTINO = [
+        'confirmado' => 'pedidos.confirmar_cancelar',
+        'cancelado'  => 'pedidos.confirmar_cancelar',
+    ];
+
+    /** Comentario del historial cuando el área interna no escribe uno */
+    private const COMENTARIOS_GESTION = [
+        'confirmado'  => 'Pago verificado',
+        'preparacion' => 'En preparación en almacén',
+        'enviado'     => 'Entregado al transportista',
+        'entregado'   => 'Entregado al cliente',
+        'cancelado'   => 'Cancelado por administración',
+    ];
+
+    /** Formato del código visible de un pedido: SF-2026-000025 */
+    private const FORMATO_CODIGO = '/^SF-\d{4}-\d{6,}$/';
 
     private const NO_ENCONTRADO = 'Pedido no encontrado';
     private const DATOS_NO_VALIDOS = 'Hay datos no válidos';
@@ -148,16 +185,25 @@ final class PedidoServicio
     public function listarPropios(array $usuario, array $query, Paginacion $paginacion): array
     {
         $cliente = $this->perfilCliente($usuario);
-        $filtros = ['cliente_id' => $cliente['id']] + $this->filtros($query, admiteBusqueda: false);
+        $filtros = ['cliente_id' => $cliente['id']] + $this->filtros($query, areaInterna: false);
 
         return $this->listado($filtros, $paginacion);
     }
 
-    /** @throws HttpExcepcion 404 si no existe o es de otro cliente */
-    public function verPropio(array $usuario, string $codigo): array
+    /**
+     * @param string|null $ip para la auditoría si el pedido es de otro cliente
+     * @throws HttpExcepcion 404 si no existe o es de otro cliente
+     */
+    public function verPropio(array $usuario, string $codigo, ?string $ip = null): array
     {
         $cliente = $this->perfilCliente($usuario);
-        return $this->detalle($this->buscar($codigo, $cliente['id']), vistaCliente: true);
+        try {
+            $pedido = $this->buscar($codigo, $cliente['id']);
+        } catch (HttpExcepcion $error) {
+            $this->registrarAccesoAjeno($usuario, $codigo, 'pedido.ver', $ip);
+            throw $error;
+        }
+        return $this->detalle($pedido, vistaCliente: true);
     }
 
     /**
@@ -172,14 +218,147 @@ final class PedidoServicio
         $datos = (new Validador($entrada))->texto('motivo', 200, obligatorio: false)->validar();
 
         $comentario = 'Cancelado por el cliente' . (isset($datos['motivo']) ? ': ' . $datos['motivo'] : '');
-        $this->transicionar($codigo, $cliente['id'], 'cancelado', $usuario, $comentario, null, $ip);
+        try {
+            $this->transicionar($codigo, $cliente['id'], 'cancelado', $usuario, $comentario, null, $ip);
+        } catch (HttpExcepcion $error) {
+            if ($error->estado === 404) {
+                $this->registrarAccesoAjeno($usuario, $codigo, 'pedido.cancelar', $ip);
+            }
+            throw $error;
+        }
 
         return $this->detalle($this->pedidos->buscarPorCodigo($codigo), vistaCliente: true);
     }
 
     // =========================================================================
+    // Área interna (almacén y administración)
+    // =========================================================================
+
+    /** Todos los pedidos: ?estado, ?buscar (código o email) y ?personalizado=1|0 */
+    public function listarTodos(array $query, Paginacion $paginacion): array
+    {
+        return $this->listado($this->filtros($query, areaInterna: true), $paginacion);
+    }
+
+    /**
+     * Detalle de cualquier pedido. El historial incluye el nombre de quien hizo
+     * cada cambio: dentro de la empresa sí interesa saber quién fue.
+     *
+     * @throws HttpExcepcion 404
+     */
+    public function verInterno(string $codigo): array
+    {
+        return $this->detalle($this->buscar($codigo, null), vistaCliente: false);
+    }
+
+    /**
+     * Cambia el estado de un pedido desde el área interna.
+     * Cuerpo: {estado, comentario?, codigo_seguimiento? (obligatorio para «enviado»)}
+     *
+     * Orden de las comprobaciones: datos (400) → permiso según el destino (403,
+     * ver PERMISO_EXTRA_POR_DESTINO) → existe (404) → transición permitida y
+     * seguimiento libre (409). Cancelar repone el stock (lo hace transicionar).
+     *
+     * @throws HttpExcepcion 400 · 403 · 404 · 409
+     */
+    public function cambiarEstado(array $usuario, string $codigo, array $entrada, ?string $ip): array
+    {
+        // El seguimiento se guarda en mayúsculas: «ab-123» y «AB-123» son el mismo
+        // envío y el UNIQUE de la columna tiene que verlos como iguales
+        if (is_string($entrada['codigo_seguimiento'] ?? null)) {
+            $entrada['codigo_seguimiento'] = mb_strtoupper(trim($entrada['codigo_seguimiento']));
+        }
+        $datos = (new Validador($entrada))
+            ->opcion('estado', self::destinos())
+            ->texto('comentario', 255, obligatorio: false)   // tamaño de historial_estados_pedido.comentario
+            ->patron('codigo_seguimiento', '/^[A-Z0-9-]{1,50}$/', 'Hasta 50 caracteres: letras, números y guiones')
+            ->validar();
+
+        $nuevo = $datos['estado'];
+        $seguimiento = $datos['codigo_seguimiento'] ?? null;
+
+        // Sin número de envío el cliente no puede seguir su paquete: se pide justo al
+        // entregarlo al transportista. En otro cambio no tiene sentido y se rechaza
+        // para que nadie crea que lo ha guardado.
+        if ($nuevo === 'enviado' && $seguimiento === null) {
+            throw HttpExcepcion::peticionIncorrecta(self::DATOS_NO_VALIDOS, [
+                'codigo_seguimiento' => 'Obligatorio para pasar a «enviado»',
+            ]);
+        }
+        if ($nuevo !== 'enviado' && $seguimiento !== null) {
+            throw HttpExcepcion::peticionIncorrecta(self::DATOS_NO_VALIDOS, [
+                'codigo_seguimiento' => 'Solo se indica al pasar a «enviado»',
+            ]);
+        }
+
+        if (!self::puedeLlevarA($usuario['rol'], $nuevo)) {
+            $this->auditoria->registrar(
+                $usuario['id'], 'pedido.cambiar_estado', 'pedido',
+                $this->pedidos->buscarPorCodigo($codigo)['id'] ?? null, 'denegado',
+                [
+                    'codigo'  => $codigo,
+                    'a'       => $nuevo,
+                    'rol'     => $usuario['rol'],
+                    'permiso' => self::PERMISO_EXTRA_POR_DESTINO[$nuevo],
+                ],
+                $ip
+            );
+            throw HttpExcepcion::prohibido('Confirmar el pago o cancelar un pedido es decisión de administración');
+        }
+
+        $comentario = $datos['comentario'] ?? self::COMENTARIOS_GESTION[$nuevo];
+        $this->transicionar($codigo, null, $nuevo, $usuario, $comentario, $seguimiento, $ip);
+
+        return $this->detalle($this->pedidos->buscarPorCodigo($codigo), vistaCliente: false);
+    }
+
+    /**
+     * ¿Puede este rol llevar un pedido a $estado desde el área interna?
+     * Aplica la separación de funciones de PERMISO_EXTRA_POR_DESTINO: almacén
+     * sí puede a preparación, enviado y entregado; a confirmado y cancelado, no.
+     */
+    private static function puedeLlevarA(string $rol, string $estado): bool
+    {
+        $permisoExtra = self::PERMISO_EXTRA_POR_DESTINO[$estado] ?? null;
+        return $permisoExtra === null || Permisos::tiene($rol, $permisoExtra);
+    }
+
+    /**
+     * Estados a los que se puede llevar un pedido: los que aparecen como destino
+     * en TRANSICIONES. A «pendiente» no se vuelve nunca, así que es un 400.
+     *
+     * @return list<string>
+     */
+    private static function destinos(): array
+    {
+        return array_values(array_unique(array_merge(...array_values(self::TRANSICIONES))));
+    }
+
+    // =========================================================================
     // Piezas comunes
     // =========================================================================
+
+    /**
+     * Protección IDOR con rastro.
+     *
+     * La clienta recibe el MISMO 404 si el código no existe que si es de otro
+     * cliente: así no puede averiguar qué códigos existen probando. Pero si el
+     * pedido SÍ existe, alguien está pidiendo pedidos ajenos (cambiando el código
+     * de la URL) y administración debe poder verlo en la auditoría.
+     */
+    private function registrarAccesoAjeno(array $usuario, string $codigo, string $tipoEvento, ?string $ip): void
+    {
+        if (!preg_match(self::FORMATO_CODIGO, $codigo)) {
+            return;   // con otro formato no puede existir: ni se consulta la BD
+        }
+        $ajeno = $this->pedidos->buscarPorCodigo($codigo);
+        if ($ajeno !== null) {
+            $this->auditoria->registrar($usuario['id'], $tipoEvento, 'pedido', (int) $ajeno['id'], 'denegado', [
+                'codigo' => $codigo,
+                'motivo' => 'el pedido pertenece a otro cliente',
+            ], $ip);
+        }
+    }
 
     /**
      * Cambia el estado de un pedido respetando TRANSICIONES. Si el nuevo estado
@@ -218,7 +397,7 @@ final class PedidoServicio
                     );
                 }
 
-                $this->pedidos->cambiarEstado($pedido['id'], $nuevo, $codigoSeguimiento);
+                $this->guardarEstado((int) $pedido['id'], $nuevo, $codigoSeguimiento);
                 $this->pedidos->registrarEstado($pedido['id'], $anterior, $nuevo, $usuario['id'], $comentario);
 
                 $detalle = ['codigo' => $codigo, 'de' => $anterior, 'a' => $nuevo];
@@ -234,6 +413,31 @@ final class PedidoServicio
                 $this->auditoria->registrar($usuario['id'], $tipoEvento, 'pedido', $pedidoId, 'error', [
                     'codigo' => $codigo, 'a' => $nuevo, 'motivo' => $error->getMessage(),
                 ], $ip);
+            }
+            throw $error;
+        }
+    }
+
+    /**
+     * Guarda el estado nuevo (y el seguimiento, si llega).
+     *
+     * 23505 = UNIQUE violado. En este UPDATE solo puede ser codigo_seguimiento:
+     * dos pedidos no comparten el número de envío del transportista. Se confía en
+     * la restricción de la BD y no en un SELECT previo, que no evitaría que dos
+     * peticiones simultáneas guardaran el mismo código.
+     *
+     * @throws HttpExcepcion 409 si el seguimiento ya lo tiene otro pedido
+     */
+    private function guardarEstado(int $pedidoId, string $nuevo, ?string $codigoSeguimiento): void
+    {
+        try {
+            $this->pedidos->cambiarEstado($pedidoId, $nuevo, $codigoSeguimiento);
+        } catch (\PDOException $error) {
+            if ($error->getCode() === '23505') {
+                throw HttpExcepcion::conflicto(
+                    'Ese código de seguimiento ya lo tiene otro pedido',
+                    ['codigo_seguimiento' => $codigoSeguimiento]
+                );
             }
             throw $error;
         }
@@ -288,13 +492,13 @@ final class PedidoServicio
     /** Un código con otro formato no puede existir: 404 sin consultar la BD */
     private function comprobarCodigo(string $codigo): void
     {
-        if (!preg_match('/^SF-\d{4}-\d{6,}$/', $codigo)) {
+        if (!preg_match(self::FORMATO_CODIGO, $codigo)) {
             throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADO);
         }
     }
 
-    /** Filtros de los listados: ?estado=pendiente (y ?buscar= en el área interna) */
-    private function filtros(array $query, bool $admiteBusqueda): array
+    /** Filtros de los listados: ?estado=pendiente (y ?buscar= y ?personalizado= en el área interna) */
+    private function filtros(array $query, bool $areaInterna): array
     {
         $filtros = [];
         $errores = [];
@@ -309,11 +513,24 @@ final class PedidoServicio
         }
 
         $buscar = $query['buscar'] ?? '';
-        if ($admiteBusqueda && $buscar !== '') {
+        if ($areaInterna && $buscar !== '') {
             if (is_string($buscar) && mb_strlen(trim($buscar)) <= 60) {
                 $filtros['buscar'] = trim($buscar);
             } else {
                 $errores['buscar'] = 'Texto de hasta 60 caracteres';
+            }
+        }
+
+        // ?personalizado=1 son los que el taller tiene que preparar a mano (bordado, caja...)
+        $personalizado = $query['personalizado'] ?? '';
+        if ($areaInterna && $personalizado !== '') {
+            $valor = is_string($personalizado)
+                ? filter_var($personalizado, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
+                : null;
+            if ($valor === null) {
+                $errores['personalizado'] = 'Valores: 1 o 0';
+            } else {
+                $filtros['personalizado'] = $valor;
             }
         }
 
