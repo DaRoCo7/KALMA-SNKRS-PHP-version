@@ -51,6 +51,47 @@ final class UsuarioRepositorio
         return $consulta->fetch() ?: null;
     }
 
+    /**
+     * Perfil que ve el propio cliente: datos de la cuenta (usuarios) y del
+     * perfil comercial (clientes) juntos. null si la cuenta no tiene perfil de
+     * cliente (admin y almacén): el JOIN no encuentra fila en clientes.
+     */
+    public function perfilCompleto(int $usuarioId): ?array
+    {
+        $consulta = BaseDatos::conexion()->prepare(
+            'SELECT u.id, u.nombre, u.apellidos, u.email,
+                    c.telefono, c.direccion, c.codigo_postal, c.ciudad, c.provincia
+             FROM usuarios u JOIN clientes c ON c.usuario_id = u.id
+             WHERE u.id = :usuario_id'
+        );
+        $consulta->execute(['usuario_id' => $usuarioId]);
+        return $consulta->fetch() ?: null;
+    }
+
+    /**
+     * Cambia el nombre y los apellidos de la cuenta. Solo se tocan las columnas
+     * que llegan en $campos y que estén en la lista fija: el nombre de la
+     * columna nunca sale de la petición, solo su valor (que va como parámetro).
+     *
+     * @param array<string, string|null> $campos ej. ['nombre' => 'Lucía']
+     */
+    public function actualizarNombre(int $usuarioId, array $campos): void
+    {
+        $this->actualizarColumnas('usuarios', 'id', $usuarioId, $campos, ['nombre', 'apellidos']);
+    }
+
+    /**
+     * Cambia los datos de contacto y envío del perfil de cliente. Va junto a
+     * actualizarNombre() dentro de una misma transacción del servicio.
+     *
+     * @param array<string, string|null> $campos ej. ['telefono' => '600000101']
+     */
+    public function actualizarPerfilCliente(int $usuarioId, array $campos): void
+    {
+        $this->actualizarColumnas('clientes', 'usuario_id', $usuarioId, $campos,
+            ['telefono', 'direccion', 'codigo_postal', 'ciudad', 'provincia']);
+    }
+
     public function emailRegistrado(string $email): bool
     {
         $consulta = BaseDatos::conexion()->prepare('SELECT 1 FROM usuarios WHERE lower(email) = lower(:email)');
@@ -135,5 +176,28 @@ final class UsuarioRepositorio
         );
         $consulta->execute(['rol' => $rol, 'rol_filtro' => $rol]);
         return (int) $consulta->fetchColumn();
+    }
+
+    /**
+     * UPDATE de las columnas permitidas que vengan en $campos. La tabla, la
+     * clave y la lista de columnas las fija cada método público (nunca la
+     * petición), así que lo único que se concatena son nombres escritos en
+     * este archivo; los valores van siempre como parámetros.
+     *
+     * @param list<string> $permitidas
+     */
+    private function actualizarColumnas(string $tabla, string $clave, int $id, array $campos, array $permitidas): void
+    {
+        $columnas = array_values(array_intersect($permitidas, array_keys($campos)));
+        if ($columnas === []) {
+            return;   // nada que cambiar en esta tabla
+        }
+
+        $asignaciones = array_map(static fn (string $columna): string => "{$columna} = :{$columna}", $columnas);
+        $parametros = array_intersect_key($campos, array_flip($columnas)) + ['id' => $id];
+
+        BaseDatos::conexion()
+            ->prepare("UPDATE {$tabla} SET " . implode(', ', $asignaciones) . " WHERE {$clave} = :id")
+            ->execute($parametros);
     }
 }
