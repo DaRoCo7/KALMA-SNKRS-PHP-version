@@ -8,11 +8,16 @@ namespace App\Seguridad;
  * Matriz de permisos: qué puede hacer cada rol.
  *
  * - admin:   todo.
- * - almacen: entra en el área interna (/panel), control de stock y
- *            logística de los pedidos (ver todos y avanzarlos de
- *            confirmado a preparación, enviado y entregado).
+ * - almacen: entra en el área interna (/panel), control de stock,
+ *            consulta de los albaranes ya cargados (cargarlos es de
+ *            administración: productos.gestionar) y logística de los
+ *            pedidos (ver todos y avanzarlos de confirmado a preparación,
+ *            enviado y entregado).
  *            Confirmar un pago o cancelar desde el área interna es decisión
  *            de administración (pedidos.confirmar_cancelar).
+ *            Genera los informes de stock (poco stock, sin ventas) y se los
+ *            envía a administración (informes_stock.enviar); quien los da por
+ *            revisados es administración (informes_stock.revisar).
  * - cliente: sus propios pedidos y su propio perfil. El catálogo es público y
  *            no necesita permiso.
  *
@@ -36,17 +41,20 @@ final class Permisos
         'pedidos.confirmar_cancelar' => 'Confirmar el pago de un pedido o cancelarlo desde el área interna',
         'stock.gestionar'            => 'Consultar y ajustar el stock de las tallas',
         'productos.gestionar'        => 'Dar de alta, editar y desactivar productos, y cargar albaranes',
+        'albaranes.ver'              => 'Ver los albaranes cargados y las tallas que entraron con cada uno',
         'usuarios.gestionar'         => 'Listar usuarios y gestionar cuentas',
         'consultas.gestionar'        => 'Ver y responder las consultas del formulario de contacto',
         'informes.ver'               => 'Ver el panel resumen y los informes',
         'auditoria.ver'              => 'Consultar el registro de auditoría',
         'datos.exportar'             => 'Exportar los pedidos en CSV o JSON',
+        'informes_stock.enviar'      => 'Generar los informes de stock, descargarlos en CSV, enviarlos y ver los enviados',
+        'informes_stock.revisar'     => 'Ver todos los informes de stock enviados y marcarlos como revisados',
     ];
 
     /** '*' = todos los permisos */
     public const MATRIZ = [
         'admin'   => ['*'],
-        'almacen' => ['panel.acceder', 'stock.gestionar', 'pedidos.ver_todos', 'pedidos.cambiar_estado'],
+        'almacen' => ['panel.acceder', 'stock.gestionar', 'albaranes.ver', 'pedidos.ver_todos', 'pedidos.cambiar_estado', 'informes_stock.enviar'],
         'cliente' => ['pedidos.propios', 'perfil.propio'],
     ];
 

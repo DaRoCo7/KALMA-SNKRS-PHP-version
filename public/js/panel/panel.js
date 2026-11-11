@@ -163,3 +163,6 @@ document.addEventListener('keydown', (evento) => {
 
 window.addEventListener('hashchange', aplicar);
 aplicar();
+
+// Contadores de la barra lateral (informes de stock pendientes); si falla, el panel sigue igual
+import('./avisos.js').catch((error) => console.error(error));

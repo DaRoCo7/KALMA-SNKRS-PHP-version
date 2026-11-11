@@ -5,7 +5,9 @@
  * título dice cuántos pedidos esperan la confirmación del pago y cuántas tallas
  * hay que reponer, y al lado van los pedidos pendientes y los modelos con
  * menos stock. El recorrido de los pedidos se dibuja como una barra con un
- * tramo por estado: se ve de un vistazo dónde se acumula el trabajo.
+ * tramo por estado: se ve de un vistazo dónde se acumula el trabajo. Debajo,
+ * dos gráficas (graficas.js) para ver los números: ingresos por mes y los
+ * modelos más vendidos; el detalle completo está en la sección Informes.
  */
 
 import { api, crear, precio } from '../api.js';
@@ -13,6 +15,23 @@ import {
     ESTADOS, NOMBRE_ESTADO, bloqueError, cabeceraSeccion, contar,
     fechaCorta, hashDe, horaActual, numero, sesionCaducada, textoError,
 } from './comun.js';
+import { graficaIngresosMes, graficaModelos } from './informes.js';
+
+/** Modelos de la gráfica «los más vendidos»; el ranking completo está en Informes */
+const MODELOS_EN_RESUMEN = 5;
+
+/**
+ * Peticiones de las gráficas y del aviso de informes de stock: si alguna
+ * falla, el resumen se pinta igual sin esa pieza (las cifras son lo primero).
+ */
+function opcional(promesa) {
+    return promesa.catch((error) => {
+        if (error.name === 'AbortError') {
+            throw error;
+        }
+        return null;
+    });
+}
 
 const PENDIENTES_EN_LISTA = 5;
 
@@ -42,13 +61,19 @@ export function montar(contenedor, ctx) {
         }
 
         try {
-            const [resumen, pendientes] = await Promise.all([
+            const [resumen, pendientes, porMes, porModelo, informesStock] = await Promise.all([
                 api('/api/gestion/resumen', { senal }),
                 ctx.puede('pedidos.ver_todos')
                     ? api(`/api/gestion/pedidos?estado=pendiente&por_pagina=${PENDIENTES_EN_LISTA}`, { senal })
                     : Promise.resolve(null),
+                opcional(api('/api/gestion/informes/ventas-por-mes', { senal })),
+                opcional(api('/api/gestion/informes/ventas-por-modelo', { senal })),
+                ctx.puede('informes_stock.revisar')
+                    ? opcional(api('/api/gestion/informes-stock?estado=pendiente&por_pagina=1', { senal }))
+                    : Promise.resolve(null),
             ]);
             pintar(resumen.datos, pendientes);
+            pintarGraficas(porMes?.datos.filas, porModelo?.datos.filas, informesStock?.paginacion.total);
             sello.textContent = `Actualizado a las ${horaActual()}`;
         } catch (error) {
             if (error.name === 'AbortError' || sesionCaducada(error)) {
@@ -81,6 +106,28 @@ export function montar(contenedor, ctx) {
             pareja.append(listaPendientes(pendientes));
         }
         pareja.append(tablaStock(datos.modelos_menos_stock, datos.tallas_bajo_minimo));
+    }
+
+    /**
+     * Ventas por mes y los modelos más vendidos, justo después del recorrido
+     * de los pedidos (que ya es la gráfica de pedidos por estado). Si hay
+     * informes de stock por revisar, se dice en la línea de arriba con enlace.
+     */
+    function pintarGraficas(meses, modelos, informesPendientes) {
+        if (meses && modelos) {
+            const graficas = crear('div', 'resumen__pareja');
+            for (const grafica of [graficaIngresosMes(meses), graficaModelos(modelos, MODELOS_EN_RESUMEN)]) {
+                const caja = crear('section', 'tarjeta');
+                caja.append(grafica);
+                graficas.append(caja);
+            }
+            cuerpo.querySelector('.recorrido')?.after(graficas);
+        }
+        if (informesPendientes > 0) {
+            const enlace = crear('a', 'tabla__enlace', contar(informesPendientes, 'informe de stock', 'informes de stock'));
+            enlace.href = hashDe('informes-stock', { estado: 'pendiente' });
+            linea.append(' · ', enlace, ' por revisar');
+        }
     }
 
     // Lo que cambia en otra sección (un pedido cancelado repone stock) se refleja aquí

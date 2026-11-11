@@ -14,7 +14,8 @@
  * @var list<string>                      $permisos
  * @var array<string, list<string>>       $transiciones
  */
-$estilos = ['/css/panel.css'];
+// panel-inventario.css: stock, albaranes y productos (tallas, formularios, carga del CSV)
+$estilos = ['/css/panel.css', '/css/panel-inventario.css', '/css/panel-informes.css'];
 $claseBody = 'pagina-panel';
 
 // Agrupadas por «grupo» conservando el orden de la lista del controlador

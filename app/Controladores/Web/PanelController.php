@@ -8,7 +8,7 @@ use App\Nucleo\Peticion;
 use App\Nucleo\Respuesta;
 use App\Seguridad\Permisos;
 use App\Seguridad\Sesion;
-use App\Servicios\PedidoServicio;
+use App\Servicios\EstadosPedido;
 
 /**
  * Área interna (/panel) para administración y almacén.
@@ -28,6 +28,14 @@ final class PanelController
     private const SECCIONES = [
         ['id' => 'resumen', 'nombre' => 'Resumen', 'grupo' => 'Operación', 'permiso' => 'informes.ver'],
         ['id' => 'pedidos', 'nombre' => 'Pedidos', 'grupo' => 'Operación', 'permiso' => 'pedidos.ver_todos'],
+        ['id' => 'stock', 'nombre' => 'Stock', 'grupo' => 'Inventario', 'permiso' => 'stock.gestionar'],
+        ['id' => 'albaranes', 'nombre' => 'Albaranes', 'grupo' => 'Inventario', 'permiso' => 'albaranes.ver'],
+        ['id' => 'productos', 'nombre' => 'Productos', 'grupo' => 'Inventario', 'permiso' => 'productos.gestionar'],
+        ['id' => 'informes', 'nombre' => 'Informes', 'grupo' => 'Análisis', 'permiso' => 'informes.ver'],
+        // El almacén los genera y envía; administración (que también tiene este permiso) los revisa
+        ['id' => 'informes-stock', 'nombre' => 'Informes de stock', 'grupo' => 'Análisis', 'permiso' => 'informes_stock.enviar'],
+        ['id' => 'consultas', 'nombre' => 'Consultas', 'grupo' => 'Control', 'permiso' => 'consultas.gestionar'],
+        ['id' => 'auditoria', 'nombre' => 'Auditoría', 'grupo' => 'Control', 'permiso' => 'auditoria.ver'],
     ];
 
     /** Cómo se llama cada rol en la pantalla */
@@ -57,7 +65,7 @@ final class PanelController
             'nombreRol'    => self::NOMBRES_ROL[$rol] ?? $rol,
             'secciones'    => $secciones,
             'permisos'     => $permisos,
-            'transiciones' => PedidoServicio::transicionesPara($rol),
+            'transiciones' => EstadosPedido::transicionesPara($rol),
         ]);
     }
 }
