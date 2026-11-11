@@ -131,6 +131,19 @@ final class ProductoRepositorio
         )->fetchAll();
     }
 
+    /**
+     * Solo id y nombre de las categorías con algo a la venta. Es la consulta que
+     * hace la cabecera en cada página, por eso no cuenta productos ni junta tablas.
+     */
+    public function categoriasConProductos(): array
+    {
+        return BaseDatos::conexion()->query(
+            'SELECT c.id, c.nombre FROM categorias c
+             WHERE EXISTS (SELECT 1 FROM productos p WHERE p.categoria_id = c.id AND p.activo)
+             ORDER BY c.nombre'
+        )->fetchAll();
+    }
+
     /** Valores para construir los filtros de la interfaz */
     public function valoresFiltros(): array
     {

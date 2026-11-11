@@ -1,0 +1,239 @@
+/*
+ * Menú: panel lateral que entra desde la izquierda. Habla el mismo idioma que
+ * la cesta (cesta.css), que entra por la derecha: mismo fondo difuminado, misma
+ * curva y la salida más rápida que la entrada. El bloqueo del scroll de fondo
+ * ya lo pone cesta.css para cualquier <dialog> abierto.
+ */
+
+/* --- Fondo: oscurecido y difuminado, igual que el de la cesta ----------------- */
+
+.menu::backdrop {
+    background: rgb(1 1 1 / 0.45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 1;
+    transition: opacity 220ms var(--salida);
+}
+
+@starting-style {
+    .menu[open]::backdrop {
+        opacity: 0;
+    }
+}
+
+.menu.cerrando::backdrop {
+    opacity: 0;
+    transition-duration: 150ms;
+}
+
+/* --- Panel ------------------------------------------------------------------------ */
+
+.menu {
+    width: min(100% - 3rem, 26rem);
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0 auto 0 0;
+    padding: 0;
+    border: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    box-shadow: 24px 0 60px rgb(1 1 1 / 0.18);
+    transform: translateX(0);
+    /* 280 ms: el panel recorre más pantalla que un desplegable y se ve llegar */
+    transition: transform 280ms var(--salida);
+}
+
+@starting-style {
+    .menu[open] {
+        transform: translateX(-100%);
+    }
+}
+
+/* Cerrar es una orden: sale en 150 ms (el mismo tiempo que espera cerrarDialogo) */
+.menu.cerrando {
+    transform: translateX(-100%);
+    transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .menu,
+    .menu.cerrando {
+        transform: none;
+        transition: none;
+    }
+}
+
+/*
+ * Sin JavaScript no hay showModal(): el enlace «Menú» lleva a #menu y el panel
+ * se muestra con :target, por encima de la página. «Cerrar» lleva a # y lo
+ * oculta. No hay fondo inerte ni foco atrapado, pero todos los enlaces funcionan.
+ */
+html:not(.con-js) .menu:target {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 100;
+    display: block;
+    overflow-y: auto;
+}
+
+.menu__caja {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    min-height: 100%;
+    padding: 0 var(--margen) 2rem;
+}
+
+.menu__cabecera {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-block: 1rem 0.5rem;
+    background: var(--blanco);
+}
+
+.menu__titulo {
+    margin: 0;
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+}
+
+.menu__etiqueta {
+    display: block;
+    margin: 0 0 0.6rem;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+/* --- Buscador ----------------------------------------------------------------------- */
+
+.menu__buscar-fila {
+    display: flex;
+}
+
+.menu__buscar input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #c4c4c4;
+    border-right: 0;
+    border-radius: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    font: inherit;
+    /* 16px como mínimo: con menos, Safari en el móvil acerca la página al escribir */
+    font-size: max(1rem, var(--paso-pequeno));
+    transition: border-color 150ms ease;
+}
+
+.menu__buscar input:focus-visible {
+    border-color: var(--negro);
+    outline: 2px solid var(--negro);
+    outline-offset: 0;
+}
+
+/* --- Páginas: grandes, son el motivo principal de abrir el menú ------------------------ */
+
+.menu__paginas ul {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.menu__paginas a {
+    display: block;
+    padding-block: 0.45rem;
+    color: var(--negro);
+    font-size: clamp(1.5rem, 1.2rem + 1vw, 1.875rem);
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -0.04em;
+    text-decoration: none;
+    text-transform: uppercase;
+    transition: color 150ms ease;
+}
+
+/* La página en la que se está: subrayada, sin necesitar color */
+.menu__paginas a[aria-current="page"] {
+    text-decoration: underline;
+    text-decoration-thickness: 3px;
+    text-underline-offset: 0.15em;
+}
+
+/* --- Atajos del catálogo ------------------------------------------------------------- */
+
+.menu__atajos {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.menu__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.menu__chips a {
+    display: inline-block;
+    padding: 0.6rem 0.9rem;
+    border: 1px solid #c4c4c4;
+    color: var(--negro);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    text-decoration: none;
+    transition: border-color 150ms ease, background-color 150ms ease, transform 160ms var(--salida);
+}
+
+.menu__chips a:active {
+    transform: scale(0.97);
+}
+
+/* --- Cuenta: al final, empujada abajo ---------------------------------------------- */
+
+.menu__cuenta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: auto;
+    padding-top: 1.5rem;
+    border-top: 1px solid #dcdcdc;
+}
+
+.menu__cuenta[hidden] {
+    display: none;
+}
+
+.menu__nombre {
+    flex-basis: 100%;
+    margin: 0;
+    font-weight: 700;
+}
+
+/* El blanco sobre blanco necesita un borde para leerse como botón */
+.menu__registro {
+    box-shadow: inset 0 0 0 1px var(--negro);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .menu__paginas a:hover {
+        color: var(--tenue);
+    }
+
+    .menu__chips a:hover {
+        border-color: var(--negro);
+        background: var(--suelo);
+    }
+}

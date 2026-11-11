@@ -107,10 +107,10 @@ html:not(.con-js) .lanzamientos-pagina__estado {
 .anuncio__nombre {
     margin: 0;
     font-size: var(--paso-entrada);
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    text-transform: uppercase;
+    /* Igual que en la portada: el nombre se lee, no grita; el rótulo es de la página */
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
     /* Dos líneas como mucho: los nombres largos se cortan antes que romper la fila */
     display: -webkit-box;
     -webkit-box-orient: vertical;

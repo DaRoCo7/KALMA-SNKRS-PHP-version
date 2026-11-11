@@ -107,7 +107,7 @@
 
 .panel-producto__nombre {
     margin: 0 3rem 0 0;
-    font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+    font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.25rem);
     font-weight: 900;
     line-height: 0.95;
     letter-spacing: -0.04em;

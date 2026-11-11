@@ -121,6 +121,16 @@ final class CatalogoServicio
         return array_map($this->opcion(...), $this->productos->opcionesPersonalizacion());
     }
 
+    /**
+     * Categorías para los atajos del menú de la cabecera.
+     * @return list<array{id: int, nombre: string}>
+     */
+    public function categoriasMenu(): array
+    {
+        return array_map(static fn (array $c): array => ['id' => (int) $c['id'], 'nombre' => $c['nombre']],
+            $this->productos->categoriasConProductos());
+    }
+
     public function valoresFiltros(): array
     {
         $valores = $this->productos->valoresFiltros();

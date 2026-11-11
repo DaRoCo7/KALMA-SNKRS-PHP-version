@@ -3,10 +3,11 @@
  * personalización. Los colores, tamaños y márgenes salen de las variables de estilos.css.
  */
 
-/* Rótulo gigante de la sección de pares disponibles */
+/* Rótulo de la sección de pares disponibles: del mismo tamaño que el de
+   lanzamientos, para que el único rótulo gigante sea el de las palabras */
 .disponibles__titulo {
     margin: 0;
-    font-size: clamp(2.6rem, 11.6vw, 13rem);
+    font-size: var(--paso-titulo);
     font-weight: 900;
     line-height: 0.88;
     letter-spacing: -0.05em;
@@ -93,10 +94,9 @@
 .lanzamiento__nombre {
     margin: 1rem 0 0;
     font-size: var(--paso-entrada);
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: -0.03em;
-    text-transform: uppercase;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
 }
 
 .lanzamiento__color {
@@ -301,7 +301,7 @@
 
 .personalizacion__titulo {
     margin: 0;
-    font-size: clamp(1.9rem, 1rem + 2.6vw, 3.5rem);
+    font-size: clamp(1.75rem, 1rem + 2vw, 2.75rem);
     font-weight: 900;
     line-height: 0.92;
     letter-spacing: -0.045em;
@@ -386,8 +386,9 @@
 .palabras__lista {
     display: grid;
     margin: 0;
-    /* Calculado para que «Exclusividad», la más larga, llene el ancho entre márgenes */
-    font-size: calc((100vw - 2 * var(--margen)) / 6.9);
+    /* El único rótulo gigante de la web. «Exclusividad», la más larga, ocupa unas
+       tres cuartas partes del ancho: impacta sin tapar la pantalla entera */
+    font-size: calc((100vw - 2 * var(--margen)) / 9.2);
     font-weight: 900;
     line-height: 0.86;
     letter-spacing: -0.05em;

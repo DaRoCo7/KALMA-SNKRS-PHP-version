@@ -1,9 +1,11 @@
 <?php
 /**
  * Cabecera común de las páginas: <head> y barra de navegación.
- * Logo a la izquierda, páginas en el centro y la cuenta a la derecha.
- * Si hay sesión, muestra el nombre del usuario y el botón de cerrar sesión
- * (un formulario POST con el token CSRF: cerrar sesión también modifica datos).
+ * Tres columnas: el botón «Menú» a la izquierda, el logo en el centro y la
+ * cuenta con la cesta a la derecha. Las páginas, el buscador y los atajos del
+ * catálogo viven en el panel del menú (parciales/menu.php).
+ * Si hay sesión, la derecha muestra el nombre del usuario y el botón de cerrar
+ * sesión (un formulario POST con el token CSRF: cerrar sesión también modifica datos).
  *
  * @var string $titulo
  * @var string[]|null $estilos    hojas de estilo propias de la página (rutas desde public/)
@@ -26,8 +28,10 @@ $claseMain ??= 'contenedor';
     <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/estilos.css">
     <link rel="stylesheet" href="/css/cesta.css">
+    <link rel="stylesheet" href="/css/menu.css">
     <?php // La cesta está en todas las páginas: el contador de la cabecera y su panel ?>
     <script type="module" src="/js/cesta.js"></script>
+    <script type="module" src="/js/menu.js"></script>
     <?php // Marca que hay JavaScript antes de pintar: las entradas animadas solo ocultan contenido si alguien lo va a mostrar ?>
     <script>document.documentElement.classList.add('con-js');</script>
 <?php foreach ($estilos as $hoja): ?>
@@ -37,23 +41,31 @@ $claseMain ??= 'contenedor';
 <body>
     <header class="cabecera">
         <div class="cabecera__interior">
+            <?php
+            // Un enlace al ancla del panel y no un botón: sin JavaScript sigue
+            // abriendo el menú (con :target, ver menu.css). menu.js lo cambia por
+            // un <button> con aria-expanded cuando puede abrirlo como diálogo.
+            ?>
+            <a class="boton-menu" href="#menu" aria-controls="menu" data-menu-abrir>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                <span class="boton-menu__texto">Menú</span>
+            </a>
             <a class="marca" href="/">
                 <img src="/img/logo-kalma.png" alt="KALMA SNKRS" width="640" height="275">
             </a>
-            <nav class="navegacion" aria-label="Principal">
-                <a href="/catalogo">Catálogo</a>
-                <a href="/lanzamientos">Lanzamientos</a>
-                <a href="/#personalizacion">Personalización</a>
-            </nav>
             <div class="cuenta">
                 <?php // Sin JavaScript no hay cesta (vive en el navegador): el botón solo se ve con JS ?>
                 <button class="boton-cesta" type="button" data-cesta-abrir aria-haspopup="dialog" aria-controls="cesta" aria-label="Cesta vacía">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1 12H6L5 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
                     <span class="boton-cesta__numero" data-cesta-numero aria-hidden="true">0</span>
                 </button>
+                <?php
+                // cesta.js sustituye estos hijos directos (enlaces, nombre y formulario)
+                // al entrar desde la cesta: si cambia la estructura, hay que cambiarlo allí
+                ?>
                 <?php if ($usuarioSesion === null): ?>
                     <a href="/login">Entrar</a>
-                    <a class="boton boton--claro" href="/registro">Crear cuenta</a>
+                    <a class="boton boton--claro cuenta__registro" href="/registro">Crear cuenta</a>
                 <?php else: ?>
                     <span class="cuenta__nombre"><?= e($usuarioSesion['nombre']) ?></span>
                     <form method="post" action="/logout" class="en-linea">
@@ -64,5 +76,6 @@ $claseMain ??= 'contenedor';
             </div>
         </div>
     </header>
+<?php require __DIR__ . '/menu.php'; ?>
 <?php require __DIR__ . '/cesta.php'; ?>
     <main<?= $claseMain !== '' ? ' class="' . e($claseMain) . '"' : '' ?>>
