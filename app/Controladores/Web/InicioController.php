@@ -14,13 +14,13 @@ use App\Servicios\CatalogoServicio;
 final class InicioController
 {
     /**
-     * Las palabras de la casa, en el orden en que salen bajo el carrusel.
+     * Las palabras de la casa, en el orden en que cierran la portada.
      * Son texto de marca, no datos: por eso viven aquí y no en la base de datos.
      */
     private const PALABRAS = ['Exclusividad', 'Identidad', 'Pasión'];
 
-    /** Lanzamientos anunciados que caben en el carrusel */
-    private const LANZAMIENTOS = 8;
+    /** Lanzamientos más cercanos que pasan por la cinta de la portada */
+    private const LANZAMIENTOS = 3;
 
     /** Pares a la venta que se enseñan debajo, antes del enlace al catálogo */
     private const DISPONIBLES = 3;

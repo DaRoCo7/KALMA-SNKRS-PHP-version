@@ -2,16 +2,17 @@
 /**
  * Portada. De arriba abajo:
  *   1. Hero animado (la silueta iluminada).
- *   2. Lanzamientos: carrusel de zapatillas anunciadas que todavía no se venden.
- *      Entran de izquierda a derecha y debajo cambia la palabra de la casa.
+ *   2. Lanzamientos: los tres más cercanos pasan en una cinta continua de
+ *      izquierda a derecha, sin que nadie toque nada.
  *   3. Disponibles: tres pares a la venta bajando bajo un rótulo fijo, y el
  *      enlace al catálogo.
  *   4. Personalización: la zapatilla, la prueba del bordado y los extras, todo
  *      en una pantalla y sin precios (se ven al comprar).
+ *   5. Las palabras de la casa, enormes, justo antes del pie.
  *
  * @var string $titulo
  * @var string[] $palabras
- * @var list<array> $lanzamientos  zapatillas con fecha de lanzamiento futura
+ * @var list<array> $lanzamientos  los lanzamientos más cercanos
  * @var list<array> $disponibles   últimos pares a la venta
  * @var list<array> $opciones      opciones de personalización activas
  */
@@ -45,42 +46,30 @@ require __DIR__ . '/parciales/hero-light.php';
 ?>
 
 <?php if ($lanzamientos !== []): ?>
-        <section class="lanzamientos" id="lanzamientos" data-carrusel aria-roledescription="carrusel" aria-labelledby="lanzamientos-titulo">
+        <section class="lanzamientos" id="lanzamientos" aria-labelledby="lanzamientos-titulo">
             <div class="lanzamientos__cabecera">
                 <h2 class="lanzamientos__titulo" id="lanzamientos-titulo">Lanzamientos</h2>
-                <p class="lanzamientos__nota">Todavía no se pueden comprar. Cada par llega al almacén el día que marca.</p>
+                <a class="boton" href="/lanzamientos">Ver todos</a>
             </div>
 
-            <ul class="carrusel" data-carrusel-pista>
-                <?php foreach ($lanzamientos as $i => $par): ?>
-                    <li class="diapositiva<?= $i === 0 ? ' es-activa' : '' ?>" data-diapositiva
-                        aria-roledescription="diapositiva" aria-label="<?= $i + 1 ?> de <?= count($lanzamientos) ?>">
-                        <img class="diapositiva__foto" src="<?= e($par['imagen']) ?>" width="1200" height="855" draggable="false"
-                             <?= $i === 0 ? '' : 'loading="lazy"' ?> alt="<?= e($par['nombre'] . ' ' . $par['colorway']) ?>">
-                        <div class="diapositiva__datos">
-                            <h3 class="diapositiva__nombre"><?= e($par['nombre']) ?></h3>
-                            <p class="diapositiva__color"><?= e($par['colorway']) ?></p>
-                            <p class="diapositiva__fecha">Sale el <?= e($fecha($par['fecha_lanzamiento'])) ?></p>
-                            <p class="diapositiva__texto"><?= e($par['descripcion']) ?></p>
-                        </div>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-
-            <div class="lanzamientos__pie">
-                <div class="lanzamientos__palabras" aria-hidden="true">
-                    <?php foreach ($palabras as $i => $palabra): ?>
-                        <p class="lanzamientos__palabra<?= $i === 0 ? ' es-activa' : '' ?>" data-palabra><?= e($palabra) ?></p>
+            <?php // Cinta continua: la lista se pinta dos veces seguidas y la pista se desplaza la
+                  // mitad de su ancho, así al acabar la vuelta encaja sin salto. La copia no existe
+                  // para el lector de pantalla ni para el teclado. ?>
+            <div class="cinta">
+                <div class="cinta__pista">
+                    <?php foreach ([false, true] as $copia): ?>
+                        <ul class="cinta__grupo"<?= $copia ? ' aria-hidden="true" inert' : '' ?>>
+                            <?php foreach ($lanzamientos as $par): ?>
+                                <li class="lanzamiento">
+                                    <img class="lanzamiento__foto" src="<?= e($par['imagen']) ?>" width="1200" height="855" draggable="false"
+                                         loading="lazy" alt="<?= $copia ? '' : e($par['nombre'] . ' ' . $par['colorway']) ?>">
+                                    <h3 class="lanzamiento__nombre"><?= e($par['nombre']) ?></h3>
+                                    <p class="lanzamiento__color"><?= e($par['colorway']) ?></p>
+                                    <p class="lanzamiento__fecha">Sale el <?= e($fecha($par['fecha_lanzamiento'])) ?></p>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
                     <?php endforeach; ?>
-                </div>
-                <div class="lanzamientos__mandos" data-carrusel-mandos hidden>
-                    <p class="lanzamientos__cuenta" data-carrusel-cuenta>1 / <?= count($lanzamientos) ?></p>
-                    <button class="boton boton--icono" type="button" data-carrusel-anterior aria-label="Lanzamiento anterior">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H5M11 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
-                    </button>
-                    <button class="boton boton--icono" type="button" data-carrusel-siguiente aria-label="Lanzamiento siguiente">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
-                    </button>
                 </div>
             </div>
         </section>
@@ -90,7 +79,6 @@ require __DIR__ . '/parciales/hero-light.php';
         <section class="disponibles" id="disponibles">
             <div class="disponibles__fijo">
                 <h2 class="disponibles__titulo">Disponibles</h2>
-                <p class="disponibles__nota">Estos ya están en el almacén. Pocas unidades por talla.</p>
             </div>
 
             <ul class="disponibles__pares">
@@ -151,6 +139,15 @@ require __DIR__ . '/parciales/hero-light.php';
             </div>
         </section>
 <?php endif; ?>
+
+        <?php // Las palabras de la casa cierran la página, una por línea y a todo el ancho ?>
+        <section class="palabras" aria-label="Así vivimos las zapatillas">
+            <h2 class="palabras__lista">
+                <?php foreach ($palabras as $palabra): ?>
+                    <span class="palabras__palabra" data-entrada><?= e($palabra) ?></span>
+                <?php endforeach; ?>
+            </h2>
+        </section>
 
         <script type="module" src="/js/portada.js"></script>
 <?php require __DIR__ . '/parciales/pie.php'; ?>

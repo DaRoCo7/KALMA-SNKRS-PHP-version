@@ -5,7 +5,7 @@
         </a>
         <nav class="pie__enlaces" aria-label="Pie de página">
             <a href="/catalogo">Catálogo</a>
-            <a href="/#lanzamientos">Lanzamientos</a>
+            <a href="/lanzamientos">Lanzamientos</a>
             <a href="/#personalizacion">Personalización</a>
             <a href="/login">Entrar</a>
             <a href="/registro">Crear cuenta</a>
