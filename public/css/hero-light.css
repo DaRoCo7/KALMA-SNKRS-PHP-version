@@ -6,8 +6,8 @@
     position: relative;
     display: grid;
     place-items: center;
-    /* Cabecera y hero llenan juntos la primera pantalla: así la frase y el botón
-       del pie del hero se ven sin desplazarse */
+    /* Cabecera y hero llenan juntos la primera pantalla: la silueta sola, sin
+       texto ni botón encima; la propia luz invita a bajar */
     height: calc(100svh - 4.5rem);
     min-height: 20rem;
     overflow: hidden;
@@ -59,39 +59,4 @@
     clip-path: inset(50%);
     white-space: nowrap;
     border: 0;
-}
-
-/* Frase y botón al pie del hero, como en un póster: texto abajo a la izquierda
-   y la acción abajo a la derecha, con los mismos márgenes que el resto de la página. */
-.hero-light__frase {
-    position: absolute;
-    left: var(--margen);
-    bottom: 2rem;
-    max-width: 22ch;
-    margin: 0;
-    color: #fff;
-    font-size: var(--paso-entrada);
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-    /* Blanco sobre negro, negro donde da la luz: sin esto se pierde al mover el foco */
-    mix-blend-mode: difference;
-    pointer-events: none;
-}
-
-.hero-light__accion {
-    position: absolute;
-    right: var(--margen);
-    bottom: 2rem;
-}
-
-@media (max-width: 40rem) {
-    .hero-light__frase {
-        bottom: 5.5rem;
-    }
-
-    .hero-light__accion {
-        left: var(--margen);
-        right: auto;
-    }
 }
