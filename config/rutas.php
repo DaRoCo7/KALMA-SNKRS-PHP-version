@@ -22,6 +22,7 @@ use App\Controladores\Web\AuthController as WebAuthController;
 use App\Controladores\Web\CatalogoController;
 use App\Controladores\Web\InicioController as WebInicioController;
 use App\Controladores\Web\LanzamientosController;
+use App\Controladores\Web\NosotrosController;
 use App\Middlewares\Autenticado;
 use App\Middlewares\IniciarSesion;
 use App\Middlewares\LimitarTasa;
@@ -51,6 +52,7 @@ $router->get('/health', [SaludController::class, 'comprobar']);
 $router->get('/', [WebInicioController::class, 'index']);
 $router->get('/catalogo', [CatalogoController::class, 'index']);
 $router->get('/lanzamientos', [LanzamientosController::class, 'index']);
+$router->get('/sobre-nosotros', [NosotrosController::class, 'index']);
 
 $router->get('/login', [WebAuthController::class, 'formularioLogin']);
 $router->post('/login', [WebAuthController::class, 'login'], [$limiteLogin]);

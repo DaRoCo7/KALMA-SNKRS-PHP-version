@@ -7,6 +7,7 @@
             <a href="/catalogo">Catálogo</a>
             <a href="/lanzamientos">Lanzamientos</a>
             <a href="/#personalizacion">Personalización</a>
+            <a href="/sobre-nosotros">Sobre nosotros</a>
             <a href="/login">Entrar</a>
             <a href="/registro">Crear cuenta</a>
         </nav>
