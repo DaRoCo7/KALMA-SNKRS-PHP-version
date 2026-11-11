@@ -30,14 +30,44 @@ export class ErrorApi extends Error {
  * Petición a la API. Devuelve el cuerpo ya leído ({datos, paginacion...}) o
  * lanza ErrorApi. Un fallo de red se convierte en ErrorApi con estado 0 para
  * que quien llama trate todos los errores igual.
+ *
+ * cuerpo va como JSON; texto + tipo envían un cuerpo de texto tal cual (el CSV
+ * del albarán). publica: true en las rutas que no exigen sesión (el login).
+ *
+ * Un 403 con motivo «csrf» casi siempre es una sesión caducada: el servidor
+ * comprueba el token antes que la sesión, y la sesión rehecha trae otro token.
+ * Se consulta /api/sesion una vez: sin sesión se lanza un 401 (y quien llama
+ * manda al login, como con cualquier 401); con sesión se toma el token nuevo y
+ * se repite la petición una sola vez.
  */
-export async function api(ruta, { metodo = 'GET', cuerpo, senal } = {}) {
+export async function api(ruta, opciones = {}) {
+    try {
+        return await peticion(ruta, opciones);
+    } catch (error) {
+        if (!(error instanceof ErrorApi) || error.estado !== 403 || error.detalles.motivo !== 'csrf') {
+            throw error;
+        }
+        const { datos: sesion } = await peticion('/api/sesion', { senal: opciones.senal });
+        fijarTokenCsrf(sesion.csrf_token);
+        if (!sesion.autenticado && !opciones.publica) {
+            throw new ErrorApi(401, 'Tu sesión ha caducado. Vuelve a entrar.', { motivo: 'sesion_caducada' });
+        }
+        return peticion(ruta, opciones);
+    }
+}
+
+async function peticion(ruta, { metodo = 'GET', cuerpo, texto, tipo = 'text/plain', senal } = {}) {
     const cabeceras = { Accept: 'application/json' };
     if (metodo !== 'GET') {
         cabeceras['X-CSRF-Token'] = tokenCsrf;
     }
-    if (cuerpo !== undefined) {
+    let cuerpoHttp;
+    if (texto !== undefined) {
+        cabeceras['Content-Type'] = `${tipo}; charset=utf-8`;
+        cuerpoHttp = texto;
+    } else if (cuerpo !== undefined) {
         cabeceras['Content-Type'] = 'application/json';
+        cuerpoHttp = JSON.stringify(cuerpo);
     }
 
     let respuesta;
@@ -45,7 +75,7 @@ export async function api(ruta, { metodo = 'GET', cuerpo, senal } = {}) {
         respuesta = await fetch(ruta, {
             method: metodo,
             headers: cabeceras,
-            body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+            body: cuerpoHttp,
             credentials: 'same-origin',
             signal: senal,
         });
@@ -65,6 +95,26 @@ export async function api(ruta, { metodo = 'GET', cuerpo, senal } = {}) {
         throw new ErrorApi(respuesta.status, error.mensaje ?? 'Algo ha fallado. Vuelve a intentarlo.', error.detalles);
     }
     return json ?? {};
+}
+
+/**
+ * Lleva al login y, al entrar, de vuelta a donde se estaba. Por defecto vuelve
+ * a la página actual con su hash (en el panel, la sección y el pedido abierto).
+ */
+export function irAlLogin(volver = window.location.pathname + window.location.search + window.location.hash) {
+    window.location.href = `/login?volver=${encodeURIComponent(volver)}`;
+}
+
+/**
+ * Si el error es de sesión caducada (401, también el que api() saca de un 403
+ * CSRF sin sesión) manda al login y devuelve true; si no, devuelve false.
+ */
+export function sesionCaducada(error, volver) {
+    if (error instanceof ErrorApi && error.estado === 401) {
+        irAlLogin(volver);
+        return true;
+    }
+    return false;
 }
 
 const formatoPrecio = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });

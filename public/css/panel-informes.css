@@ -1,6 +1,6 @@
 /*
  * Panel: gráficas (public/js/panel/graficas.js) y las secciones de análisis y
- * control (informes, informes de stock, consultas y auditoría).
+ * control (informes, informes de stock y consultas).
  *
  * Va aparte de panel.css para que cada parte del panel crezca en su archivo.
  * Usa los mismos tonos (--p-*) y el mismo hueco de 16 px.
@@ -506,32 +506,12 @@ select.campo-texto {
     display: none;
 }
 
-/* --- Consultas y auditoría ------------------------------------------------------ */
+/* --- Consultas ------------------------------------------------------------------ */
 
 .mensaje-consulta {
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-}
-
-.json {
-    margin: 0;
-    padding: 12px;
-    max-height: 420px;
-    overflow: auto;
-    border: 1px solid var(--p-borde);
-    border-radius: var(--p-radio-control);
-    background: var(--p-elevado);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 12px;
-    line-height: 18px;
-    white-space: pre;
-}
-
-.resultado--error,
-.resultado--denegado {
-    color: var(--p-negativo);
-    font-weight: 700;
 }
 
 /* --- Pantallas estrechas ------------------------------------------------------- */
@@ -570,9 +550,4 @@ select.campo-texto {
     .grafica__columna {
         transition: none;
     }
-}
-
-/* Enlace del evento a su informe de stock, separado del JSON */
-.auditoria__enlace {
-    margin-top: 12px !important;
 }

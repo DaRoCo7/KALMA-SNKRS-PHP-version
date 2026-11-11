@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Servicios;
 
 use App\Nucleo\BaseDatos;
+use App\Nucleo\Formato;
 use App\Nucleo\HttpExcepcion;
 use App\Nucleo\Paginacion;
 use App\Nucleo\Validador;
@@ -24,7 +25,6 @@ final class StockServicio
 {
     /** Un ajuste mayor que esto no es una corrección: es una entrada de mercancía (albarán) */
     private const AJUSTE_MAXIMO = 500;
-    private const MAX_ID = 2_147_483_647;   // máximo de un INTEGER de PostgreSQL
     private const NO_ENCONTRADA = 'Talla no encontrada';
 
     public function __construct(
@@ -57,7 +57,7 @@ final class StockServicio
      */
     public function ajustar(array $usuario, string $id, array $entrada, ?string $ip): array
     {
-        $varianteId = self::id($id);
+        $varianteId = Validador::idRuta($id, self::NO_ENCONTRADA);
         [$cantidad, $motivo] = $this->validarAjuste($entrada);
 
         try {
@@ -108,7 +108,7 @@ final class StockServicio
      */
     public function movimientos(string $id, Paginacion $paginacion): array
     {
-        $varianteId = self::id($id);
+        $varianteId = Validador::idRuta($id, self::NO_ENCONTRADA);
         $this->stock->buscarTalla($varianteId) ?? throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADA);
 
         $total = $this->stock->contarMovimientos($varianteId);
@@ -127,7 +127,7 @@ final class StockServicio
                     'rol'    => $m['usuario_rol'],
                 ],
                 'motivo'           => $m['motivo'],
-                'fecha'            => self::fecha($m['fecha']),
+                'fecha'            => Formato::fecha($m['fecha']),
             ], $filas),
             'paginacion' => $paginacion->meta($total),
         ];
@@ -170,10 +170,11 @@ final class StockServicio
 
         $buscar = $query['buscar'] ?? '';
         if ($buscar !== '') {
-            if (is_string($buscar) && mb_strlen(trim($buscar)) <= 60) {
-                $filtros['buscar'] = trim($buscar);
+            $limpio = Validador::busqueda($buscar);
+            if ($limpio === null) {
+                $errores['buscar'] = Validador::MENSAJE_BUSQUEDA;
             } else {
-                $errores['buscar'] = 'Texto de hasta 60 caracteres';
+                $filtros['buscar'] = $limpio;
             }
         }
 
@@ -194,10 +195,8 @@ final class StockServicio
             if ($id === '') {
                 continue;
             }
-            $valor = is_string($id)
-                ? filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_ID]])
-                : false;
-            if ($valor === false) {
+            $valor = Validador::id($id);
+            if ($valor === null) {
                 $errores[$campo] = "Identificador numérico {$de}";
             } else {
                 $filtros[$campo] = $valor;
@@ -208,13 +207,6 @@ final class StockServicio
             throw HttpExcepcion::peticionIncorrecta('Filtros no válidos', $errores);
         }
         return $filtros;
-    }
-
-    /** El {id} de la URL: si no es un entero positivo, esa talla no puede existir (404 sin consultar la BD) */
-    private static function id(string $id): int
-    {
-        $valor = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_ID]]);
-        return $valor === false ? throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADA) : $valor;
     }
 
     /** Talla tal como la devuelve la API (NUMERIC llega de PDO como texto: se pasa a número) */
@@ -241,11 +233,5 @@ final class StockServicio
             'rfid_tienda'  => $t['rfid_tienda'],
             'activo'       => $t['activo'],
         ];
-    }
-
-    /** Fecha de PostgreSQL (2026-11-08 19:15:00+01) en ISO 8601 (2026-11-08T19:15:00+01:00) */
-    private static function fecha(?string $valor): ?string
-    {
-        return $valor === null ? null : (new \DateTimeImmutable($valor))->format(DATE_ATOM);
     }
 }

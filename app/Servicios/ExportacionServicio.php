@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Servicios;
 
+use App\Nucleo\Csv;
+use App\Nucleo\Formato;
 use App\Nucleo\HttpExcepcion;
 use App\Nucleo\Log;
 use App\Nucleo\Validador;
@@ -28,15 +30,6 @@ final class ExportacionServicio
         'precio_unitario', 'recargo_personalizacion', 'importe', 'personalizacion', 'total_pedido',
     ];
 
-    /**
-     * Excel trata como fórmula una celda que empieza por estos caracteres: un
-     * email "=HYPERLINK(...)@x.com" ejecutaría la fórmula al abrir el archivo
-     * (inyección de fórmulas CSV). Una comilla simple delante lo deja como texto.
-     */
-    private const INICIO_FORMULA = ['=', '+', '-', '@', "\t", "\r"];
-
-    /** UTF-8 con BOM: sin él, Excel abre el CSV como ANSI y rompe las tildes y las eñes */
-    private const BOM_UTF8 = "\xEF\xBB\xBF";
 
     public function __construct(
         private readonly ExportacionRepositorio $exportacion = new ExportacionRepositorio(),
@@ -74,47 +67,32 @@ final class ExportacionServicio
 
         return [
             'contenido'      => $contenido,
-            'tipo'           => $formato === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8',
+            'tipo'           => $formato === 'csv' ? Csv::TIPO : 'application/json; charset=utf-8',
             'nombre_archivo' => "kalma-pedidos-{$hoy}.{$formato}",
         ];
     }
 
     /**
-     * CSV para Excel en español: separador punto y coma (la coma es el separador
-     * decimal) y decimales con coma, 119,99. Con punto, Excel en español leería
-     * 12.05 como una fecha (12 de mayo).
-     *
-     * fputcsv escribe sobre un archivo temporal en memoria (php://temp): se
-     * encarga de poner comillas y de escapar las que ya trae el texto.
+     * CSV para Excel en español (BOM, «;», coma decimal y celdas protegidas
+     * contra fórmulas: ver Csv). Una fila por línea de pedido.
      */
     private function csv(array $lineas): string
     {
-        $archivo = fopen('php://temp', 'r+');
-        fwrite($archivo, self::BOM_UTF8);
-        $this->filaCsv($archivo, self::COLUMNAS_CSV);
-
-        foreach ($lineas as $l) {
-            $this->filaCsv($archivo, [
-                self::texto($l['codigo']),
-                self::fecha($l['fecha_creacion']),
-                self::texto($l['estado']),
-                self::texto($l['cliente_email']),
-                self::texto($l['nombre_producto']),
-                self::texto($l['color']),
-                self::talla((float) $l['talla']),
-                (string) (int) $l['cantidad'],
-                self::decimal((float) $l['precio_unitario']),
-                self::decimal((float) $l['recargo_personalizacion']),
-                self::decimal((float) $l['importe']),
-                self::texto(self::personalizacionEnTexto(json_decode($l['personalizacion'], true))),
-                self::decimal((float) $l['total']),
-            ]);
-        }
-
-        rewind($archivo);
-        $contenido = (string) stream_get_contents($archivo);
-        fclose($archivo);
-        return $contenido;
+        return Csv::generar(self::COLUMNAS_CSV, array_map(static fn (array $l): array => [
+            Csv::texto($l['codigo']),
+            Formato::fecha($l['fecha_creacion']),
+            Csv::texto($l['estado']),
+            Csv::texto($l['cliente_email']),
+            Csv::texto($l['nombre_producto']),
+            Csv::texto($l['color']),
+            Csv::talla((float) $l['talla']),
+            (string) (int) $l['cantidad'],
+            Csv::decimal((float) $l['precio_unitario']),
+            Csv::decimal((float) $l['recargo_personalizacion']),
+            Csv::decimal((float) $l['importe']),
+            Csv::texto(self::personalizacionEnTexto(json_decode($l['personalizacion'], true))),
+            Csv::decimal((float) $l['total']),
+        ], $lineas));
     }
 
     /** Lista de pedidos con sus líneas anidadas (agrupa las filas por pedido) */
@@ -124,7 +102,7 @@ final class ExportacionServicio
         foreach ($lineas as $l) {
             $pedidos[$l['pedido_id']] ??= [
                 'codigo'        => $l['codigo'],
-                'fecha'         => self::fecha($l['fecha_creacion']),
+                'fecha'         => Formato::fecha($l['fecha_creacion']),
                 'estado'        => $l['estado'],
                 'cliente_email' => $l['cliente_email'],
                 'personalizado' => $l['personalizado'],
@@ -179,31 +157,6 @@ final class ExportacionServicio
         return $filtros;
     }
 
-    /** @param resource $archivo */
-    private function filaCsv($archivo, array $celdas): void
-    {
-        // escape '' = formato estándar RFC 4180 (las comillas se duplican, sin barra invertida)
-        fputcsv($archivo, $celdas, ';', '"', '', "\r\n");
-    }
-
-    /** Celda de texto protegida contra la inyección de fórmulas */
-    private static function texto(?string $valor): string
-    {
-        $valor ??= '';
-        return $valor !== '' && in_array($valor[0], self::INICIO_FORMULA, true) ? "'" . $valor : $valor;
-    }
-
-    /** 119.99 -> "119,99" · 12 -> "12,00" */
-    private static function decimal(float $numero): string
-    {
-        return number_format($numero, 2, ',', '');
-    }
-
-    /** 42 -> "42" · 42.5 -> "42,5" (solo hay tallas enteras o medias) */
-    private static function talla(float $talla): string
-    {
-        return number_format($talla, floor($talla) === $talla ? 0 : 1, ',', '');
-    }
 
     /** «Caja edición KALMA; Nombre bordado en el talón: LUCÍA» */
     private static function personalizacionEnTexto(array $opciones): string
@@ -212,11 +165,5 @@ final class ExportacionServicio
             static fn (array $o): string => $o['texto'] === null ? $o['nombre'] : "{$o['nombre']}: {$o['texto']}",
             $opciones
         ));
-    }
-
-    /** Fecha de PostgreSQL en ISO 8601 (2026-11-08T19:15:00+01:00) */
-    private static function fecha(string $valor): string
-    {
-        return (new \DateTimeImmutable($valor))->format(DATE_ATOM);
     }
 }

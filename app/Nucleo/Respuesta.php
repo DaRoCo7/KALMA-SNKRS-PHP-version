@@ -84,11 +84,6 @@ final class Respuesta
         return $this;
     }
 
-    public function estado(): int
-    {
-        return $this->estado;
-    }
-
     public function enviar(): void
     {
         http_response_code($this->estado);

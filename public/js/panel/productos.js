@@ -20,9 +20,9 @@
 import { api, crear, esFutura, precio, talla as formatoTalla } from '../api.js';
 import { bloqueError, cabeceraSeccion, contar, hashDe, numero, sesionCaducada, textoError } from './comun.js';
 import {
-    cabezaLateral, campo, crearLateral, etiqueta, fechaDia, filaVacia, filasEsqueleto, fotoProducto,
+    cabezaLateral, campoFormulario, etiqueta, fechaDia, filaVacia, filasEsqueleto, fotoProducto, lateral as crearLateral,
     mostrarErrores, pintarPaginas,
-} from './inventario-comun.js';
+} from './piezas.js';
 
 const POR_PAGINA = 20;
 const ESPERA_BUSQUEDA = 300;
@@ -338,27 +338,27 @@ export function montar(contenedor, ctx) {
         if (!producto) {
             const codigo = texto('codigo_marca', 10, { spellcheck: false, placeholder: 'DD1391-102' });
             codigo.setAttribute('autocapitalize', 'characters');
-            campos.codigo_marca = campo({
+            campos.codigo_marca = campoFormulario({
                 id: 'producto-codigo', etiqueta: 'Código de Nike', control: codigo,
                 ayuda: 'Style code de nike.com (6 letras o cifras, guion y 3 cifras). No se podrá cambiar.',
             });
         }
-        campos.nombre = campo({ id: 'producto-nombre', etiqueta: 'Nombre', control: texto('nombre', 140, { value: producto?.nombre ?? '' }), clase: 'campo-inv--ancho' });
-        campos.colorway = campo({ id: 'producto-colorway', etiqueta: 'Colorway', control: texto('colorway', 100, { value: producto?.colorway ?? '', placeholder: 'White/University Blue' }), clase: 'campo-inv--ancho' });
-        campos.precio = campo({
+        campos.nombre = campoFormulario({ id: 'producto-nombre', etiqueta: 'Nombre', control: texto('nombre', 140, { value: producto?.nombre ?? '' }), clase: 'campo-inv--ancho' });
+        campos.colorway = campoFormulario({ id: 'producto-colorway', etiqueta: 'Colorway', control: texto('colorway', 100, { value: producto?.colorway ?? '', placeholder: 'White/University Blue' }), clase: 'campo-inv--ancho' });
+        campos.precio = campoFormulario({
             id: 'producto-precio', etiqueta: 'Precio (€)',
             control: texto('precio', 8, { inputMode: 'decimal', value: producto ? String(producto.precio).replace('.', ',') : '', placeholder: '119,99' }),
             ayuda: 'Los pedidos ya hechos conservan su precio', clase: 'campo-inv--corto',
         });
-        campos.categoria_id = campo({ id: 'producto-categoria', etiqueta: 'Categoría', control: desplegable('categoria_id', categorias, producto?.categoria.id) });
-        campos.color_id = campo({ id: 'producto-color', etiqueta: 'Color', control: desplegable('color_id', colores, producto?.color.id) });
+        campos.categoria_id = campoFormulario({ id: 'producto-categoria', etiqueta: 'Categoría', control: desplegable('categoria_id', categorias, producto?.categoria.id) });
+        campos.color_id = campoFormulario({ id: 'producto-color', etiqueta: 'Color', control: desplegable('color_id', colores, producto?.color.id) });
 
         const descripcion = crear('textarea', 'campo-texto campo-area');
         Object.assign(descripcion, { name: 'descripcion', maxLength: 2000, rows: 3, value: producto?.descripcion ?? '' });
-        campos.descripcion = campo({ id: 'producto-descripcion', etiqueta: 'Descripción (opcional)', control: descripcion, clase: 'campo-inv--ancho' });
+        campos.descripcion = campoFormulario({ id: 'producto-descripcion', etiqueta: 'Descripción (opcional)', control: descripcion, clase: 'campo-inv--ancho' });
 
         if (!producto) {
-            campos.tallas = campo({
+            campos.tallas = campoFormulario({
                 id: 'producto-tallas', etiqueta: 'Tallas (opcional)',
                 control: texto('tallas', 200, { placeholder: '40 41 42,5', inputMode: 'decimal' }),
                 ayuda: 'Separadas por espacios (42,5 es media talla); de 34 a 50', clase: 'campo-inv--ancho',

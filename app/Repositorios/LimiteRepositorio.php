@@ -54,6 +54,20 @@ final class LimiteRepositorio
         return ['contador' => (int) $fila['contador'], 'reinicio' => (int) $fila['reinicio']];
     }
 
+    /**
+     * Cuántos lleva en la ventana actual, sin sumar ninguno. Un contador de una
+     * ventana ya caducada cuenta como 0, igual que haría incrementar().
+     */
+    public function contador(string $clave, int $ventanaSegundos): int
+    {
+        $consulta = BaseDatos::conexion()->prepare(
+            'SELECT contador FROM limites_peticiones
+             WHERE clave = :clave AND inicio_ventana > now() - make_interval(secs => :ventana)'
+        );
+        $consulta->execute(['clave' => $clave, 'ventana' => $ventanaSegundos]);
+        return (int) $consulta->fetchColumn();
+    }
+
     public function borrar(string $clave): void
     {
         BaseDatos::conexion()

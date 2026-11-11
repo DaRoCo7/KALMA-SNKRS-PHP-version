@@ -31,7 +31,7 @@ require dirname(__DIR__) . '/parciales/documento-inicio.php';
         <p class="login__aviso" id="aviso-acceso" role="alert"><?= e($error) ?></p>
     <?php endif; ?>
 
-    <?php // acceso__formulario es el gancho de acceso.js para llevar el foco al primer error ?>
+    <?php // acceso__formulario es el gancho de acceso.js: foco al primer error y formato del email ?>
     <form method="post" action="/login" class="login__formulario acceso__formulario" data-enviando="Entrando…" novalidate>
         <input type="hidden" name="_csrf" value="<?= e(\App\Seguridad\Sesion::tokenCsrf()) ?>">
         <?php if ($volver !== null): ?>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controladores\Api\Gestion;
 
+use App\Nucleo\Formato;
 use App\Nucleo\HttpExcepcion;
 use App\Nucleo\Paginacion;
 use App\Nucleo\Peticion;
@@ -34,7 +35,7 @@ final class AuditoriaController
         $total = $this->auditoria->contar($filtros);
         $eventos = array_map(static fn (array $e): array => [
             'id'          => (int) $e['id'],
-            'fecha'       => (new \DateTimeImmutable($e['fecha']))->format(DATE_ATOM),
+            'fecha'       => Formato::fecha($e['fecha']),
             'usuario'     => $e['usuario_id'] === null ? null : [
                 'id'    => (int) $e['usuario_id'],
                 'email' => $e['usuario_email'],

@@ -23,9 +23,9 @@
 import { api, crear, talla as formatoTalla } from '../api.js';
 import { bloqueError, cabeceraSeccion, contar, fechaCorta, hashDe, numero, sesionCaducada, textoError } from './comun.js';
 import {
-    cabezaLateral, campo, conSigno, crearLateral, etiqueta, fechaDia, filaVacia, filasEsqueleto,
-    fotoProducto, mostrarErrores, todasLasPaginas,
-} from './inventario-comun.js';
+    cabezaLateral, campoFormulario, conSigno, etiqueta, fechaDia, filaVacia, filasEsqueleto,
+    fotoProducto, lateral as crearLateral, mostrarErrores, todasLasPaginas,
+} from './piezas.js';
 
 const ESPERA_BUSQUEDA = 300;
 const MOVIMIENTOS_POR_PAGINA = 20;
@@ -359,13 +359,13 @@ export function montar(contenedor, ctx) {
 
         const entradaCantidad = crear('input', 'campo-texto num');
         Object.assign(entradaCantidad, { type: 'number', step: 1, min: -500, max: 500, inputMode: 'numeric', autocomplete: 'off', name: 'cantidad' });
-        const cantidad = campo({
+        const cantidad = campoFormulario({
             id: 'ajuste-cantidad', etiqueta: 'Cantidad', control: entradaCantidad,
             ayuda: 'Positiva suma pares, negativa los resta', clase: 'campo-inv--corto',
         });
         const entradaMotivo = crear('input', 'campo-texto');
         Object.assign(entradaMotivo, { type: 'text', maxLength: 255, autocomplete: 'off', name: 'motivo' });
-        const motivo = campo({
+        const motivo = campoFormulario({
             id: 'ajuste-motivo', etiqueta: 'Motivo', control: entradaMotivo,
             ayuda: 'Queda en el historial: recuento, caja dañada, devolución…', clase: 'campo-inv--ancho',
         });

@@ -348,7 +348,7 @@
             "url": "{{base_url}}/api/login",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email_ataque}}\",\n  \"password\": \"Incorrecta1\"\n}", "options": { "raw": { "language": "json" } } },
-            "description": "Límite por cuenta: 5 intentos de login cada 15 minutos. El script previo hace 5 intentos fallidos contra un email inventado y esta petición (la sexta) recibe 429 con Retry-After."
+            "description": "Límite por cuenta e IP: 5 intentos de login cada 15 minutos desde una misma IP contra un mismo email. El script previo hace 5 intentos fallidos contra un email inventado y esta petición (la sexta) recibe 429 con Retry-After. El bloqueo solo afecta a esa IP: el dueño de la cuenta puede entrar desde la suya."
           },
           "event": [
             { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
@@ -3618,6 +3618,400 @@
       ]
     },
     {
+      "name": "Albaranes repetidos",
+      "description": "Una referencia ya cargada se rechaza con 409 y no suma nada (el intento queda en la auditoría como albaran.repetido_rechazado y sale en GET /api/gestion/albaranes/avisos). Solo entra con ?aceptar_repetida=1&motivo=..., y la carga queda marcada como repetida. Cada ejecución usa una referencia nueva al azar.",
+      "item": [
+        {
+          "name": "Login de administración (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol admin', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('admin'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Primera carga de una referencia nueva (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia={{alr_referencia}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{alr_csv}}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "Un par de la Air Force 1 en la 42 con una referencia al azar: es la carga que después se intenta repetir."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('alr_referencia', 'ALB-REP-' + Date.now().toString(36).toUpperCase() + '-' + Math.floor(Math.random() * 1000));",
+                  "pm.collectionVariables.set('alr_csv', 'codigo_marca,nombre,colorway,categoria,color,precio,talla,cantidad\\nCW2288-111,,,,,,42,1');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json().datos;",
+                  "pm.test('No es repetida', () => {",
+                  "    pm.expect(r.repetida).to.eql(false);",
+                  "    pm.expect(r.motivo_repetida).to.eql(null);",
+                  "    pm.expect(r.unidades).to.eql(1);",
+                  "    pm.expect(r.tallas_desactivadas).to.eql([]);",
+                  "});",
+                  "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+                  "    pm.collectionVariables.set('alr_stock', respuesta.json().datos.tallas.find((t) => t.talla === 42).stock);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recargar la misma referencia sin aceptarla (409)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia={{alr_referencia}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{alr_csv}}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "La referencia ya está cargada: 409 con los datos de la carga anterior y sin tocar el stock."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "const d = pm.response.json().error.detalles;",
+                  "pm.test('Trae la carga anterior', () => {",
+                  "    pm.expect(d.referencia).to.eql(pm.collectionVariables.get('alr_referencia'));",
+                  "    pm.expect(d.cargas).to.eql(1);",
+                  "    pm.expect(d.carga_anterior).to.include.keys('fecha', 'usuario', 'filas', 'unidades');",
+                  "    pm.expect(d.carga_anterior.unidades).to.eql(1);",
+                  "    pm.expect(d.carga_anterior.usuario.email).to.eql('admin@kalma.test');",
+                  "    pm.expect(d.aceptar).to.include('aceptar_repetida=1');",
+                  "});",
+                  "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+                  "    const talla = respuesta.json().datos.tallas.find((t) => t.talla === 42);",
+                  "    pm.test('El stock no ha cambiado', () => pm.expect(talla.stock).to.eql(Number(pm.collectionVariables.get('alr_stock'))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aceptar la repetida sin motivo (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia={{alr_referencia}}&aceptar_repetida=1",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{alr_csv}}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "Aceptar una referencia repetida exige un motivo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('El error está en el motivo', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('motivo'));",
+                  "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+                  "    const talla = respuesta.json().datos.tallas.find((t) => t.talla === 42);",
+                  "    pm.test('El stock sigue sin cambiar', () => pm.expect(talla.stock).to.eql(Number(pm.collectionVariables.get('alr_stock'))));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aceptar la repetida con motivo (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia={{alr_referencia}}&aceptar_repetida=1&motivo=Segunda%20entrega%20del%20proveedor",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{alr_csv}}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "Con el motivo sí entra: suma otra vez y queda marcada como repetida."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json().datos;",
+                  "pm.test('Marcada como repetida con su motivo', () => {",
+                  "    pm.expect(r.repetida).to.eql(true);",
+                  "    pm.expect(r.motivo_repetida).to.eql('Segunda entrega del proveedor');",
+                  "});",
+                  "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+                  "    const talla = respuesta.json().datos.tallas.find((t) => t.talla === 42);",
+                  "    pm.test('Ahora sí ha sumado un par', () => pm.expect(talla.stock).to.eql(Number(pm.collectionVariables.get('alr_stock')) + 1));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El intento rechazado sale en los avisos (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes/avisos?por_pagina=10"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const avisos = pm.response.json().datos.filter((a) => a.referencia === pm.collectionVariables.get('alr_referencia'));",
+                  "pm.test('Un solo aviso de esta referencia (el 400 no cuenta), ya cargada después', () => {",
+                  "    pm.expect(avisos).to.have.lengthOf(1);",
+                  "    pm.expect(avisos[0].aceptada_despues).to.eql(true);",
+                  "    pm.expect(avisos[0].usuario.email).to.eql('admin@kalma.test');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El detalle es la carga repetida (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes/detalle?referencia={{alr_referencia}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const a = pm.response.json().datos;",
+                  "pm.test('Dos cargas y la última es la repetida', () => {",
+                  "    pm.expect(a.cargas).to.eql(2);",
+                  "    pm.expect(a.repetida).to.eql(true);",
+                  "    pm.expect(a.motivo_repetida).to.eql('Segunda entrega del proveedor');",
+                  "    pm.expect(a.tallas).to.have.lengthOf(1);   // cada carga ve solo sus movimientos",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de administración (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de almacén (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"almacen@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol almacen', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('almacen'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén no puede aceptar una repetida (403)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia={{alr_referencia}}&aceptar_repetida=1&motivo=Intento%20del%20almac%C3%A9n",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{alr_csv}}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "Cargar (y aceptar) es solo de administración."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén no ve los avisos (403)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes/avisos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de almacén (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Informes de stock",
       "description": "El almacén genera los informes de poco stock y de zapatillas sin ventas, los descarga en CSV y los envía a administración, que los revisa. Se guardan en la tabla auditoria (informe_stock.enviar / informe_stock.revisar). Cada ejecución envía un informe nuevo y lo marca como revisado: la carpeta se puede repetir.",
       "item": [
@@ -4263,6 +4657,9 @@
     }
   ],
   "variable": [
+    { "key": "alr_referencia", "value": "" },
+    { "key": "alr_csv", "value": "" },
+    { "key": "alr_stock", "value": "" },
     { "key": "email_nuevo", "value": "" },
     { "key": "email_ataque", "value": "" },
     { "key": "cuerpo_sin_stock", "value": "" },

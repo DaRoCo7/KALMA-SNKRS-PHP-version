@@ -6,6 +6,7 @@ namespace App\Servicios;
 
 use App\Nucleo\HttpExcepcion;
 use App\Nucleo\Paginacion;
+use App\Nucleo\Validador;
 use App\Repositorios\ProductoRepositorio;
 
 /**
@@ -189,10 +190,11 @@ final class CatalogoServicio
     {
         // Cada filtro: cómo se convierte (null = no válido) y qué mensaje se devuelve si falla
         $reglas = [
-            'buscar'         => [$this->texto(...), 'Texto de hasta 60 caracteres'],
-            'categoria'      => [$this->identificador(...), 'Identificador numérico'],
-            'color'          => [$this->identificador(...), 'Identificador numérico'],
-            'talla'          => [$this->talla(...), 'Talla entre 34 y 50 (admite medias tallas, ej. 42.5)'],
+            'buscar'         => [Validador::busqueda(...), Validador::MENSAJE_BUSQUEDA],
+            // Con el máximo de un INTEGER: ?categoria=99999999999 es un 400, no un 500 de PostgreSQL
+            'categoria'      => [Validador::id(...), 'Identificador numérico'],
+            'color'          => [Validador::id(...), 'Identificador numérico'],
+            'talla'          => [Validador::talla(...), Validador::MENSAJE_TALLA],
             'precio_min'     => [$this->precio(...), 'Número mayor o igual que 0'],
             'precio_max'     => [$this->precio(...), 'Número mayor o igual que 0'],
             'personalizable' => [$this->booleano(...), 'Valores: 1/0 o true/false'],
@@ -228,25 +230,8 @@ final class CatalogoServicio
         return $filtros;
     }
 
-    // --- Conversores de los filtros: devuelven el valor limpio o null si no es válido ---
-
-    private function texto(mixed $valor): ?string
-    {
-        return (is_string($valor) && mb_strlen(trim($valor)) <= 60) ? trim($valor) : null;
-    }
-
-    private function identificador(mixed $valor): ?int
-    {
-        $entero = filter_var($valor, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        return $entero === false ? null : $entero;
-    }
-
-    private function talla(mixed $valor): ?float
-    {
-        $talla = filter_var($valor, FILTER_VALIDATE_FLOAT);
-        $valida = $talla !== false && $talla >= 34 && $talla <= 50 && fmod($talla * 2, 1.0) === 0.0;
-        return $valida ? $talla : null;
-    }
+    // --- Conversores propios del catálogo (búsqueda, ids y talla son los comunes del Validador):
+    //     devuelven el valor limpio o null si no es válido ---
 
     private function precio(mixed $valor): ?float
     {

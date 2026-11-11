@@ -26,7 +26,8 @@
  *   - Todo lo que viene de la API se pinta con textContent.
  */
 
-import { crear } from '../api.js';
+import { crear, precio } from '../api.js';
+import { contar, numero } from './comun.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -550,4 +551,70 @@ export function mesCorto(aaaamm, i) {
     const [anio, mes] = aaaamm.split('-').map(Number);
     const corto = MESES[mes - 1].slice(0, 3);
     return i === 0 || mes === 1 ? `${corto} ${String(anio).slice(2)}` : corto;
+}
+
+/** «octubre» -> «Octubre» */
+export function capitalizar(texto) {
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+// =============================================================================
+// Gráficas de ventas que comparten Informes y el Resumen. Viven aquí, y no en
+// informes.js, para que una sección no dependa del módulo de otra
+// =============================================================================
+
+/** Ingresos por mes en columnas; el mejor mes en negro y en el título */
+export function graficaIngresosMes(filas, periodo = '') {
+    const mejor = filas.reduce((max, f) => (f.ingresos > (max?.ingresos ?? -1) ? f : max), null);
+    const total = filas.reduce((suma, f) => suma + f.ingresos, 0);
+    return columnas({
+        titulo: mejor
+            ? `${capitalizar(nombreMes(mejor.mes))} es el mejor mes: ${precio(mejor.ingresos)}`
+            : 'Sin ventas en este periodo',
+        subtitulo: `Ingresos por mes${periodo ? ', ' + periodo : ''} · ${precio(total)} en total`,
+        filas,
+        valor: (f) => f.ingresos,
+        etiqueta: (f) => capitalizar(nombreMes(f.mes)),
+        etiquetaEje: (f, i) => mesCorto(f.mes, i),
+        formato: precio,
+        detalle: (f) => `${contar(f.pedidos, 'pedido', 'pedidos')} · ${contar(f.unidades, 'par', 'pares')}`,
+        destacar: (f) => f === mejor,
+        columnasTabla: [
+            { titulo: 'Mes', valor: (f) => capitalizar(nombreMes(f.mes)) },
+            { titulo: 'Pedidos', valor: (f) => numero(f.pedidos), num: true },
+            { titulo: 'Pares', valor: (f) => numero(f.unidades), num: true },
+            { titulo: 'Ingresos', valor: (f) => precio(f.ingresos), num: true },
+        ],
+        vacio: 'No hay ventas en este periodo.',
+    });
+}
+
+/**
+ * Ranking de modelos por ingresos. La gráfica enseña los primeros; la tabla,
+ * todos (si se pide).
+ */
+export function graficaModelos(filas, cuantos, periodo = '', tablaCompleta = false) {
+    const primeros = filas.slice(0, cuantos);
+    const lider = primeros[0];
+    const parte = lider ? Math.round((lider.ingresos / filas.reduce((s, f) => s + f.ingresos, 0)) * 100) : 0;
+    return barras({
+        titulo: lider ? `${lider.nombre} lidera las ventas: ${precio(lider.ingresos)} (${parte} %)` : 'Sin ventas en este periodo',
+        subtitulo: `Ingresos por modelo y colorway, ${filas.length > cuantos ? `los ${cuantos} primeros de ${filas.length}` : `${contar(filas.length, 'modelo', 'modelos')}`}${periodo ? ', ' + periodo : ''}`,
+        filas: primeros,
+        filasTabla: tablaCompleta ? filas : primeros,
+        valor: (f) => f.ingresos,
+        etiqueta: (f) => f.nombre,
+        sub: (f) => f.colorway,
+        formato: precio,
+        detalle: (f) => `${contar(f.unidades, 'par', 'pares')} en ${contar(f.pedidos, 'pedido', 'pedidos')} · ${f.codigo_marca}`,
+        destacar: (f, i) => i === 0,
+        columnasTabla: [
+            { titulo: 'Modelo', valor: (f) => `${f.nombre} · ${f.colorway}` },
+            { titulo: 'Código', valor: (f) => f.codigo_marca },
+            { titulo: 'Pedidos', valor: (f) => numero(f.pedidos), num: true },
+            { titulo: 'Pares', valor: (f) => numero(f.unidades), num: true },
+            { titulo: 'Ingresos', valor: (f) => precio(f.ingresos), num: true },
+        ],
+        vacio: 'No hay ventas en este periodo.',
+    });
 }

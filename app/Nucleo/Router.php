@@ -6,7 +6,8 @@ namespace App\Nucleo;
 
 /**
  * Enrutador: decide qué controlador atiende cada petición según el método
- * HTTP y la ruta. Las rutas se definen en config/rutas.php.
+ * HTTP y la ruta. Las rutas se definen en config/rutas.php y en los módulos de
+ * config/rutas/. No hay PUT: todas las ediciones son parciales y usan PATCH.
  *
  *   $router->get('/api/productos/{id}', [ProductoController::class, 'ver'], [Autenticado::class]);
  */
@@ -32,11 +33,6 @@ final class Router
     public function post(string $ruta, callable|array $accion, array $middlewares = []): void
     {
         $this->agregar('POST', $ruta, $accion, $middlewares);
-    }
-
-    public function put(string $ruta, callable|array $accion, array $middlewares = []): void
-    {
-        $this->agregar('PUT', $ruta, $accion, $middlewares);
     }
 
     public function patch(string $ruta, callable|array $accion, array $middlewares = []): void

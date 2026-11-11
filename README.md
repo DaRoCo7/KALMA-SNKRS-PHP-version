@@ -138,12 +138,12 @@ public/index.php (front controller)
 | Carpeta | Contenido |
 |---|---|
 | `public/` | `index.php` (única entrada), CSS e imágenes |
-| `app/Nucleo/` | Router, Peticion, Respuesta, gestión de errores, logs, conexión, validación, paginación |
+| `app/Nucleo/` | Router, Peticion, Respuesta, gestión de errores, logs, conexión, validación (también los ids de la ruta, `?buscar` y la talla), paginación, fechas ISO (`Formato`) y CSV para Excel (`Csv`) |
 | `app/Middlewares/` | Sesión, CSRF, autenticación, permisos y límite de peticiones |
 | `app/Seguridad/` | Matriz de permisos por rol, sesión y limitador |
 | `app/Controladores/Api/` | API JSON (`Gestion/` para el área interna) |
 | `app/Controladores/Web/` | Páginas HTML |
-| `app/Servicios/` | Reglas de negocio |
+| `app/Servicios/` | Reglas de negocio; `PresentacionPedido` y `PresentacionProducto` dan forma al JSON |
 | `app/Repositorios/` | Acceso a datos |
 | `app/vistas/` | Plantillas HTML |
 | `config/` | Rutas de la aplicación (una tabla por módulo en `config/rutas/`) |
@@ -227,7 +227,7 @@ ejemplos de petición y respuesta en la colección de Postman.
 | CSRF | Token por sesión obligatorio en toda petición que modifica datos; cookie `SameSite=Lax` |
 | Sesión | Cookie HttpOnly (y Secure con HTTPS), id regenerado al iniciar sesión, caducidad a los 30 minutos sin actividad |
 | Contraseñas | `password_hash` (bcrypt) y tiempo de respuesta igual exista o no el email |
-| Fuerza bruta | Límite por IP en Nginx y en PHP, y 5 intentos por cuenta cada 15 minutos, con auditoría |
+| Fuerza bruta | Límite por IP en Nginx y en PHP. Por cuenta, 5 intentos cada 15 minutos desde una misma IP (el sexto es un `429` aunque la contraseña sea buena), así que quien conozca un email no puede dejar fuera a su dueño, que entra desde su IP. Si la cuenta acumula 10 fallos desde varias IP, cada IP tiene un solo intento hasta que pasen los 15 minutos. Todo queda en la auditoría |
 | Accesos indebidos | Matriz de permisos por rol en el servidor; el pedido de otro cliente responde 404 (IDOR) y queda en auditoría |
 | Errores | Nunca se muestran trazas: el cliente recibe un mensaje y una referencia que se busca en el log |
 | Exportación CSV (pedidos e informes de stock) | Las celdas que empiezan por `=`, `+`, `-` o `@` se neutralizan (inyección de fórmulas en Excel) |
@@ -289,3 +289,14 @@ Hay que tener en cuenta dos cosas:
   así no hace falta un volumen para archivos subidos.
 - **`codigo_marca`** es el código de estilo real de Nike (`CW2288-111`); **`rfid_tienda`** es la etiqueta RFID que
   pone KALMA en cada talla. Son cosas distintas (ver [`docs/diagrama-er.md`](docs/diagrama-er.md)).
+- **Límite de login por cuenta e IP.** Antes el límite contaba los intentos de la cuenta viniera de donde viniera,
+  y bastaba con conocer un email para bloquear a su dueño 15 minutos. Ahora el bloqueo duro va por cuenta + IP
+  y se consume antes de comprobar la contraseña, en una sola sentencia atómica. No se dejó entrar siempre a la
+  contraseña buena porque la diferencia entre un `429` y un `200` le diría al atacante cuál es.
+
+## 11. Mejoras futuras
+
+- **Verificación de cuentas por correo (SMTP, enlace de confirmación).** Hoy una cuenta se puede usar en cuanto se
+  registra. Harían falta un servidor SMTP configurado por variables de entorno, un token aleatorio de un solo uso
+  con caducidad (guardado como hash), una ruta que lo confirme y que el login rechace las cuentas que todavía no
+  lo hayan confirmado.

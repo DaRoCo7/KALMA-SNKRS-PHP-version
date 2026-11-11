@@ -29,7 +29,11 @@ final class VerificarCsrf implements Middleware
             $token = $peticion->cabecera('x-csrf-token') ?? $peticion->campoFormulario('_csrf');
 
             if (!is_string($token) || !Sesion::tokenCsrfValido($token)) {
-                throw HttpExcepcion::prohibido('Token CSRF ausente o no válido');
+                // El código sigue siendo 403, pero el motivo deja al navegador distinguirlo
+                // de un permiso que falta: este middleware va antes que Autenticado, así que
+                // una sesión caducada (rehecha sin token) llega aquí y no como 401. El
+                // cliente consulta /api/sesion y decide si toca volver a entrar o reintentar
+                throw new HttpExcepcion(403, 'Token CSRF ausente o no válido', ['motivo' => 'csrf']);
             }
         }
         return $siguiente($peticion);

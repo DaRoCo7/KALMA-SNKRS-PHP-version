@@ -55,8 +55,9 @@ html:not(.con-js) .boton-cesta {
     display: inline-block;
 }
 
-/* En el móvil la cabecera ya va justa con «Entrar» y «Crear cuenta»: la cesta
-   estrecha un poco su hueco para que nada se salga de la pantalla */
+/* En el móvil la cabecera lleva Menú, el logo centrado, la cesta y un único
+   enlace de cuenta («Crear cuenta» y el nombre pasan al menú, ver estilos.css):
+   la cesta estrecha un poco su hueco para que el logo siga cabiendo a 360 px */
 @media (max-width: 44rem) {
     .cuenta {
         gap: 0.6rem;

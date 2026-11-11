@@ -71,7 +71,8 @@ final class LecturaPedidos
 
     /**
      * Listado paginado. ?estado= en los dos lados; ?buscar= y ?personalizado=
-     * solo en el área interna (en la del cliente se ignoran).
+     * solo en el área interna (en la del cliente se ignoran). El área interna
+     * recibe además «recuentos», las cifras por estado de las pestañas.
      *
      * @param array $acotar filtros que impone quien llama, p. ej. ['cliente_id' => 7]
      * @throws HttpExcepcion 400 si algún filtro no es válido
@@ -82,13 +83,36 @@ final class LecturaPedidos
         $total = $this->pedidos->contar($filtros);
         $filas = $this->pedidos->listar($filtros, $paginacion->porPagina, $paginacion->offset());
 
-        return [
+        $respuesta = [
             'datos'      => array_map(fn (array $p): array => $this->presentacion->resumen($p) + [
                 'lineas'   => (int) $p['num_lineas'],
                 'unidades' => (int) $p['unidades'],
             ], $filas),
             'paginacion' => $paginacion->meta($total),
         ];
+        if ($areaInterna) {
+            $respuesta['recuentos'] = $this->recuentos($filtros);
+        }
+        return $respuesta;
+    }
+
+    /**
+     * Pedidos por estado con los mismos filtros del listado salvo el estado:
+     * son las cifras de las pestañas del panel. Van en la misma respuesta (y no
+     * en un endpoint aparte) para que salgan de los mismos filtros ya validados
+     * y la lista y sus cifras lleguen juntas, en una sola petición.
+     *
+     * @return array{total: int, por_estado: array<string, int>}
+     */
+    private function recuentos(array $filtros): array
+    {
+        $porEstado = $this->pedidos->contarPorEstado($filtros);
+        // Todos los estados, también los que no tienen pedidos: el cliente no tiene que adivinar los ceros
+        $completo = [];
+        foreach (EstadosPedido::ESTADOS as $estado) {
+            $completo[$estado] = $porEstado[$estado] ?? 0;
+        }
+        return ['total' => array_sum($completo), 'por_estado' => $completo];
     }
 
     /** Filtros de los listados: ?estado=pendiente (y ?buscar= y ?personalizado= en el área interna) */

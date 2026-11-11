@@ -15,13 +15,15 @@
  * fecha) y es de administración, mientras que «Pedidos» también lo usa el
  * almacén, que no puede exportar.
  *
- * Las gráficas de ventas también las usa el Resumen (se exportan abajo).
+ * Las gráficas de ventas que comparte con el Resumen están en graficas.js.
  */
 
 import { api, crear, precio } from '../api.js';
 import { ESTADOS, NOMBRE_ESTADO, bloqueError, cabeceraSeccion, contar, horaActual, numero, sesionCaducada, textoError } from './comun.js';
-import { PERIODOS, campo, desplegable, fechaDia, periodoDe } from './analisis-comun.js';
-import { barras, columnas, linea, mesCorto, nombreMes } from './graficas.js';
+import { PERIODOS, campoFiltro, desplegable, fechaDia, periodoDe } from './piezas.js';
+import {
+    barras, capitalizar, graficaIngresosMes, graficaModelos, linea, mesCorto, nombreMes,
+} from './graficas.js';
 
 const MODELOS_EN_GRAFICA = 10;
 
@@ -63,7 +65,7 @@ export function montar(contenedor, ctx) {
     aplicar.type = 'submit';
     const errorFechas = crear('p', 'barra-filtros__error');
     errorFechas.setAttribute('role', 'alert');
-    filtros.append(rapidos, campo('Desde', desde), campo('Hasta', hasta), aplicar, errorFechas);
+    filtros.append(rapidos, campoFiltro('Desde', desde), campoFiltro('Hasta', hasta), aplicar, errorFechas);
     filtros.addEventListener('submit', (evento) => {
         evento.preventDefault();
         if (desde.value && hasta.value && desde.value > hasta.value) {
@@ -184,34 +186,8 @@ function tarjeta(contenido) {
 }
 
 // =============================================================================
-// Gráficas (también las usa el Resumen)
+// Gráficas propias de esta sección (las que comparte con el Resumen están en graficas.js)
 // =============================================================================
-
-/** Ingresos por mes en columnas; el mejor mes en negro y en el título */
-export function graficaIngresosMes(filas, periodo = '') {
-    const mejor = filas.reduce((max, f) => (f.ingresos > (max?.ingresos ?? -1) ? f : max), null);
-    const total = filas.reduce((suma, f) => suma + f.ingresos, 0);
-    return columnas({
-        titulo: mejor
-            ? `${capitalizar(nombreMes(mejor.mes))} es el mejor mes: ${precio(mejor.ingresos)}`
-            : 'Sin ventas en este periodo',
-        subtitulo: `Ingresos por mes${periodo ? ', ' + periodo : ''} · ${precio(total)} en total`,
-        filas,
-        valor: (f) => f.ingresos,
-        etiqueta: (f) => capitalizar(nombreMes(f.mes)),
-        etiquetaEje: (f, i) => mesCorto(f.mes, i),
-        formato: precio,
-        detalle: (f) => `${contar(f.pedidos, 'pedido', 'pedidos')} · ${contar(f.unidades, 'par', 'pares')}`,
-        destacar: (f) => f === mejor,
-        columnasTabla: [
-            { titulo: 'Mes', valor: (f) => capitalizar(nombreMes(f.mes)) },
-            { titulo: 'Pedidos', valor: (f) => numero(f.pedidos), num: true },
-            { titulo: 'Pares', valor: (f) => numero(f.unidades), num: true },
-            { titulo: 'Ingresos', valor: (f) => precio(f.ingresos), num: true },
-        ],
-        vacio: 'No hay ventas en este periodo.',
-    });
-}
 
 /** Pares vendidos por mes: otra medida, otra gráfica (nunca un segundo eje) */
 function graficaParesMes(filas) {
@@ -241,36 +217,6 @@ function graficaParesMes(filas) {
 }
 
 const MESES_CORTOS = (aaaamm) => nombreMes(aaaamm).split(' ')[0];
-
-/**
- * Ranking de modelos por ingresos. La gráfica enseña los primeros; la tabla,
- * todos (si se pide).
- */
-export function graficaModelos(filas, cuantos, periodo = '', tablaCompleta = false) {
-    const primeros = filas.slice(0, cuantos);
-    const lider = primeros[0];
-    const parte = lider ? Math.round((lider.ingresos / filas.reduce((s, f) => s + f.ingresos, 0)) * 100) : 0;
-    return barras({
-        titulo: lider ? `${lider.nombre} lidera las ventas: ${precio(lider.ingresos)} (${parte} %)` : 'Sin ventas en este periodo',
-        subtitulo: `Ingresos por modelo y colorway, ${filas.length > cuantos ? `los ${cuantos} primeros de ${filas.length}` : `${contar(filas.length, 'modelo', 'modelos')}`}${periodo ? ', ' + periodo : ''}`,
-        filas: primeros,
-        filasTabla: tablaCompleta ? filas : primeros,
-        valor: (f) => f.ingresos,
-        etiqueta: (f) => f.nombre,
-        sub: (f) => f.colorway,
-        formato: precio,
-        detalle: (f) => `${contar(f.unidades, 'par', 'pares')} en ${contar(f.pedidos, 'pedido', 'pedidos')} · ${f.codigo_marca}`,
-        destacar: (f, i) => i === 0,
-        columnasTabla: [
-            { titulo: 'Modelo', valor: (f) => `${f.nombre} · ${f.colorway}` },
-            { titulo: 'Código', valor: (f) => f.codigo_marca },
-            { titulo: 'Pedidos', valor: (f) => numero(f.pedidos), num: true },
-            { titulo: 'Pares', valor: (f) => numero(f.unidades), num: true },
-            { titulo: 'Ingresos', valor: (f) => precio(f.ingresos), num: true },
-        ],
-        vacio: 'No hay ventas en este periodo.',
-    });
-}
 
 /** Opciones de personalización por veces que se eligieron; el recargo, en el tooltip y la tabla */
 function graficaPersonalizaciones(filas) {
@@ -334,11 +280,7 @@ function bloqueExportar(params) {
     enlaces();
 
     const fila = crear('div', 'exportar');
-    fila.append(campo('Estado', estado), csv, json);
+    fila.append(campoFiltro('Estado', estado), csv, json);
     caja.append(cabeza, fila);
     return caja;
-}
-
-function capitalizar(texto) {
-    return texto.charAt(0).toUpperCase() + texto.slice(1);
 }

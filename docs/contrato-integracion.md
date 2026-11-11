@@ -153,7 +153,7 @@ El pedido `SF-2026-000022` es de otro cliente: sirve para demostrar que `cliente
   |---|---|---|
   | 400 | Datos no válidos | `{"errores": {"campo": "motivo"}}` (todos los campos a la vez) |
   | 401 | Sin sesión | — |
-  | 403 | Sin permiso o token CSRF no válido | — |
+  | 403 | Sin permiso o token CSRF no válido | `{"motivo": "csrf"}` si es el token |
   | 404 | La ruta o el recurso no existen (o no son tuyos) | — |
   | 405 | Método no permitido en esa ruta | `{"permitidos": "GET, POST"}` |
   | 409 | Choca con el estado actual (sin stock, estado que no permite el cambio, email repetido) | Según el caso |
@@ -175,6 +175,9 @@ El pedido `SF-2026-000022` es de otro cliente: sirve para demostrar que `cliente
 3. **El token cambia al iniciar sesión o registrarse.** El nuevo viene en la respuesta del login o del registro
    y el front debe usarlo a partir de ese momento.
 4. `401` → llevar al usuario a `/login`. `403` → mostrar "no tienes permiso".
+5. `403` con `motivo: "csrf"` suele ser una sesión caducada (el CSRF se comprueba antes que la sesión):
+   `api()` de `public/js/api.js` consulta `GET /api/sesion`; sin sesión lo trata como un `401`, y con ella
+   toma el token nuevo y reintenta una sola vez.
 
 ### 9.3 Endpoints
 
@@ -252,7 +255,7 @@ Cuerpo de `POST /api/pedidos`:
 |---|---|---|---|
 | GET | `/api/gestion/resumen` | `informes.ver` | 200: pedidos por estado, unidades vendidas, ingresos, personalizados, tallas bajo mínimo, modelos con menos stock |
 | GET | `/api/gestion/informes/{nombre}?desde&hasta` | `informes.ver` | 200, 400, 404. Nombres: `ventas-por-modelo`, `ventas-por-mes`, `personalizaciones` (sin pedidos cancelados) |
-| GET | `/api/gestion/pedidos?estado&buscar&personalizado&pagina` | `pedidos.ver_todos` | 200, 400 |
+| GET | `/api/gestion/pedidos?estado&buscar&personalizado&pagina` | `pedidos.ver_todos` | 200, 400. Junto a `datos` y `paginacion` trae `recuentos` (`total` y `por_estado`), con los mismos filtros salvo `estado`: las pestañas del panel salen de la misma petición |
 | GET | `/api/gestion/pedidos/{codigo}` | `pedidos.ver_todos` | 200, 404 |
 | PATCH | `/api/gestion/pedidos/{codigo}/estado` | `pedidos.cambiar_estado` (+ `pedidos.confirmar_cancelar` para confirmar o cancelar) | 200, 400, 403, 404, 409 transición no válida o seguimiento repetido |
 | GET | `/api/gestion/stock?buscar&bajo_minimo&producto_id&categoria_id&pagina` | `stock.gestionar` | 200, 400 (`buscar` admite también la etiqueta RFID; cada talla trae `producto.categoria`, `producto.fecha_lanzamiento` y `producto.lanzamiento`) |
@@ -263,7 +266,8 @@ Cuerpo de `POST /api/pedidos`:
 | POST | `/api/gestion/productos` | `productos.gestionar` | 201, 400, 409 código repetido |
 | PATCH | `/api/gestion/productos/{id}` | `productos.gestionar` | 200, 400, 404 (el código de Nike no se edita) |
 | DELETE | `/api/gestion/productos/{id}` | `productos.gestionar` | 204 (lo desactiva, no lo borra), 404 |
-| POST | `/api/gestion/albaranes?referencia` | `productos.gestionar` | 200 con el resumen, 400 con los errores de cada fila, 415 (cuerpo `text/csv`) |
+| POST | `/api/gestion/albaranes?referencia&aceptar_repetida&motivo` | `productos.gestionar` | 200 con el resumen, 400 con los errores de cada fila o sin `motivo` al aceptar, 409 referencia ya cargada, 415 (cuerpo `text/csv`) |
+| GET | `/api/gestion/albaranes/avisos?pagina` | `productos.gestionar` | 200: intentos rechazados por referencia repetida (`referencia, fecha, usuario, filas, unidades, aceptada_despues`), del más reciente al más antiguo |
 | GET | `/api/gestion/albaranes?pagina` | `albaranes.ver` | 200: albaranes aceptados, del más reciente al más antiguo (`referencia, fecha, usuario, filas, unidades, productos_nuevos, productos_actualizados, tallas_nuevas, desactivados`) |
 | GET | `/api/gestion/albaranes/detalle?referencia` | `albaranes.ver` | 200 con el resumen, `cargas` y `tallas` (zapatilla, talla, `cantidad` y `stock_resultante`), 400 sin referencia, 404 |
 | GET | `/api/gestion/consultas?estado&pagina` | `consultas.gestionar` | 200, 400 |
@@ -292,6 +296,15 @@ El archivo no se guarda y no hay tabla de albaranes: la lista sale de la auditor
 y el resumen) y el detalle, de los movimientos de stock de tipo `entrada` con el motivo `Albarán <referencia>`. La referencia del
 detalle va en `?referencia=` porque puede llevar `/`. Si una referencia se cargó más de una vez, el detalle es la última carga
 y `cargas` dice cuántas hubo.
+**Referencia repetida**: una referencia ya cargada se rechaza con `409` y no suma nada; `detalles` trae `referencia`, `cargas`
+y `carga_anterior` (`fecha, usuario, filas, unidades`). Para cargarla igualmente se repite la petición con
+`&aceptar_repetida=1&motivo=...` (motivo obligatorio, de 5 a 300 caracteres; sin él, `400`). La comprobación va bajo
+`pg_advisory_xact_lock(hashtext(referencia))`, así que dos envíos simultáneos no entran los dos. En la auditoría:
+`albaran.repetido_rechazado` (resultado `denegado`, con `referencia, filas, unidades, anterior_id`) por cada intento
+rechazado, y la carga aceptada es un `albaran.cargar` con `repetida: true`, `motivo_repetida` y `anterior_id`.
+El resumen (y la lista y el detalle) traen `repetida`, `motivo_repetida` y `tallas_desactivadas` (`[{codigo_marca, talla}]`:
+tallas con `activo = false` que han recibido stock; siguen sin venderse). Las tallas se bloquean en orden de id antes de mover
+el stock, como en los pedidos.
 
 **Exportación CSV**: una fila por línea de pedido, separador `;`, BOM UTF-8 y coma decimal (para Excel en español).
 

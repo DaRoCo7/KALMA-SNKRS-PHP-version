@@ -4,7 +4,7 @@
  * Todo lo que llega de la API se pinta con textContent (a través de crear()).
  */
 
-import { crear } from '../api.js';
+import { crear, sesionCaducada as sesionCaducadaApi } from '../api.js';
 
 /** Orden del recorrido de un pedido; «cancelado» va aparte porque no es un paso */
 export const ESTADOS = ['pendiente', 'confirmado', 'preparacion', 'enviado', 'entregado', 'cancelado'];
@@ -47,13 +47,13 @@ export function etiquetaEstado(estado) {
     return crear('span', `estado estado--${estado}`, NOMBRE_ESTADO[estado] ?? estado);
 }
 
-/** Lleva al login si la sesión ha caducado; devuelve true si lo ha hecho */
+/**
+ * Lleva al login si la sesión ha caducado (401, o el 403 CSRF que api.js
+ * convierte en 401) y, al entrar, de vuelta a la misma sección; devuelve true
+ * si lo ha hecho.
+ */
 export function sesionCaducada(error) {
-    if (error?.estado === 401) {
-        window.location.href = '/login?volver=' + encodeURIComponent('/panel' + window.location.hash);
-        return true;
-    }
-    return false;
+    return sesionCaducadaApi(error, '/panel' + window.location.hash);
 }
 
 /** Frase para la persona según el código de la respuesta (contrato, 9.1) */

@@ -6,7 +6,7 @@
  * con textContent a través de crear(): nada de lo que llega se mete con innerHTML.
  */
 import {
-    api, ErrorApi, precio, talla, fechaLarga, crear, prepararDialogo, cerrarDialogo, movimientoReducido,
+    api, precio, talla, fechaLarga, crear, prepararDialogo, cerrarDialogo, movimientoReducido, sesionCaducada,
 } from './api.js';
 
 /** Textos de cada estado. Tienen que entenderse sin conocer el flujo interno */
@@ -48,13 +48,12 @@ function pares(unidades) {
     return unidades === 1 ? '1 par' : `${unidades} pares`;
 }
 
-/** Sin sesión (caducada a los 30 min) se vuelve al login y, después, aquí */
+/**
+ * Sin sesión (caducada a los 30 min) se vuelve al login y, después, aquí. El
+ * 403 CSRF de una sesión caducada ya llega de api() convertido en 401.
+ */
 function siSesionCaducada(error) {
-    if (error instanceof ErrorApi && error.estado === 401) {
-        window.location.href = `/login?volver=${encodeURIComponent(window.location.pathname)}`;
-        return true;
-    }
-    return false;
+    return sesionCaducada(error, window.location.pathname);
 }
 
 function etiquetaEstado(estado) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Servicios;
 
+use App\Nucleo\Formato;
 use App\Repositorios\PedidoRepositorio;
 
 /**
@@ -30,7 +31,7 @@ final class PresentacionPedido
             'estado'         => $p['estado'],
             'personalizado'  => $p['personalizado'],
             'total'          => (float) $p['total'],
-            'fecha_creacion' => self::fecha($p['fecha_creacion']),
+            'fecha_creacion' => Formato::fecha($p['fecha_creacion']),
             'cliente'        => [
                 'id'     => (int) $p['cliente_id'],
                 'nombre' => trim("{$p['cliente_nombre']} {$p['cliente_apellidos']}"),
@@ -63,7 +64,7 @@ final class PresentacionPedido
         $historial = array_map(static fn (array $h): array => [
             'estado_anterior' => $h['estado_anterior'],
             'estado_nuevo'    => $h['estado_nuevo'],
-            'fecha'           => self::fecha($h['fecha']),
+            'fecha'           => Formato::fecha($h['fecha']),
             'comentario'      => $h['comentario'],
             'rol'             => $h['usuario_rol'],
         ] + ($vistaCliente ? [] : ['usuario' => $h['usuario_nombre']]), $this->pedidos->historial($p['id']));
@@ -72,16 +73,10 @@ final class PresentacionPedido
             'direccion_envio'     => $p['direccion_envio'],
             'codigo_seguimiento'  => $p['codigo_seguimiento'],
             'notas'               => $p['notas'],
-            'fecha_actualizacion' => self::fecha($p['fecha_actualizacion']),
+            'fecha_actualizacion' => Formato::fecha($p['fecha_actualizacion']),
             'se_puede_cancelar'   => EstadosPedido::sePuedeCancelar($p['estado']),
             'lineas'              => $lineas,
             'historial'           => $historial,
         ];
-    }
-
-    /** Fecha de PostgreSQL (2026-11-08 19:15:00+01) en ISO 8601 (2026-11-08T19:15:00+01:00) */
-    public static function fecha(?string $valor): ?string
-    {
-        return $valor === null ? null : (new \DateTimeImmutable($valor))->format(DATE_ATOM);
     }
 }

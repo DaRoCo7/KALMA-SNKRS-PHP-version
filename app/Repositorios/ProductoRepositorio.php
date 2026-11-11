@@ -13,6 +13,23 @@ use App\Nucleo\BaseDatos;
  */
 final class ProductoRepositorio
 {
+    /**
+     * Ya lanzada: sin fecha de lanzamiento o con una que ya llegó. Un lanzamiento
+     * anunciado se enseña en su página, pero no se vende ni sale en el catálogo.
+     * Se decide con el reloj de la BD (CURRENT_DATE) para que todas las consultas
+     * cambien a la vez a medianoche, sin depender de la hora del servidor PHP.
+     */
+    public const LANZADO = '(p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)';
+
+    /**
+     * Lo que se vende hoy: producto activo y ya lanzado. Es LA condición del
+     * catálogo: el listado, sus filtros, el menú y los informes de stock la
+     * comparten para que nunca cuenten productos distintos (si los filtros
+     * contaran los lanzamientos, Jordan diría 9 y al filtrar saldrían 3).
+     * La tabla productos tiene que llevar el alias p en la consulta.
+     */
+    public const A_LA_VENTA = 'p.activo AND ' . self::LANZADO;
+
     /** Ordenaciones permitidas: el cliente elige la clave, nunca el SQL */
     public const ORDENES = [
         'novedades'   => 'p.fecha_creacion DESC, p.id DESC',
@@ -139,32 +156,39 @@ final class ProductoRepositorio
     {
         return BaseDatos::conexion()->query(
             'SELECT c.id, c.nombre FROM categorias c
-             WHERE EXISTS (SELECT 1 FROM productos p WHERE p.categoria_id = c.id AND p.activo)
+             WHERE EXISTS (SELECT 1 FROM productos p WHERE p.categoria_id = c.id AND ' . self::A_LA_VENTA . ')
              ORDER BY c.nombre'
         )->fetchAll();
     }
 
-    /** Valores para construir los filtros de la interfaz */
+    /**
+     * Valores para construir los filtros de la interfaz. Todos salen de lo que
+     * el listado puede devolver (A_LA_VENTA): un número junto a una categoría,
+     * un color o un precio que luego no aparece al filtrar sería mentira.
+     */
     public function valoresFiltros(): array
     {
         $pdo = BaseDatos::conexion();
+        $aLaVenta = self::A_LA_VENTA;
 
         return [
             'categorias' => $pdo->query(
-                'SELECT c.id, c.nombre, count(p.id) AS productos
-                 FROM categorias c LEFT JOIN productos p ON p.categoria_id = c.id AND p.activo
-                 GROUP BY c.id ORDER BY c.nombre'
+                "SELECT c.id, c.nombre, count(p.id) AS productos
+                 FROM categorias c LEFT JOIN productos p ON p.categoria_id = c.id AND {$aLaVenta}
+                 GROUP BY c.id ORDER BY c.nombre"
             )->fetchAll(),
             'colores' => $pdo->query(
-                'SELECT col.id, col.nombre, col.codigo_hex
-                 FROM colores col WHERE EXISTS (SELECT 1 FROM productos p WHERE p.color_id = col.id AND p.activo)
-                 ORDER BY col.nombre'
+                "SELECT col.id, col.nombre, col.codigo_hex
+                 FROM colores col WHERE EXISTS (SELECT 1 FROM productos p WHERE p.color_id = col.id AND {$aLaVenta})
+                 ORDER BY col.nombre"
             )->fetchAll(),
             'tallas' => $pdo->query(
-                'SELECT DISTINCT v.talla FROM variantes v JOIN productos p ON p.id = v.producto_id
-                 WHERE v.activo AND p.activo AND v.stock > 0 ORDER BY v.talla'
+                "SELECT DISTINCT v.talla FROM variantes v JOIN productos p ON p.id = v.producto_id
+                 WHERE v.activo AND v.stock > 0 AND {$aLaVenta} ORDER BY v.talla"
             )->fetchAll(\PDO::FETCH_COLUMN),
-            'precio' => $pdo->query('SELECT min(precio) AS minimo, max(precio) AS maximo FROM productos WHERE activo')->fetch(),
+            'precio' => $pdo->query(
+                "SELECT min(p.precio) AS minimo, max(p.precio) AS maximo FROM productos p WHERE {$aLaVenta}"
+            )->fetch(),
         ];
     }
 
@@ -175,7 +199,7 @@ final class ProductoRepositorio
     private function condiciones(array $filtros): array
     {
         // Los lanzamientos anunciados no salen en el catálogo hasta su fecha
-        $sql = ['p.activo', '(p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)'];
+        $sql = [self::A_LA_VENTA];
         $parametros = [];
 
         if (isset($filtros['buscar'])) {

@@ -15,7 +15,7 @@ import {
     ESTADOS, NOMBRE_ESTADO, bloqueError, cabeceraSeccion, contar,
     fechaCorta, hashDe, horaActual, numero, sesionCaducada, textoError,
 } from './comun.js';
-import { graficaIngresosMes, graficaModelos } from './informes.js';
+import { graficaIngresosMes, graficaModelos } from './graficas.js';
 
 /** Modelos de la gráfica «los más vendidos»; el ranking completo está en Informes */
 const MODELOS_EN_RESUMEN = 5;

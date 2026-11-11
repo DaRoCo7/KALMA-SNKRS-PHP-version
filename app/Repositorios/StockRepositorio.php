@@ -30,6 +30,9 @@ final class StockRepositorio
 
     /**
      * Tallas para el control de stock, ordenadas por modelo, colorway y talla.
+     * v.id desempata: dos productos con el mismo nombre y colorway (otro código)
+     * tienen tallas iguales, y sin un orden único una página podría repetir
+     * una talla y saltarse otra al paginar.
      *
      * @param array{buscar?: string, bajo_minimo?: bool, producto_id?: int, categoria_id?: int} $filtros
      */
@@ -40,7 +43,7 @@ final class StockRepositorio
         $consulta = BaseDatos::conexion()->prepare(
             'SELECT ' . self::COLUMNAS_TALLA . ' ' . self::DESDE_TALLAS . '
              WHERE ' . $where . '
-             ORDER BY p.nombre, p.colorway, v.talla
+             ORDER BY p.nombre, p.colorway, v.talla, v.id
              LIMIT :limite OFFSET :desplazamiento'
         );
         $consulta->execute($parametros + ['limite' => $limite, 'desplazamiento' => $desplazamiento]);
@@ -110,7 +113,7 @@ final class StockRepositorio
         }
         if (!empty($filtros['bajo_minimo'])) {
             // Un lanzamiento sin stock no es una talla agotada: aún no ha llegado
-            $sql[] = 'v.stock <= v.stock_minimo AND (p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)';
+            $sql[] = 'v.stock <= v.stock_minimo AND ' . ProductoRepositorio::LANZADO;
         }
         if (isset($filtros['producto_id'])) {
             $sql[] = 'v.producto_id = :producto_id';
@@ -150,7 +153,7 @@ final class StockRepositorio
             'SELECT v.id, v.producto_id, v.talla, v.stock, v.activo,
                     p.nombre, p.colorway, p.precio, p.personalizable, p.activo AS producto_activo,
                     -- Un lanzamiento anunciado no se vende hasta su fecha, aunque ya haya llegado stock
-                    (p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE) AS lanzado
+                    ' . ProductoRepositorio::LANZADO . ' AS lanzado
              FROM variantes v
              JOIN productos p ON p.id = v.producto_id
              WHERE v.id = ANY(CAST(:ids AS integer[]))
@@ -174,6 +177,7 @@ final class StockRepositorio
      *
      * @param string $tipo entrada | venta | cancelacion | ajuste
      * @return int stock que queda después del movimiento
+     * @throws \LogicException si la talla no existe (quien llama ya la ha bloqueado o comprobado)
      */
     public function mover(
         int $varianteId,
@@ -210,6 +214,12 @@ final class StockRepositorio
             'motivo'              => $motivo,
         ]);
 
-        return (int) $consulta->fetchColumn();
+        // Sin fila, el UPDATE no encontró la talla y no se guardó ningún movimiento.
+        // Devolver 0 haría creer que el stock quedó a cero: es un error de programación.
+        $stock = $consulta->fetchColumn();
+        if ($stock === false) {
+            throw new \LogicException("No existe la talla {$varianteId}: no se ha movido el stock");
+        }
+        return (int) $stock;
     }
 }

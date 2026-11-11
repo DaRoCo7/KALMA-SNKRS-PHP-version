@@ -234,6 +234,25 @@ final class PedidoRepositorio
         return (int) $consulta->fetchColumn();
     }
 
+    /**
+     * Cuántos pedidos hay en cada estado con los demás filtros (búsqueda,
+     * personalizado...). Una sola consulta con GROUP BY en lugar de un count()
+     * por estado: las pestañas del panel se pintan con un solo viaje a la BD.
+     * El filtro de estado se ignora, porque es justo lo que se reparte.
+     *
+     * @return array<string, int> estado => pedidos (solo los estados que tienen alguno)
+     */
+    public function contarPorEstado(array $filtros): array
+    {
+        unset($filtros['estado']);
+        [$where, $parametros] = $this->condiciones($filtros);
+        $consulta = BaseDatos::conexion()->prepare(
+            'SELECT p.estado, count(*) AS total ' . self::DESDE . ' WHERE ' . $where . ' GROUP BY p.estado'
+        );
+        $consulta->execute($parametros);
+        return array_map('intval', $consulta->fetchAll(\PDO::FETCH_KEY_PAIR));
+    }
+
     /** @return array{0: string, 1: array<string, mixed>} */
     private function condiciones(array $filtros): array
     {

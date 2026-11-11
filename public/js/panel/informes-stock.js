@@ -22,7 +22,7 @@ import { api, crear, talla } from '../api.js';
 import {
     bloqueError, cabeceraSeccion, contar, fechaCorta, hashDe, numero, sesionCaducada, textoError,
 } from './comun.js';
-import { cabezaLateral, campo, lateral, pintarPaginas } from './analisis-comun.js';
+import { cabezaLateral, campoFiltro, lateral, pintarPaginas } from './piezas.js';
 import { barras } from './graficas.js';
 
 const POR_PAGINA = 20;
@@ -104,7 +104,7 @@ export function montar(contenedor, ctx) {
         campoDias.setAttribute('aria-describedby', errorDias.id);
         const ver = crear('button', 'control', 'Ver');
         ver.type = 'submit';
-        filaDias.append(rapidos, campo('Días sin vender (1 a 365)', campoDias), ver, errorDias);
+        filaDias.append(rapidos, campoFiltro('Días sin vender (1 a 365)', campoDias), ver, errorDias);
 
         formulario.append(tipos, filaDias);
         caja.append(cabeza, formulario);
@@ -182,7 +182,11 @@ export function montar(contenedor, ctx) {
             previa.replaceChildren(cabezaPrevia, ...contenidoInforme(datos), formularioEnvio());
         }
 
-        /** Comentario opcional y el botón de enviar; se envía lo que se está viendo */
+        /**
+         * Comentario opcional y el botón de enviar. Solo se mandan el tipo y los
+         * días: el servidor vuelve a calcular el informe al guardarlo, así que si
+         * el stock ha cambiado desde la vista previa se guarda el dato al día
+         */
         function formularioEnvio() {
             const envio = crear('form', 'envio');
             const etiqueta = crear('label', 'paso__etiqueta', 'Comentario para administración (opcional)');

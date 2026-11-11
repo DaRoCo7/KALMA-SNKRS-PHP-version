@@ -19,8 +19,33 @@ use App\Seguridad\LimitadorTasa;
  */
 final class AuthServicio
 {
-    /** Intentos de login por cuenta en la ventana (aunque el atacante cambie de IP) */
-    private const INTENTOS_POR_CUENTA = 5;
+    /**
+     * Límite de login por cuenta. Antes se gastaba un intento de la cuenta en
+     * cada petición, viniera de donde viniera: quien supiera un email podía
+     * escribir 5 contraseñas malas y dejar a su dueño 15 minutos sin entrar,
+     * aunque luego escribiera la buena. Ahora hay dos contadores:
+     *
+     *   1. Cuenta + IP (bloqueo duro): 5 intentos cada 15 minutos desde una
+     *      misma IP contra un mismo email, y a partir del sexto un 429 aunque
+     *      la contraseña sea la buena. Se consume ANTES de comprobarla y con
+     *      una sola sentencia atómica, así que ni lanzando 100 peticiones a la
+     *      vez se cuela una más. El login correcto lo pone a cero. Frena la
+     *      fuerza bruta desde una IP igual que antes, pero el bloqueo solo le
+     *      cae a esa IP: el dueño entra desde la suya.
+     *   2. Fallos de la cuenta desde cualquier IP (solo cuentan los fallos):
+     *      si llegan a 10, la cuenta está bajo un ataque repartido entre IP y
+     *      cada IP pasa a tener un único intento en la ventana. El atacante
+     *      necesita una IP nueva por cada contraseña; el dueño, que no ha
+     *      fallado desde la suya, sigue entrando a la primera.
+     *
+     * Por encima siguen el límite por IP de PHP (LIMITE_LOGIN_IP, 20 cada 15
+     * minutos para todas las cuentas) y el de Nginx. Se descartó bloquear por
+     * cuenta sin mirar la IP (es lo que permitía dejar fuera al dueño) y dejar
+     * pasar siempre la contraseña buena (la diferencia entre «429» y «entra»
+     * diría al atacante cuál es, sin límite de intentos).
+     */
+    private const INTENTOS_POR_CUENTA_E_IP = 5;
+    private const FALLOS_CUENTA_BAJO_ATAQUE = 10;
     private const VENTANA_LOGIN = 900;   // 15 minutos
 
     /**
@@ -96,18 +121,15 @@ final class AuthServicio
         }
         $email = mb_strtolower(trim($email));
 
-        // Límite por cuenta: frena a quien prueba contraseñas contra un mismo email
-        try {
-            $this->limitador->consumir('login:email', $email, self::INTENTOS_POR_CUENTA, self::VENTANA_LOGIN);
-        } catch (HttpExcepcion $limite) {
-            $this->auditoria->registrar(null, 'auth.login', 'usuario', null, 'denegado', ['motivo' => 'límite de intentos'], $ip);
-            throw $limite;
-        }
+        $this->comprobarLimite($email, $ip);
 
         $usuario = $this->usuarios->buscarPorEmail($email);
         $correcta = password_verify($password, $usuario['password_hash'] ?? self::HASH_FICTICIO);
 
         if ($usuario === null || !$correcta) {
+            // Solo los fallos cuentan para la cuenta (también si el email no existe:
+            // así la respuesta no cambia según haya cuenta o no)
+            $this->limitador->anotar('login:fallos_cuenta', $email, self::VENTANA_LOGIN);
             // Mismo mensaje exista o no el email: no se revela qué cuentas hay
             $this->auditoria->registrar($usuario['id'] ?? null, 'auth.login', 'usuario', $usuario['id'] ?? null,
                 'denegado', ['motivo' => 'credenciales incorrectas'], $ip);
@@ -124,10 +146,46 @@ final class AuthServicio
             $this->usuarios->actualizarHash($usuario['id'], password_hash($password, PASSWORD_DEFAULT));
         }
 
-        $this->limitador->reiniciar('login:email', $email);
+        // Solo el contador de esta IP: los fallos de la cuenta desde otras IP
+        // siguen contando, porque entrar el dueño no para un ataque repartido
+        $this->limitador->reiniciar('login:cuenta_ip', self::claveCuentaIp($email, $ip));
         $this->usuarios->registrarAcceso($usuario['id']);
         $this->auditoria->registrar($usuario['id'], 'auth.login', 'usuario', $usuario['id'], 'exito', [], $ip);
 
         return $this->usuarios->buscarPorId($usuario['id']);
+    }
+
+    /**
+     * Las dos reglas del límite por cuenta (ver la constante INTENTOS_POR_CUENTA_E_IP).
+     * Cada 429 queda en la auditoría con su motivo, sin el email.
+     *
+     * @throws HttpExcepcion 429 con Retry-After
+     */
+    private function comprobarLimite(string $email, ?string $ip): void
+    {
+        $denegar = function (string $motivo, ?HttpExcepcion $limite = null) use ($ip): never {
+            $this->auditoria->registrar(null, 'auth.login', 'usuario', null, 'denegado', ['motivo' => $motivo], $ip);
+            throw $limite ?? HttpExcepcion::demasiadasPeticiones(self::VENTANA_LOGIN);
+        };
+
+        try {
+            $intentosIp = $this->limitador->consumir('login:cuenta_ip', self::claveCuentaIp($email, $ip),
+                self::INTENTOS_POR_CUENTA_E_IP, self::VENTANA_LOGIN);
+        } catch (HttpExcepcion $limite) {
+            $denegar('límite de intentos', $limite);
+        }
+
+        // Bajo ataque, una IP que ya lo ha intentado no tiene más intentos en la ventana
+        if ($intentosIp > 1
+            && $this->limitador->intentos('login:fallos_cuenta', $email, self::VENTANA_LOGIN) >= self::FALLOS_CUENTA_BAJO_ATAQUE) {
+            Log::aviso('Login frenado: cuenta con fallos desde varias IP', ['intentos_ip' => $intentosIp]);
+            $denegar('límite de intentos (cuenta bajo ataque)');
+        }
+    }
+
+    /** Email + IP en una sola clave (el limitador guarda solo su hash) */
+    private static function claveCuentaIp(string $email, ?string $ip): string
+    {
+        return $email . '|' . ($ip ?? 'sin-ip');
     }
 }

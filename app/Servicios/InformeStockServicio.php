@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Servicios;
 
 use App\Nucleo\BaseDatos;
+use App\Nucleo\Csv;
+use App\Nucleo\Formato;
 use App\Nucleo\HttpExcepcion;
 use App\Nucleo\Log;
 use App\Nucleo\Paginacion;
@@ -57,9 +59,6 @@ final class InformeStockServicio
         'sin_ventas' => ['codigo_marca', 'modelo', 'colorway', 'tallas', 'stock_total', 'ultima_venta', 'dias_sin_vender'],
     ];
 
-    /** Las mismas reglas que la exportación de pedidos (ExportacionServicio): inyección de fórmulas */
-    private const INICIO_FORMULA = ['=', '+', '-', '@', "\t", "\r"];
-    private const BOM_UTF8 = "\xEF\xBB\xBF";
 
     public function __construct(
         private readonly InformeStockRepositorio $informes = new InformeStockRepositorio(),
@@ -154,7 +153,7 @@ final class InformeStockServicio
      */
     public function ver(array $usuario, string $id): array
     {
-        return $this->formatear($this->buscarVisible($usuario, self::id($id)), true);
+        return $this->formatear($this->buscarVisible($usuario, Validador::idRuta($id, self::NO_ENCONTRADO, Validador::ID_MAXIMO_BIGINT)), true);
     }
 
     /**
@@ -165,7 +164,7 @@ final class InformeStockServicio
      */
     public function marcarRevisado(array $usuario, string $id, ?string $ip): array
     {
-        $idInforme = self::id($id);
+        $idInforme = Validador::idRuta($id, self::NO_ENCONTRADO, Validador::ID_MAXIMO_BIGINT);
 
         BaseDatos::transaccion(function () use ($idInforme, $usuario, $ip): void {
             // Bloquea el envío: dos revisiones a la vez se ponen en fila
@@ -277,7 +276,7 @@ final class InformeStockServicio
             'codigo_marca'    => $f['codigo_marca'],
             'stock_total'     => (int) $f['stock_total'],
             'tallas'          => (int) $f['tallas'],
-            'ultima_venta'    => $f['ultima_venta'] === null ? null : (new \DateTimeImmutable($f['ultima_venta']))->format(DATE_ATOM),
+            'ultima_venta'    => Formato::fecha($f['ultima_venta']),
             'dias_sin_vender' => $f['dias_sin_vender'] === null ? null : (int) $f['dias_sin_vender'],
         ];
     }
@@ -297,12 +296,6 @@ final class InformeStockServicio
         return Permisos::tiene($usuario['rol'], 'informes_stock.revisar');
     }
 
-    /** Un id que no es un entero positivo no puede existir: 404 sin consultar la BD */
-    private static function id(string $id): int
-    {
-        $entero = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => PHP_INT_MAX]]);
-        return $entero === false ? throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADO) : $entero;
-    }
 
     private function formatear(array $f, bool $conFilas): array
     {
@@ -320,9 +313,9 @@ final class InformeStockServicio
             'comentario'  => $f['comentario'],
             'total_filas' => (int) $f['total_filas'],
             'recortado'   => (bool) $f['recortado'],
-            'creado_en'   => (new \DateTimeImmutable($f['creado_en']))->format(DATE_ATOM),
+            'creado_en'   => Formato::fecha($f['creado_en']),
             'creado_por'  => $persona($f['creado_por_id'], $f['creado_por_nombre'], $f['creado_por_apellidos'], $f['creado_por_email']),
-            'revisado_en' => $f['revisado_en'] === null ? null : (new \DateTimeImmutable($f['revisado_en']))->format(DATE_ATOM),
+            'revisado_en' => Formato::fecha($f['revisado_en']),
             'revisado_por' => $persona($f['revisado_por_id'], $f['revisado_por_nombre'], $f['revisado_por_apellidos'], $f['revisado_por_email']),
         ];
         if ($conFilas) {
@@ -334,56 +327,33 @@ final class InformeStockServicio
     // --- CSV ---------------------------------------------------------------------
 
     /**
-     * CSV para Excel en español, igual que la exportación de pedidos: BOM
-     * UTF-8, separador «;» y coma decimal en las tallas (42,5).
+     * CSV para Excel en español, con las mismas reglas que la exportación de
+     * pedidos (ver Csv): BOM, «;», coma decimal en las tallas (42,5) y celdas
+     * de texto protegidas contra la inyección de fórmulas.
      *
      * @return array{contenido: string, tipo: string, nombre_archivo: string}
      */
     private function archivoCsv(string $tipo, array $filas, string $nombreArchivo): array
     {
-        $archivo = fopen('php://temp', 'r+');
-        fwrite($archivo, self::BOM_UTF8);
-        self::filaCsv($archivo, self::COLUMNAS_CSV[$tipo]);
+        $celdas = array_map(static fn (array $f): array => $tipo === 'stock_bajo'
+            ? [
+                Csv::texto($f['codigo_marca']), Csv::texto($f['nombre']), Csv::texto($f['colorway']),
+                Csv::talla((float) $f['talla']), (string) (int) $f['stock'], (string) (int) $f['stock_minimo'],
+                Csv::texto($f['rfid_tienda']),
+            ]
+            : [
+                Csv::texto($f['codigo_marca']), Csv::texto($f['nombre']), Csv::texto($f['colorway']),
+                (string) (int) $f['tallas'], (string) (int) $f['stock_total'],
+                // Fecha y hora de España sin zona, que Excel reconoce como fecha; vacía si nunca se vendió
+                $f['ultima_venta'] === null ? '' : (new \DateTimeImmutable($f['ultima_venta']))
+                    ->setTimezone(new \DateTimeZone('Europe/Madrid'))->format('Y-m-d H:i'),
+                $f['dias_sin_vender'] === null ? '' : (string) (int) $f['dias_sin_vender'],
+            ], $filas);
 
-        foreach ($filas as $f) {
-            self::filaCsv($archivo, $tipo === 'stock_bajo'
-                ? [
-                    self::texto($f['codigo_marca']), self::texto($f['nombre']), self::texto($f['colorway']),
-                    self::talla((float) $f['talla']), (string) (int) $f['stock'], (string) (int) $f['stock_minimo'],
-                    self::texto($f['rfid_tienda']),
-                ]
-                : [
-                    self::texto($f['codigo_marca']), self::texto($f['nombre']), self::texto($f['colorway']),
-                    (string) (int) $f['tallas'], (string) (int) $f['stock_total'],
-                    // Fecha y hora de España sin zona, que Excel reconoce como fecha; vacía si nunca se vendió
-                    $f['ultima_venta'] === null ? '' : (new \DateTimeImmutable($f['ultima_venta']))
-                        ->setTimezone(new \DateTimeZone('Europe/Madrid'))->format('Y-m-d H:i'),
-                    $f['dias_sin_vender'] === null ? '' : (string) (int) $f['dias_sin_vender'],
-                ]);
-        }
-
-        rewind($archivo);
-        $contenido = (string) stream_get_contents($archivo);
-        fclose($archivo);
-
-        return ['contenido' => $contenido, 'tipo' => 'text/csv; charset=utf-8', 'nombre_archivo' => $nombreArchivo];
-    }
-
-    /** @param resource $archivo */
-    private static function filaCsv($archivo, array $celdas): void
-    {
-        fputcsv($archivo, $celdas, ';', '"', '', "\r\n");
-    }
-
-    /** Celda de texto protegida: una comilla simple delante deja la fórmula como texto */
-    private static function texto(?string $valor): string
-    {
-        $valor ??= '';
-        return $valor !== '' && in_array($valor[0], self::INICIO_FORMULA, true) ? "'" . $valor : $valor;
-    }
-
-    private static function talla(float $talla): string
-    {
-        return number_format($talla, floor($talla) === $talla ? 0 : 1, ',', '');
+        return [
+            'contenido'      => Csv::generar(self::COLUMNAS_CSV[$tipo], $celdas),
+            'tipo'           => Csv::TIPO,
+            'nombre_archivo' => $nombreArchivo,
+        ];
     }
 }

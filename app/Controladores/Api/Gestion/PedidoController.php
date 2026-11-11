@@ -24,7 +24,10 @@ final class PedidoController
     {
     }
 
-    /** GET /api/gestion/pedidos?estado=&buscar=&personalizado=1&pagina=1 · todos, del más reciente al más antiguo */
+    /**
+     * GET /api/gestion/pedidos?estado=&buscar=&personalizado=1&pagina=1 · todos, del más
+     * reciente al más antiguo, con «recuentos» por estado para las pestañas del panel
+     */
     public function index(Peticion $peticion): Respuesta
     {
         $paginacion = Paginacion::desdePeticion($peticion);

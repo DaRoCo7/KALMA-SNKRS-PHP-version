@@ -35,7 +35,8 @@ final class PanelController
         // El almacén los genera y envía; administración (que también tiene este permiso) los revisa
         ['id' => 'informes-stock', 'nombre' => 'Informes de stock', 'grupo' => 'Análisis', 'permiso' => 'informes_stock.enviar'],
         ['id' => 'consultas', 'nombre' => 'Consultas', 'grupo' => 'Control', 'permiso' => 'consultas.gestionar'],
-        ['id' => 'auditoria', 'nombre' => 'Auditoría', 'grupo' => 'Control', 'permiso' => 'auditoria.ver'],
+        // La auditoría no tiene pantalla: es un registro técnico que no le sirve a quien
+        // lleva la tienda. Sigue guardándose y se consulta en GET /api/gestion/auditoria
     ];
 
     /** Cómo se llama cada rol en la pantalla */

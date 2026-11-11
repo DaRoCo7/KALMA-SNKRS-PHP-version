@@ -13,7 +13,7 @@
 
 import { api, crear } from '../api.js';
 import { bloqueError, cabeceraSeccion, contar, fechaCorta, hashDe, numero, sesionCaducada, textoError } from './comun.js';
-import { cabezaLateral, lateral, pintarPaginas } from './analisis-comun.js';
+import { cabezaLateral, lateral, pintarPaginas } from './piezas.js';
 
 const POR_PAGINA = 20;
 const ESTADOS = ['pendiente', 'respondida', 'cerrada'];

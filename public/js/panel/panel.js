@@ -86,7 +86,7 @@ function marcarActiva(id) {
     }
 }
 
-let actual = null;   // { id, instancia, control }
+let actual = null;   // { id, instancia, control, params }: params son los últimos del hash
 let primeraCarga = true;
 
 async function aplicar() {
@@ -101,15 +101,18 @@ async function aplicar() {
     }
     marcarActiva(id);
 
-    // Misma sección: solo cambian los filtros o el pedido abierto
+    // Misma sección: solo cambian los filtros o el pedido abierto. Si su módulo
+    // aún se está importando, se guardan y se aplican al terminar de montarse
     if (actual?.id === id) {
+        actual.params = params;
         actual.instancia?.actualizar?.(params);
         return;
     }
 
     actual?.control.abort();
     const control = new AbortController();
-    actual = { id, instancia: null, control };
+    const seccion = { id, instancia: null, control, params };
+    actual = seccion;
     trabajo.replaceChildren();
     const nombre = enlaces.find((enlace) => enlace.dataset.seccion === id)?.textContent.trim() ?? id;
     document.title = `${nombre} | Panel | KALMA SNKRS`;
@@ -119,7 +122,7 @@ async function aplicar() {
         if (control.signal.aborted) {
             return;
         }
-        actual.instancia = modulo.montar(trabajo, {
+        seccion.instancia = modulo.montar(trabajo, {
             rol: raiz.dataset.rol,
             puede: (permiso) => permisos.has(permiso),
             transiciones,
@@ -129,6 +132,10 @@ async function aplicar() {
             anunciar,
             avisarCambio,
         }) ?? null;
+        // El hash ha cambiado mientras llegaba el módulo: se aplica lo último
+        if (seccion.params !== params) {
+            seccion.instancia?.actualizar?.(seccion.params);
+        }
     } catch (error) {
         console.error(error);
         trabajo.replaceChildren(bloqueError('No se ha podido cargar esta sección. Recarga la página.'));

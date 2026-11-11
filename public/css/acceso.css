@@ -1,8 +1,8 @@
 /*
- * Login y registro: pantalla partida.
+ * Registro: pantalla partida (el login tiene su propia hoja, login.css).
  * A la izquierda, sobre negro, solo el logo: dice dónde estás sin pedir lectura.
  * A la derecha, sobre blanco, el título y el formulario, con tipografía
- * contenida y mucho aire para que entrar sea un trámite tranquilo.
+ * contenida y mucho aire para que crear la cuenta sea un trámite tranquilo.
  * En móvil se apila: una franja negra corta con el logo y, debajo, el formulario.
  */
 

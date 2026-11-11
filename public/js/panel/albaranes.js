@@ -4,8 +4,15 @@
  * tallas que entraron con cada uno. Administración ve además el formulario de
  * carga (permiso productos.gestionar).
  *
- * API: GET /api/gestion/albaranes?pagina, GET /api/gestion/albaranes/detalle?referencia
- * y POST /api/gestion/albaranes?referencia (cuerpo text/csv).
+ * API: GET /api/gestion/albaranes?pagina, GET /api/gestion/albaranes/detalle?referencia,
+ * POST /api/gestion/albaranes?referencia (cuerpo text/csv) y, solo administración,
+ * GET /api/gestion/albaranes/avisos.
+ *
+ * Una referencia ya cargada se rechaza con un 409: el panel enseña los datos de
+ * la carga anterior y deja «Cancelar» o «Cargar igualmente» (con motivo, que
+ * se envía como ?aceptar_repetida=1&motivo=). Los intentos rechazados salen en
+ * el bloque «Avisos» de arriba, y las cargas repetidas, con la etiqueta
+ * «Repetido». Todo eso es solo para administración: el almacén no carga.
  *
  * El archivo no se guarda: lo que queda de cada carga es su resumen en la
  * auditoría y sus movimientos de stock, y de ahí sale todo lo que se ve aquí.
@@ -18,8 +25,9 @@
 import { api, crear, talla as formatoTalla } from '../api.js';
 import { bloqueError, cabeceraSeccion, contar, fechaCorta, hashDe, numero, sesionCaducada, textoError } from './comun.js';
 import {
-    cabezaLateral, campo, conSigno, crearLateral, enviarTexto, etiqueta, filaVacia, filasEsqueleto, pintarPaginas,
-} from './inventario-comun.js';
+    cabezaLateral, campoFormulario as campo, conSigno, lateral as crearLateral, enviarTexto, etiqueta, filaVacia,
+    filasEsqueleto, pintarPaginas,
+} from './piezas.js';
 
 const POR_PAGINA = 20;
 const COLUMNAS = 7;
@@ -27,6 +35,10 @@ const TAMANO_MAXIMO = 1_048_576;   // el mismo límite de cuerpo que aplica la A
 // El mismo patrón que AlbaranServicio::PATRON_REFERENCIA
 const PATRON_REFERENCIA = /^[A-Za-z0-9/_-]{1,50}$/;
 const COLUMNAS_CSV = 'codigo_marca, nombre, colorway, categoria, color, precio, talla, cantidad';
+const AVISOS_POR_PAGINA = 5;
+// Los mismos límites que AlbaranServicio::MOTIVO_MINIMO y MOTIVO_MAXIMO
+const MOTIVO_MINIMO = 5;
+const MOTIVO_MAXIMO = 300;
 
 /** Nombre legible de cada columna del CSV para los errores por fila */
 const NOMBRE_COLUMNA = {
@@ -46,6 +58,8 @@ export function montar(contenedor, ctx) {
     let controlDetalle = null;
     let primeraLista = true;
     let abierto = null;   // referencia del albarán del panel lateral
+    let controlAvisos = null;
+    const esAdmin = ctx.puede('productos.gestionar');
 
     // --- Estructura ------------------------------------------------------------
 
@@ -53,8 +67,10 @@ export function montar(contenedor, ctx) {
     linea.textContent = 'Cargando los albaranes…';
 
     const piezas = [cabecera];
-    if (ctx.puede('productos.gestionar')) {
-        piezas.push(bloqueCarga());
+    // Los avisos y la carga son de administración: el almacén solo consulta
+    const avisos = esAdmin ? bloqueAvisos() : null;
+    if (esAdmin) {
+        piezas.push(avisos.elemento, bloqueCarga());
     }
 
     const bloqueLista = crear('section', 'tarjeta tarjeta--lista');
@@ -179,16 +195,41 @@ export function montar(contenedor, ctx) {
             }
             mostrarErroresCarga({});
 
+            // El archivo se lee como UTF-8 estricto: fichero.text() cambiaría los bytes no
+            // válidos por «�» y un CSV de Excel en Windows-1252 entraría con «Ni�o»
+            const texto = decodificarUtf8(await fichero.arrayBuffer());
+            if (texto === null) {
+                mostrarErroresCarga({ archivo: 'El archivo no está guardado como UTF-8' });
+                resultado.replaceChildren(errorCodificacion(fichero.name));
+                return;
+            }
+            await enviarAlbaran({ ref, texto, nombre: fichero.name });
+        });
+
+        /**
+         * Envía el albarán. Con «motivo», acepta cargar una referencia que ya se
+         * cargó (?aceptar_repetida=1). «campoMotivo» es donde se enseña un error
+         * del motivo sin perder el aviso de la referencia repetida.
+         */
+        async function enviarAlbaran({ ref, texto, nombre, motivo = null, campoMotivo = null }) {
             enviar.disabled = true;
             form.setAttribute('aria-busy', 'true');
-            resultado.append(crear('p', 'carga-inv__enviando', `Cargando ${fichero.name}…`));
+            if (motivo === null) {
+                resultado.replaceChildren(crear('p', 'carga-inv__enviando', `Cargando ${nombre}…`));
+            }
+            let ruta = `/api/gestion/albaranes?referencia=${encodeURIComponent(ref)}`;
+            if (motivo !== null) {
+                ruta += `&aceptar_repetida=1&motivo=${encodeURIComponent(motivo)}`;
+            }
             try {
-                const texto = await fichero.text();
-                const { datos } = await enviarTexto(`/api/gestion/albaranes?referencia=${encodeURIComponent(ref)}`, texto, 'text/csv');
+                const { datos } = await enviarTexto(ruta, texto, 'text/csv');
                 form.reset();
                 resultado.replaceChildren(resumenCarga(datos));
                 ctx.anunciar(`${datos.referencia}: ${contar(datos.unidades, 'par', 'pares')} al stock`);
                 ctx.avisarCambio('albaranes');
+                if (datos.repetida) {
+                    cargarAvisos();   // el aviso pasa a «Cargada después»
+                }
                 if (params.pagina) {
                     ctx.irA('albaranes', { ...params, pagina: undefined }, { reemplazar: true });
                 } else {
@@ -198,8 +239,18 @@ export function montar(contenedor, ctx) {
                 if (sesionCaducada(error)) {
                     return;
                 }
+                const errorMotivo = error.detalles?.errores?.motivo;
+                if (error.estado === 400 && errorMotivo && campoMotivo) {
+                    campoMotivo.error.textContent = errorMotivo;
+                    campoMotivo.control.setAttribute('aria-invalid', 'true');
+                    campoMotivo.control.focus();
+                    return;
+                }
                 resultado.replaceChildren();
-                if (error.estado === 400) {
+                if (error.estado === 409 && error.detalles?.carga_anterior) {
+                    resultado.append(avisoRepetida(error.detalles, { ref, texto, nombre }));
+                    cargarAvisos();   // el intento rechazado ya es un aviso más
+                } else if (error.estado === 400) {
                     pintarErroresAlbaran(error, resultado);
                 } else if (error.estado === 413) {
                     mostrarErroresCarga({ archivo: 'El archivo es demasiado grande para la tienda: divídelo en varios albaranes' });
@@ -212,7 +263,121 @@ export function montar(contenedor, ctx) {
                 enviar.disabled = false;
                 form.removeAttribute('aria-busy');
             }
-        });
+        }
+
+        /** El CSV no es UTF-8: no se envía nada y se explica cómo guardarlo bien */
+        function errorCodificacion(nombre) {
+            const caja = crear('div', 'errores-inv');
+            caja.setAttribute('role', 'alert');
+            caja.append(
+                crear('p', 'errores-inv__titulo', `${nombre} no está en UTF-8: no se ha enviado.`),
+                crear('p', 'errores-inv__general', 'Guarda el CSV como UTF-8 y vuelve a elegirlo; si no, las tildes y las eñes (Niño) llegarían estropeadas.'),
+                crear('p', 'errores-inv__pie', 'En Excel: Archivo › Guardar como › Tipo «CSV UTF-8 (delimitado por comas) (*.csv)». En LibreOffice: Guardar como CSV y, en «Juego de caracteres», Unicode (UTF-8).'),
+            );
+            return caja;
+        }
+
+        /**
+         * 409: la referencia ya se cargó. Se enseña la carga anterior y dos
+         * salidas: cancelar (no pasa nada) o cargar igualmente, que pide el
+         * motivo y una confirmación porque las unidades se suman otra vez.
+         */
+        function avisoRepetida(detalles, envio) {
+            const anterior = detalles.carga_anterior;
+            const caja = crear('div', 'errores-inv');
+            caja.setAttribute('role', 'alert');
+            const titulo = crear('p', 'errores-inv__titulo', `La referencia ${detalles.referencia} ya se cargó: no se ha sumado ninguna unidad.`);
+            titulo.tabIndex = -1;
+            const datos = crear('dl', 'datos datos--anchos');
+            const filas = [
+                ['Cargada el', fechaCorta(anterior.fecha)],
+                ['Por', anterior.usuario?.nombre ?? 'Usuario borrado'],
+                ['Pares', numero(anterior.unidades)],
+                ['Filas', numero(anterior.filas)],
+            ];
+            if (detalles.cargas > 1) {
+                filas.push(['Veces cargada', numero(detalles.cargas)]);
+            }
+            datos.append(...filas.flatMap(([nombreDato, valor]) => [crear('dt', '', nombreDato), crear('dd', 'num', valor)]));
+            const explicacion = crear('p', 'errores-inv__pie', 'Si es el mismo albarán, cancela: volver a cargarlo duplicaría el stock. Cárgalo solo si de verdad han llegado otra vez esas unidades.');
+
+            const botones = crear('div', 'paso__botones');
+            const cancelar = crear('button', 'control', 'Cancelar');
+            cancelar.type = 'button';
+            const igualmente = crear('button', 'control control--peligro', 'Cargar igualmente');
+            igualmente.type = 'button';
+            botones.append(cancelar, igualmente);
+            caja.append(titulo, datos, explicacion, botones);
+
+            cancelar.addEventListener('click', () => {
+                resultado.replaceChildren();
+                ctx.anunciar('Carga cancelada: no se ha sumado nada');
+                entradaRef.focus();
+            });
+            igualmente.addEventListener('click', () => {
+                botones.remove();
+                caja.append(confirmacionRepetida(envio, () => {
+                    caja.append(botones);
+                    igualmente.focus();
+                }));
+            });
+            requestAnimationFrame(() => titulo.focus());
+            return caja;
+        }
+
+        /** Motivo obligatorio y confirmación explícita antes de repetir la carga */
+        function confirmacionRepetida(envio, alVolver) {
+            const paso = crear('form', 'paso paso--peligro');
+            paso.noValidate = true;
+            paso.append(crear('p', 'paso__texto', `¿Cargar ${envio.ref} otra vez? Las unidades de ${envio.nombre} se sumarán de nuevo al stock.`));
+            const id = 'carga-motivo-repetida';
+            const etiquetaMotivo = crear('label', 'paso__etiqueta', 'Motivo (obligatorio, queda en la auditoría)');
+            etiquetaMotivo.htmlFor = id;
+            const motivo = crear('textarea', 'campo-texto campo-area');
+            Object.assign(motivo, { id, maxLength: MOTIVO_MAXIMO, rows: 2, placeholder: 'Ej.: el proveedor mandó una segunda entrega con el mismo número' });
+            const error = crear('p', 'paso__error');
+            error.id = `${id}-error`;
+            motivo.setAttribute('aria-describedby', error.id);
+            // El error se quita al escribir: si no, sigue pidiendo un motivo que ya está escrito
+            motivo.addEventListener('input', () => {
+                error.textContent = '';
+                motivo.removeAttribute('aria-invalid');
+            });
+            const fila = crear('div', 'paso__botones');
+            const si = crear('button', 'control control--peligro-lleno', 'Sí, cargar igualmente');
+            si.type = 'submit';
+            const no = crear('button', 'control control--texto', 'No, volver');
+            no.type = 'button';
+            no.addEventListener('click', () => {
+                paso.remove();
+                alVolver();
+            });
+            fila.append(si, no);
+            paso.append(etiquetaMotivo, motivo, error, fila);
+
+            paso.addEventListener('submit', async (evento) => {
+                evento.preventDefault();
+                const texto = motivo.value.trim();
+                error.textContent = '';
+                motivo.removeAttribute('aria-invalid');
+                if (texto.length < MOTIVO_MINIMO) {
+                    error.textContent = texto === ''
+                        ? 'Escribe por qué se vuelve a cargar esta referencia'
+                        : `Al menos ${MOTIVO_MINIMO} caracteres`;
+                    motivo.setAttribute('aria-invalid', 'true');
+                    motivo.focus();
+                    return;
+                }
+                si.disabled = true;
+                try {
+                    await enviarAlbaran({ ...envio, motivo: texto, campoMotivo: { control: motivo, error } });
+                } finally {
+                    si.disabled = false;
+                }
+            });
+            requestAnimationFrame(() => motivo.focus());
+            return paso;
+        }
 
         function mostrarErroresCarga(errores) {
             for (const { control, error } of [referencia, archivo]) {
@@ -308,11 +473,90 @@ export function montar(contenedor, ctx) {
         const ver = crear('a', 'control', 'Ver las tallas que han entrado');
         ver.href = hashDe('albaranes', { ref: datos.referencia });
         caja.append(titulo, lista);
-        if (datos.aviso) {
+        if (datos.repetida) {
+            caja.append(crear('p', 'exito-inv__aviso', `Carga repetida aceptada. Motivo: ${datos.motivo_repetida}`));
+        }
+        if (datos.desactivados.length) {
             caja.append(crear('p', 'exito-inv__aviso', 'Hay zapatillas desactivadas en el albarán: su stock se ha sumado, pero siguen sin venderse hasta que se reactiven en Productos.'));
+        }
+        if (datos.tallas_desactivadas?.length) {
+            caja.append(crear('p', 'exito-inv__aviso', `${contar(datos.tallas_desactivadas.length, 'talla desactivada ha', 'tallas desactivadas han')} recibido stock (${listaTallas(datos.tallas_desactivadas)}): siguen sin venderse hasta que se reactiven.`));
         }
         caja.append(ver);
         return caja;
+    }
+
+    // --- Avisos de referencias repetidas (solo administración) ---------------------
+
+    /**
+     * Los últimos intentos de cargar una referencia que ya estaba cargada. Se
+     * esconde si no hay ninguno: un bloque vacío arriba solo distrae.
+     */
+    function bloqueAvisos() {
+        const elemento = crear('section', 'tarjeta tarjeta--lista');
+        elemento.setAttribute('aria-labelledby', 'albaranes-avisos-titulo');
+        elemento.hidden = true;
+        const cabeza = crear('div', 'tarjeta__cabeza');
+        const titulo = crear('h2', 'tarjeta__titulo', 'Avisos');
+        titulo.id = 'albaranes-avisos-titulo';
+        const meta = crear('p', 'tarjeta__meta', 'referencias repetidas que no se han cargado');
+        cabeza.append(titulo, meta);
+        const envoltorioAvisos = crear('div', 'tabla-desplazable');
+        const tablaAvisos = crear('table', 'tabla tabla--inv');
+        tablaAvisos.innerHTML = '<caption class="oculto">Intentos rechazados de cargar una referencia ya cargada, del más reciente al más antiguo</caption>'
+            + '<thead><tr><th scope="col">Intento</th><th scope="col">Referencia</th><th scope="col">Por</th>'
+            + '<th scope="col" class="num">Pares</th><th scope="col">Estado</th></tr></thead>';
+        const cuerpo = crear('tbody');
+        tablaAvisos.append(cuerpo);
+        envoltorioAvisos.append(tablaAvisos);
+        elemento.append(cabeza, envoltorioAvisos);
+        return { elemento, cuerpo, meta };
+    }
+
+    async function cargarAvisos() {
+        if (!avisos) {
+            return;
+        }
+        controlAvisos?.abort();
+        controlAvisos = new AbortController();
+        try {
+            const respuesta = await api(`/api/gestion/albaranes/avisos?por_pagina=${AVISOS_POR_PAGINA}`, { senal: controlAvisos.signal });
+            pintarAvisos(respuesta.datos, respuesta.paginacion.total);
+        } catch (error) {
+            // Los avisos son un extra: si fallan, la sección sigue sirviendo sin ellos
+            if (error.name !== 'AbortError') {
+                sesionCaducada(error);
+            }
+        }
+    }
+
+    function pintarAvisos(lista, total) {
+        avisos.elemento.hidden = lista.length === 0;
+        const pendientes = lista.filter((aviso) => !aviso.aceptada_despues).length;
+        // Una referencia ya cargada que se intentó cargar otra vez: no sumó nada
+        const estado = pendientes
+            ? `${contar(pendientes, 'referencia repetida rechazada', 'referencias repetidas rechazadas')}`
+            : 'referencias repetidas, ya cargadas después';
+        avisos.meta.textContent = total > lista.length
+            ? `${estado} · los ${numero(lista.length)} intentos más recientes de ${numero(total)}`
+            : estado;
+        avisos.cuerpo.replaceChildren(...lista.map((aviso) => {
+            const fila = crear('tr');
+            const ref = crear('td');
+            const enlace = crear('a', 'tabla__enlace', aviso.referencia);
+            enlace.href = hashDe('albaranes', { ...params, ref: aviso.referencia });
+            ref.append(enlace);
+            const estado = crear('td');
+            estado.append(aviso.aceptada_despues ? etiqueta('Cargada después', 'activa') : etiqueta('Rechazada', 'nueva'));
+            fila.append(
+                crear('td', 'tabla__fecha num', fechaCorta(aviso.fecha)),
+                ref,
+                crear('td', 'tabla__cliente', aviso.usuario?.nombre ?? 'Usuario borrado'),
+                crear('td', 'num', numero(aviso.unidades)),
+                estado,
+            );
+            return fila;
+        }));
     }
 
     // --- Lista -------------------------------------------------------------------
@@ -365,6 +609,9 @@ export function montar(contenedor, ctx) {
             const enlace = crear('a', 'tabla__enlace', albaran.referencia);
             enlace.href = hashDe('albaranes', { ...params, ref: albaran.referencia });
             ref.append(enlace);
+            if (esAdmin && albaran.repetida) {
+                ref.append(' ', etiqueta('Repetido', 'nueva'));
+            }
 
             const zapatillas = crear('td', 'celda-cambios');
             const nuevas = albaran.productos_nuevos.length;
@@ -430,6 +677,7 @@ export function montar(contenedor, ctx) {
     function pintarDetalle(albaran) {
         const quien = albaran.usuario?.nombre ?? 'un usuario borrado';
         const cabeza = cabezaLateral(lateral, albaran.referencia, {
+            etiquetas: esAdmin && albaran.repetida ? [etiqueta('Repetido', 'nueva')] : [],
             meta: `Cargado el ${fechaCorta(albaran.fecha)} por ${quien} · ${contar(albaran.unidades, 'par', 'pares')}`,
             textoCerrar: 'Cerrar el albarán',
         });
@@ -438,6 +686,9 @@ export function montar(contenedor, ctx) {
         const datos = crear('dl', 'datos datos--anchos');
         datos.append(...filasResumen(albaran));
         resumen.append(crear('h3', 'detalle__subtitulo', 'Resumen'), datos);
+        if (esAdmin && albaran.repetida) {
+            resumen.append(crear('p', 'nota-inv nota-inv--caja', `Carga repetida aceptada. Motivo: ${albaran.motivo_repetida}`));
+        }
         if (albaran.cargas > 1) {
             resumen.append(crear('p', 'nota-inv', `Esta referencia se ha cargado ${numero(albaran.cargas)} veces; aquí se ve la última carga.`));
         }
@@ -511,9 +762,11 @@ export function montar(contenedor, ctx) {
     ctx.senal.addEventListener('abort', () => {
         controlLista?.abort();
         controlDetalle?.abort();
+        controlAvisos?.abort();
     });
 
     cargarLista();
+    cargarAvisos();
     if (params.ref) {
         abrirDetalle(params.ref);
     }
@@ -531,8 +784,26 @@ function filasResumen(datos) {
         ['Actualizadas', lista(datos.productos_actualizados)],
         ['Tallas nuevas', numero(datos.tallas_nuevas)],
         ['Desactivadas', lista(datos.desactivados)],
+        ['Tallas desactivadas', datos.tallas_desactivadas?.length ? listaTallas(datos.tallas_desactivadas) : '—'],
     ];
     return filas.flatMap(([nombre, valor]) => [crear('dt', '', nombre), crear('dd', valor === '—' ? 'datos__vacio' : 'num', valor)]);
+}
+
+/** «CW2288-111 42, CW2288-111 42.5»: tallas desactivadas que recibieron stock */
+function listaTallas(tallas) {
+    return tallas.map((t) => `${t.codigo_marca} ${formatoTalla(t.talla)}`).join(', ');
+}
+
+/**
+ * Bytes del archivo como texto UTF-8, o null si no lo son. «fatal» hace que
+ * falle en vez de cambiar en silencio los bytes no válidos por «�».
+ */
+function decodificarUtf8(bytes) {
+    try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+        return null;
+    }
 }
 
 function limpiar(entrada) {

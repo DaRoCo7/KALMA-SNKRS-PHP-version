@@ -23,7 +23,17 @@ let lineas = leer();
 function leer() {
     try {
         const guardadas = JSON.parse(window.localStorage.getItem(CLAVE) ?? '[]');
-        return Array.isArray(guardadas) ? guardadas.filter((l) => Number.isInteger(l?.variante_id) && l.cantidad > 0) : [];
+        if (!Array.isArray(guardadas)) {
+            return [];
+        }
+        // Una cesta de una versión anterior (o tocada a mano) puede no traer la
+        // personalización como lista: se normaliza a [] para que no rompa la página
+        return guardadas
+            .filter((l) => Number.isInteger(l?.variante_id) && l.cantidad > 0)
+            .map((l) => ({
+                ...l,
+                personalizacion: Array.isArray(l.personalizacion) ? l.personalizacion.filter((o) => o && typeof o === 'object') : [],
+            }));
     } catch {
         return [];
     }
@@ -367,7 +377,7 @@ async function hacerPedido(evento) {
     }
 }
 
-async function enviarPedido(reintento = false) {
+async function enviarPedido() {
     try {
         const { datos: pedido } = await api('/api/pedidos', { metodo: 'POST', cuerpo: cuerpoPedido() });
         lineas = [];
@@ -388,20 +398,13 @@ async function enviarPedido(reintento = false) {
             case 401:
                 irAEntrar();
                 break;
-            case 403: {
-                // O la sesión ha caducado y el token ya no vale, o la cuenta no es de cliente
-                const datos = await consultarSesion();
-                if (!datos.autenticado) {
-                    irAEntrar();
-                } else if (datos.usuario?.rol !== 'cliente') {
-                    mensaje('lineas', 'Las cuentas de la tienda no pueden hacer pedidos. Entra con una cuenta de cliente.');
-                } else if (!reintento) {
-                    await enviarPedido(true);
-                } else {
-                    mensaje('lineas', error.message);
-                }
+            case 403:
+                // El token caducado ya lo resuelve api() (reintenta o lo convierte en 401):
+                // aquí solo llega una cuenta que no es de cliente o un token que sigue sin valer
+                mensaje('lineas', error.detalles.motivo === 'csrf'
+                    ? error.message
+                    : 'Las cuentas de la tienda no pueden hacer pedidos. Entra con una cuenta de cliente.');
                 break;
-            }
             case 409:
                 pintarSinStock(error.detalles.sin_stock ?? []);
                 mensaje('lineas', 'Alguna talla ya no tiene stock suficiente. Revisa la cesta y vuelve a pedir.');
@@ -450,7 +453,31 @@ function pintarSinStock(sinStock) {
 
 // --- Entrar sin salir de la página ------------------------------------------------
 
+// Mismo mensaje que el servidor (Validador::email) y la misma comprobación que
+// acceso.js: algo@algo.algo, sin espacios. El servidor sigue siendo quien valida
+const EMAIL_VALIDO = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+const MENSAJE_EMAIL = 'Email no válido';
+// Solo se avisa del formato después de salir del campo o de intentar entrar,
+// nunca mientras se escribe por primera vez
+let emailTocado = false;
+
+function revisarEmail() {
+    const campo = formEntrar.elements.email;
+    const valor = campo.value.trim();
+    const destino = formEntrar.querySelector('[data-error="email"]');
+    if (valor !== '' && !EMAIL_VALIDO.test(valor)) {
+        errorCampo(formEntrar, 'email', MENSAJE_EMAIL);
+        return;
+    }
+    // Ya escrito y bien formado: se quita el aviso; vacío, solo el de formato
+    if (destino && (valor !== '' || destino.textContent === MENSAJE_EMAIL)) {
+        destino.textContent = '';
+        campo.removeAttribute('aria-invalid');
+    }
+}
+
 function irAEntrar() {
+    emailTocado = false;
     const registro = dialogo.querySelector('[data-cesta-registro]');
     // Tras crear la cuenta, la persona vuelve a la página donde estaba (la cesta sigue guardada)
     registro.href = `/registro?volver=${encodeURIComponent(window.location.pathname)}`;
@@ -467,9 +494,12 @@ async function entrar(evento) {
 
     const email = formEntrar.elements.email.value.trim();
     const password = formEntrar.elements.password.value;
-    if (email === '' || password === '') {
+    const emailMal = email !== '' && !EMAIL_VALIDO.test(email);
+    if (email === '' || password === '' || emailMal) {
         if (email === '') errorCampo(formEntrar, 'email', 'Escribe tu email.');
+        if (emailMal) errorCampo(formEntrar, 'email', MENSAJE_EMAIL);
         if (password === '') errorCampo(formEntrar, 'password', 'Escribe tu contraseña.');
+        emailTocado = true;
         formEntrar.querySelector('[aria-invalid]')?.focus();
         return;
     }
@@ -477,7 +507,8 @@ async function entrar(evento) {
     const boton = formEntrar.querySelector('[type="submit"]');
     boton.disabled = true;
     try {
-        const { datos } = await api('/api/login', { metodo: 'POST', cuerpo: { email, password } });
+        // publica: con el token de la página caducado, api() toma el nuevo y reintenta sin pedir sesión
+        const { datos } = await api('/api/login', { metodo: 'POST', cuerpo: { email, password }, publica: true });
         // El servidor cambia el token al iniciar sesión: el de la página ya no vale
         fijarTokenCsrf(datos.csrf_token);
         sesion = { autenticado: true, usuario: datos.usuario, csrf_token: datos.csrf_token };
@@ -551,4 +582,13 @@ if (dialogo) {
     lista.addEventListener('click', alPulsarLinea);
     formPedido.addEventListener('submit', hacerPedido);
     formEntrar.addEventListener('submit', entrar);
+    formEntrar.elements.email.addEventListener('blur', () => {
+        emailTocado = true;
+        revisarEmail();
+    });
+    formEntrar.elements.email.addEventListener('input', () => {
+        if (emailTocado) {
+            revisarEmail();
+        }
+    });
 }

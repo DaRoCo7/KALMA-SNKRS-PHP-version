@@ -41,16 +41,14 @@ final class GestionProductoServicio
     public const NOMBRE_MAXIMO = 140;
     public const COLORWAY_MAXIMO = 100;
 
-    /** Mayor valor de una columna INTEGER de PostgreSQL */
-    private const ID_MAXIMO = 2_147_483_647;
     private const MAX_TALLAS = 30;
     private const NO_ENCONTRADO = 'Producto no encontrado';
     private const DATOS_NO_VALIDOS = 'Hay datos no válidos';
-    private const MENSAJE_TALLA = 'Talla entre 34 y 50 (admite medias tallas, ej. 42.5)';
 
     public function __construct(
         private readonly CatalogoInternoRepositorio $catalogo = new CatalogoInternoRepositorio(),
         private readonly AuditoriaRepositorio $auditoria = new AuditoriaRepositorio(),
+        private readonly PresentacionProducto $presentacion = new PresentacionProducto(),
     ) {
     }
 
@@ -66,7 +64,7 @@ final class GestionProductoServicio
         $filas = $this->catalogo->listar($filtros, $paginacion->porPagina, $paginacion->offset());
 
         return [
-            'datos'      => array_map($this->resumen(...), $filas),
+            'datos'      => array_map($this->presentacion->resumen(...), $filas),
             'paginacion' => $paginacion->meta($total),
         ];
     }
@@ -74,9 +72,9 @@ final class GestionProductoServicio
     /** @throws HttpExcepcion 404 */
     public function ver(string $id): array
     {
-        $producto = $this->catalogo->buscarPorId($this->comprobarId($id))
+        $producto = $this->catalogo->buscarPorId(Validador::idRuta($id, self::NO_ENCONTRADO))
             ?? throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADO);
-        return $this->detalle($producto);
+        return $this->presentacion->detalle($producto);
     }
 
     // =========================================================================
@@ -111,7 +109,7 @@ final class GestionProductoServicio
         }
 
         Log::info('Producto creado', ['producto_id' => $nuevo['id'], 'codigo_marca' => $datos['codigo_marca']]);
-        return $this->detalle($this->catalogo->buscarPorId($nuevo['id']));
+        return $this->presentacion->detalle($this->catalogo->buscarPorId($nuevo['id']));
     }
 
     /**
@@ -129,7 +127,7 @@ final class GestionProductoServicio
      */
     public function editar(array $usuario, string $id, array $entrada, ?string $ip): array
     {
-        $productoId = $this->comprobarId($id);
+        $productoId = Validador::idRuta($id, self::NO_ENCONTRADO);
         if (array_key_exists('codigo_marca', $entrada)) {
             throw HttpExcepcion::peticionIncorrecta(self::DATOS_NO_VALIDOS, [
                 'codigo_marca' => 'No se puede cambiar: si es incorrecto, desactiva el producto y da de alta otro',
@@ -161,7 +159,7 @@ final class GestionProductoServicio
             $this->auditoria->registrar($usuario['id'], 'producto.editar', 'producto', $productoId, 'exito', $detalle, $ip);
         });
 
-        return $this->detalle($this->catalogo->buscarPorId($productoId));
+        return $this->presentacion->detalle($this->catalogo->buscarPorId($productoId));
     }
 
     /**
@@ -174,7 +172,7 @@ final class GestionProductoServicio
      */
     public function desactivar(array $usuario, string $id, ?string $ip): void
     {
-        $productoId = $this->comprobarId($id);
+        $productoId = Validador::idRuta($id, self::NO_ENCONTRADO);
 
         BaseDatos::transaccion(function () use ($productoId, $usuario, $ip): void {
             $actual = $this->catalogo->bloquear($productoId) ?? throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADO);
@@ -228,17 +226,12 @@ final class GestionProductoServicio
     }
 
     /**
-     * Talla válida (34 a 50, enteras o medias) o null. Admite 42.5 o "42.5";
-     * rechaza true, un array o 42.3.
+     * Talla válida o null. La regla es la común (Validador::talla); se mantiene
+     * aquí porque AlbaranServicio la llama con este nombre.
      */
     public static function talla(mixed $valor): ?float
     {
-        if (is_bool($valor) || !is_scalar($valor)) {
-            return null;
-        }
-        $talla = filter_var($valor, FILTER_VALIDATE_FLOAT);
-        $valida = $talla !== false && $talla >= 34 && $talla <= 50 && fmod($talla * 2, 1.0) === 0.0;
-        return $valida ? (float) $talla : null;
+        return Validador::talla($valor);
     }
 
     /**
@@ -290,8 +283,8 @@ final class GestionProductoServicio
             ->texto('colorway', self::COLORWAY_MAXIMO, $exigido('colorway'))
             ->texto('descripcion', 2000, obligatorio: false)
             ->importe('precio', self::PRECIO_MINIMO, self::PRECIO_MAXIMO, $exigido('precio'))
-            ->entero('categoria_id', 1, self::ID_MAXIMO, $exigido('categoria_id'))
-            ->entero('color_id', 1, self::ID_MAXIMO, $exigido('color_id'))
+            ->entero('categoria_id', 1, Validador::ID_MAXIMO, $exigido('categoria_id'))
+            ->entero('color_id', 1, Validador::ID_MAXIMO, $exigido('color_id'))
             ->booleano('personalizable', $parcial ? null : false);
         if ($parcial) {
             $validador->booleano('activo');
@@ -354,7 +347,7 @@ final class GestionProductoServicio
         foreach ($tallas as $posicion => $valor) {
             $talla = self::talla($valor);
             if ($talla === null) {
-                $errores["tallas.{$posicion}"] = self::MENSAJE_TALLA;
+                $errores["tallas.{$posicion}"] = Validador::MENSAJE_TALLA;
             } elseif (isset($limpias[self::claveTalla($talla)])) {
                 $errores["tallas.{$posicion}"] = 'Talla repetida';
             } else {
@@ -389,10 +382,11 @@ final class GestionProductoServicio
 
         $buscar = $query['buscar'] ?? '';
         if ($buscar !== '') {
-            if (is_string($buscar) && mb_strlen(trim($buscar)) <= 60) {
-                $filtros['buscar'] = trim($buscar);
+            $limpio = Validador::busqueda($buscar);
+            if ($limpio === null) {
+                $errores['buscar'] = Validador::MENSAJE_BUSQUEDA;
             } else {
-                $errores['buscar'] = 'Texto de hasta 60 caracteres';
+                $filtros['buscar'] = $limpio;
             }
         }
 
@@ -412,16 +406,6 @@ final class GestionProductoServicio
         return $filtros;
     }
 
-    /** Un id que no es un entero positivo no puede existir: 404 sin consultar la BD */
-    private function comprobarId(string $id): int
-    {
-        $entero = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::ID_MAXIMO]]);
-        if ($entero === false) {
-            throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADO);
-        }
-        return $entero;
-    }
-
     /** ¿El valor de la BD y el nuevo son el mismo? (PostgreSQL devuelve los NUMERIC como texto) */
     private static function igual(mixed $actual, mixed $nuevo): bool
     {
@@ -430,55 +414,5 @@ final class GestionProductoServicio
             is_int($nuevo)   => (int) $actual === $nuevo,
             default          => $actual === $nuevo,
         };
-    }
-
-    // =========================================================================
-    // Formato de salida
-    // =========================================================================
-
-    /** Datos de un producto en el listado interno */
-    private function resumen(array $p): array
-    {
-        return [
-            'id'                  => (int) $p['id'],
-            'codigo_marca'        => $p['codigo_marca'],
-            'nombre'              => $p['nombre'],
-            'colorway'            => $p['colorway'],
-            'slug'                => $p['slug'],
-            'precio'              => (float) $p['precio'],
-            'personalizable'      => $p['personalizable'],
-            'activo'              => $p['activo'],
-            'imagen'              => $p['imagen'] === null ? null : '/' . $p['imagen'],
-            'categoria'           => ['id' => (int) $p['categoria_id'], 'nombre' => $p['categoria']],
-            'color'               => ['id' => (int) $p['color_id'], 'nombre' => $p['color'], 'hex' => $p['codigo_hex']],
-            'stock_total'         => (int) $p['stock_total'],
-            'num_tallas'          => (int) $p['num_tallas'],
-            // AAAA-MM-DD o null; si es futura, la zapatilla está anunciada y no se vende todavía
-            'fecha_lanzamiento'   => $p['fecha_lanzamiento'],
-            'fecha_actualizacion' => self::fecha($p['fecha_actualizacion']),
-        ];
-    }
-
-    /** Producto con descripción y todas sus tallas (también las desactivadas), con su RFID */
-    private function detalle(array $p): array
-    {
-        return $this->resumen($p) + [
-            'descripcion'    => $p['descripcion'],
-            'fecha_creacion' => self::fecha($p['fecha_creacion']),
-            'variantes'      => array_map(static fn (array $v): array => [
-                'id'           => (int) $v['id'],
-                'talla'        => (float) $v['talla'],
-                'stock'        => (int) $v['stock'],
-                'stock_minimo' => (int) $v['stock_minimo'],
-                'rfid_tienda'  => $v['rfid_tienda'],
-                'activo'       => $v['activo'],
-            ], $this->catalogo->variantes((int) $p['id'])),
-        ];
-    }
-
-    /** Fecha de PostgreSQL (2026-11-08 19:15:00+01) en ISO 8601 (2026-11-08T19:15:00+01:00) */
-    private static function fecha(?string $valor): ?string
-    {
-        return $valor === null ? null : (new \DateTimeImmutable($valor))->format(DATE_ATOM);
     }
 }

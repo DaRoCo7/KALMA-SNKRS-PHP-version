@@ -25,6 +25,8 @@ $router->patch('/api/gestion/productos/{id}', [GestionProductoController::class,
 $router->delete('/api/gestion/productos/{id}', [GestionProductoController::class, 'desactivar'], $gestionProductos);
 
 $router->post('/api/gestion/albaranes', [AlbaranController::class, 'cargar'], $gestionProductos);
+// Avisos de referencias repetidas: solo administración, que es quien decide si se cargan igualmente
+$router->get('/api/gestion/albaranes/avisos', [AlbaranController::class, 'avisos'], $gestionProductos);
 
 // Consultar los albaranes ya cargados también lo puede hacer el almacén (albaranes.ver).
 // La referencia del detalle va en ?referencia= porque puede llevar «/» (ALB/2026/42)

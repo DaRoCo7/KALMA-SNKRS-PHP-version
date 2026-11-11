@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Servicios;
 
 use App\Nucleo\BaseDatos;
+use App\Nucleo\Formato;
 use App\Nucleo\HttpExcepcion;
 use App\Nucleo\Log;
 use App\Nucleo\Paginacion;
@@ -82,7 +83,7 @@ final class ConsultaServicio
      */
     public function cambiarEstado(array $usuario, string $id, array $entrada, ?string $ip): array
     {
-        $idConsulta = self::id($id);
+        $idConsulta = Validador::idRuta($id, self::NO_ENCONTRADA);
         $datos = (new Validador($entrada))->opcion('estado', self::ESTADOS)->validar();
 
         $consulta = BaseDatos::transaccion(function () use ($idConsulta, $datos, $usuario, $ip): array {
@@ -103,13 +104,6 @@ final class ConsultaServicio
         return self::formatear($consulta);
     }
 
-    /** Un id que no es un entero positivo no puede existir: 404 sin consultar la BD */
-    private static function id(string $id): int
-    {
-        $entero = filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 2147483647]]);
-        return $entero === false ? throw HttpExcepcion::noEncontrado(self::NO_ENCONTRADA) : $entero;
-    }
-
     private static function formatear(array $c): array
     {
         return [
@@ -119,7 +113,7 @@ final class ConsultaServicio
             'asunto'         => $c['asunto'],
             'mensaje'        => $c['mensaje'],
             'estado'         => $c['estado'],
-            'fecha_consulta' => (new \DateTimeImmutable($c['fecha_consulta']))->format(DATE_ATOM),
+            'fecha_consulta' => Formato::fecha($c['fecha_consulta']),
         ];
     }
 }

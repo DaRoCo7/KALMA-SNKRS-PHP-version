@@ -24,8 +24,14 @@ use App\Repositorios\StockRepositorio;
  *
  * El albarán entra entero o no entra: se valida el archivo completo ANTES de
  * escribir y, si una sola fila está mal, se rechaza con el error de cada fila.
- * Así nunca queda medio albarán cargado y el almacén puede corregir el archivo
- * y volver a enviarlo sin duplicar unidades.
+ * Así nunca queda medio albarán cargado: un archivo rechazado no ha sumado
+ * nada, y la administración puede corregirlo y volver a enviarlo con la misma
+ * referencia (todavía no cuenta como cargada).
+ *
+ * Una referencia que YA se cargó se rechaza con un 409 (y el intento queda en
+ * la auditoría como aviso para la administración), porque volver a cargarla
+ * duplicaría las unidades. Solo entra si la petición lo acepta expresamente
+ * con ?aceptar_repetida=1&motivo=..., y esa carga queda marcada como repetida.
  */
 final class AlbaranServicio
 {
@@ -38,6 +44,8 @@ final class AlbaranServicio
     private const MAX_UNIDADES_FILA = 1000;
     private const PATRON_REFERENCIA = '/^[A-Za-z0-9\/_-]{1,50}$/';
     private const ALBARAN_NO_VALIDO = 'El albarán tiene errores: no se ha cargado ninguna fila';
+    private const MOTIVO_MINIMO = 5;
+    private const MOTIVO_MAXIMO = 300;
 
     public function __construct(
         private readonly CatalogoInternoRepositorio $catalogo = new CatalogoInternoRepositorio(),
@@ -124,16 +132,56 @@ final class AlbaranServicio
             'productos_actualizados' => $detalle['productos_actualizados'] ?? [],
             'tallas_nuevas'          => (int) ($detalle['tallas_nuevas'] ?? 0),
             'desactivados'           => $detalle['desactivados'] ?? [],
+            // Las cargas anteriores a estas claves no las tienen en su JSON
+            'tallas_desactivadas'    => $detalle['tallas_desactivadas'] ?? [],
+            'repetida'               => (bool) ($detalle['repetida'] ?? false),
+            'motivo_repetida'        => $detalle['motivo_repetida'] ?? null,
+        ];
+    }
+
+    /**
+     * GET /api/gestion/albaranes/avisos · intentos rechazados de cargar una
+     * referencia que ya estaba cargada, del más reciente al más antiguo. Solo
+     * administración: es quien decide si se carga igualmente.
+     */
+    public function avisos(Paginacion $paginacion): array
+    {
+        $total = $this->albaranes->contarAvisos();
+        $filas = $this->albaranes->avisos($paginacion->porPagina, $paginacion->offset());
+
+        return [
+            'datos' => array_map(static function (array $fila): array {
+                $detalle = json_decode((string) $fila['detalle'], true, flags: JSON_THROW_ON_ERROR);
+                return [
+                    'id'               => (int) $fila['id'],
+                    'referencia'       => (string) ($detalle['referencia'] ?? ''),
+                    'fecha'            => (new \DateTimeImmutable($fila['fecha']))->format(DATE_ATOM),
+                    'usuario'          => $fila['usuario_id'] === null ? null : [
+                        'id'     => (int) $fila['usuario_id'],
+                        'nombre' => trim("{$fila['usuario_nombre']} {$fila['usuario_apellidos']}"),
+                        'email'  => $fila['usuario_email'],
+                    ],
+                    'filas'            => (int) ($detalle['filas'] ?? 0),
+                    'unidades'         => (int) ($detalle['unidades'] ?? 0),
+                    'aceptada_despues' => (bool) $fila['aceptada_despues'],
+                ];
+            }, $filas),
+            'paginacion' => $paginacion->meta($total),
         ];
     }
 
     /**
      * @param mixed $referencia número del albarán del proveedor (ej. ALB-2026-0042), de ?referencia=
-     * @throws HttpExcepcion 400 archivo o filas no válidos · 409 una zapatilla nueva se dio de alta mientras tanto
+     * @param mixed $aceptarRepetida ?aceptar_repetida=1 para cargar una referencia que ya se cargó
+     * @param mixed $motivo ?motivo= obligatorio con aceptar_repetida: por qué se vuelve a cargar
+     * @throws HttpExcepcion 400 archivo, filas o aceptación no válidos ·
+     *                       409 referencia ya cargada sin aceptarla o zapatilla nueva dada de alta mientras tanto
      */
-    public function cargar(array $usuario, string $csv, mixed $referencia, ?string $ip): array
+    public function cargar(array $usuario, string $csv, mixed $referencia, mixed $aceptarRepetida, mixed $motivo, ?string $ip): array
     {
         $referencia = $this->referencia($referencia);
+        // null si no se acepta repetir; si se acepta, el motivo ya validado
+        $motivoRepetida = $this->aceptacion($aceptarRepetida, $motivo);
         $marcaId = $this->productos->marcaId();
 
         // 1. Leer y validar el archivo sin escribir nada
@@ -148,9 +196,18 @@ final class AlbaranServicio
 
         // 2. Escribir en UNA transacción: o entra el albarán entero o no entra nada
         try {
-            $resumen = BaseDatos::transaccion(
-                fn (): array => $this->escribir($zapatillas, $marcaId, $usuario['id'], $ip, $referencia, count($filas))
-            );
+            $resultado = BaseDatos::transaccion(function () use ($zapatillas, $marcaId, $usuario, $ip, $referencia, $filas, $motivoRepetida): array {
+                // La comprobación de «ya cargada» y la escritura van bajo el mismo cerrojo:
+                // dos envíos simultáneos de la referencia no pueden pasar los dos
+                $this->albaranes->bloquearReferencia($referencia);
+                $anterior = $this->albaranes->buscarPorReferencia($referencia);
+                if ($anterior !== null && $motivoRepetida === null) {
+                    // No se escribe nada: el rechazo se audita fuera, después del COMMIT
+                    return ['anterior' => $anterior];
+                }
+                $repetida = $anterior === null ? null : ['motivo' => $motivoRepetida, 'anterior_id' => (int) $anterior['id']];
+                return ['resumen' => $this->escribir($zapatillas, $marcaId, $usuario['id'], $ip, $referencia, count($filas), $repetida)];
+            });
         } catch (\PDOException $error) {
             // Un 23505 aquí solo puede significar que otra petición dio de alta una de las
             // zapatillas nuevas entre la validación y la escritura: se pide volver a enviarlo
@@ -163,21 +220,104 @@ final class AlbaranServicio
             throw $error;
         }
 
-        Log::info('Albarán cargado', ['referencia' => $referencia, 'unidades' => $resumen['unidades']]);
+        if (isset($resultado['anterior'])) {
+            $this->rechazarRepetida($usuario, $referencia, $resultado['anterior'], $filas, $ip);
+        }
+        $resumen = $resultado['resumen'];
 
+        Log::info('Albarán cargado', ['referencia' => $referencia, 'unidades' => $resumen['unidades'], 'repetida' => $resumen['repetida']]);
+
+        $avisos = [];
         if ($resumen['desactivados'] !== []) {
-            $resumen['aviso'] = 'Se ha sumado el stock de zapatillas desactivadas, pero siguen sin venderse. '
+            $avisos[] = 'Se ha sumado el stock de zapatillas desactivadas, pero siguen sin venderse. '
                 . 'Para volver a venderlas: PATCH /api/gestion/productos/{id} con {"activo": true}';
         }
+        if ($resumen['tallas_desactivadas'] !== []) {
+            $avisos[] = 'Se ha sumado el stock de tallas desactivadas (ver tallas_desactivadas): siguen sin venderse hasta que se reactiven';
+        }
+        if ($avisos !== []) {
+            $resumen['aviso'] = implode('. ', $avisos);
+        }
         return $resumen;
+    }
+
+    /**
+     * La referencia ya estaba cargada y la petición no lo acepta: el intento se
+     * deja en la auditoría (los avisos que ve la administración en el panel) y
+     * se responde 409 con los datos de la carga anterior.
+     *
+     * Se registra fuera de la transacción de la carga, que ya ha terminado sin
+     * escribir nada: si se registrara dentro, el 409 lo desharía con el ROLLBACK.
+     *
+     * @throws HttpExcepcion 409 siempre
+     */
+    private function rechazarRepetida(array $usuario, string $referencia, array $anterior, array $filas, ?string $ip): never
+    {
+        $previa = self::resumenGuardado($anterior);
+        $unidades = array_sum(array_column($filas, 'cantidad'));
+
+        $this->auditoria->registrar($usuario['id'], AlbaranRepositorio::EVENTO_RECHAZO, 'albaran', null, 'denegado', [
+            'referencia'  => $referencia,
+            'filas'       => count($filas),
+            'unidades'    => $unidades,
+            'anterior_id' => $previa['id'],
+        ], $ip);
+        Log::info('Albarán con referencia repetida rechazado', ['referencia' => $referencia]);
+
+        throw HttpExcepcion::conflicto(
+            "La referencia {$referencia} ya se cargó: no se ha sumado ninguna unidad",
+            [
+                'referencia'     => $referencia,
+                'cargas'         => (int) $anterior['cargas'],
+                'carga_anterior' => [
+                    'fecha'    => $previa['fecha'],
+                    'usuario'  => $previa['usuario'],
+                    'filas'    => $previa['filas'],
+                    'unidades' => $previa['unidades'],
+                ],
+                'aceptar'        => 'Para cargarlo igualmente, repite la petición con ?aceptar_repetida=1&motivo=<por qué se vuelve a cargar>',
+            ]
+        );
+    }
+
+    /**
+     * ?aceptar_repetida=1&motivo=... Cargar otra vez una referencia duplica sus
+     * unidades, así que solo se hace si se pide expresamente y diciendo por qué
+     * (el motivo queda en la auditoría junto a la carga).
+     *
+     * @return string|null el motivo si se acepta repetir; null si no
+     * @throws HttpExcepcion 400 valor de aceptar_repetida no válido o motivo ausente
+     */
+    private function aceptacion(mixed $aceptar, mixed $motivo): ?string
+    {
+        if ($aceptar === null || $aceptar === '' || $aceptar === '0' || $aceptar === 'false') {
+            return null;
+        }
+        if ($aceptar !== '1' && $aceptar !== 'true') {
+            throw HttpExcepcion::peticionIncorrecta('Parámetro aceptar_repetida no válido', [
+                'aceptar_repetida' => 'Usa 1 para cargar una referencia que ya se cargó',
+            ]);
+        }
+
+        $motivo = is_string($motivo) ? trim($motivo) : '';
+        $largo = mb_strlen($motivo);
+        if ($largo < self::MOTIVO_MINIMO || $largo > self::MOTIVO_MAXIMO) {
+            throw HttpExcepcion::peticionIncorrecta('Falta el motivo para cargar una referencia repetida', [
+                'motivo' => $largo === 0
+                    ? 'Obligatorio al aceptar una referencia repetida: explica por qué se vuelve a cargar'
+                    : 'Entre ' . self::MOTIVO_MINIMO . ' y ' . self::MOTIVO_MAXIMO . ' caracteres',
+            ]);
+        }
+        return $motivo;
     }
 
     /**
      * Da de alta lo que falta y suma las unidades. Se llama dentro de la transacción.
      *
      * @param array<string, array> $zapatillas agrupadas por código (ver agrupar())
+     * @param array{motivo: string, anterior_id: int}|null $repetida si se aceptó repetir la referencia
      */
-    private function escribir(array $zapatillas, int $marcaId, int $usuarioId, ?string $ip, string $referencia, int $filas): array
+    private function escribir(array $zapatillas, int $marcaId, int $usuarioId, ?string $ip, string $referencia, int $filas, ?array $repetida): array
     {
         // Se bloquean las zapatillas que ya existen: si dos albaranes traen la misma
         // talla nueva, el segundo espera y la encuentra creada en vez de chocar
@@ -191,7 +331,12 @@ final class AlbaranServicio
             'productos_actualizados' => [],
             'tallas_nuevas'          => 0,
             'desactivados'           => [],
+            'tallas_desactivadas'    => [],
+            'repetida'               => $repetida !== null,
+            'motivo_repetida'        => $repetida['motivo'] ?? null,
         ];
+        // Unidades que entran en cada talla: variante_id => cantidad, código y talla
+        $entradas = [];
 
         foreach ($zapatillas as $codigo => $zapatilla) {
             $existente = $bloqueadas[$codigo] ?? null;
@@ -222,22 +367,26 @@ final class AlbaranServicio
                 }
             }
 
-            $resumen['tallas_nuevas'] += $this->darEntrada($productoId, $variantes, $zapatilla['tallas'], $usuarioId, "Albarán {$referencia}");
+            $resumen['tallas_nuevas'] += $this->prepararTallas($productoId, $codigo, $variantes, $zapatilla['tallas'], $entradas);
             $resumen['unidades'] += array_sum(array_column($zapatilla['tallas'], 'cantidad'));
         }
 
-        $this->auditoria->registrar($usuarioId, 'albaran.cargar', 'albaran', null, 'exito', $resumen, $ip);
+        $resumen['tallas_desactivadas'] = $this->darEntrada($entradas, $usuarioId, "Albarán {$referencia}");
+
+        $detalle = $resumen + ($repetida === null ? [] : ['anterior_id' => $repetida['anterior_id']]);
+        $this->auditoria->registrar($usuarioId, AlbaranRepositorio::EVENTO_CARGA, 'albaran', null, 'exito', $detalle, $ip);
         return $resumen;
     }
 
     /**
-     * Suma las unidades de cada talla; las tallas que el producto no tenía se
-     * crean antes (con stock 0 y su RFID).
+     * Crea las tallas que el producto no tenía (con stock 0 y su RFID) y anota
+     * en $entradas cuántas unidades recibe cada talla. Todavía no mueve stock.
      *
      * @param array<string, int> $variantes "42.5" => id de la talla
+     * @param array<int, array{cantidad: int, codigo_marca: string, talla: float}> $entradas
      * @return int tallas creadas
      */
-    private function darEntrada(int $productoId, array $variantes, array $tallas, int $usuarioId, string $motivo): int
+    private function prepararTallas(int $productoId, string $codigo, array $variantes, array $tallas, array &$entradas): int
     {
         $creadas = 0;
         foreach ($tallas as $clave => $linea) {
@@ -245,10 +394,37 @@ final class AlbaranServicio
                 $variantes[$clave] = $this->catalogo->crearTalla($productoId, $linea['talla']);
                 $creadas++;
             }
-            // Siempre por mover(): cada entrada deja su movimiento con la referencia del albarán
-            $this->stock->mover($variantes[$clave], $linea['cantidad'], 'entrada', null, $usuarioId, $motivo);
+            $entradas[$variantes[$clave]] = ['cantidad' => $linea['cantidad'], 'codigo_marca' => $codigo, 'talla' => $linea['talla']];
         }
         return $creadas;
+    }
+
+    /**
+     * Suma las unidades talla a talla. Antes se bloquean TODAS las tallas en
+     * orden de id, como hacen los pedidos y las cancelaciones: si el albarán las
+     * fuera bloqueando en el orden del CSV, podría esperar a un pedido que a su
+     * vez espera a una talla que ya tiene el albarán (interbloqueo).
+     *
+     * @param array<int, array{cantidad: int, codigo_marca: string, talla: float}> $entradas por id de talla
+     * @return list<array{codigo_marca: string, talla: float}> tallas desactivadas que han recibido stock
+     */
+    private function darEntrada(array $entradas, int $usuarioId, string $motivo): array
+    {
+        $bloqueadas = $this->stock->bloquearVariantes(array_keys($entradas));
+        ksort($entradas);
+
+        $desactivadas = [];
+        foreach ($entradas as $varianteId => $entrada) {
+            // La talla puede estar desactivada aunque la zapatilla esté a la venta: las
+            // unidades existen y se cuentan, pero no se venden hasta que se reactive
+            if (isset($bloqueadas[$varianteId]) && !$bloqueadas[$varianteId]['activo']) {
+                $desactivadas[] = ['codigo_marca' => $entrada['codigo_marca'], 'talla' => $entrada['talla']];
+            }
+            // Siempre por mover(): cada entrada deja su movimiento con la referencia del albarán
+            $this->stock->mover($varianteId, $entrada['cantidad'], 'entrada', null, $usuarioId, $motivo);
+        }
+        usort($desactivadas, static fn (array $a, array $b): int => [$a['codigo_marca'], $a['talla']] <=> [$b['codigo_marca'], $b['talla']]);
+        return $desactivadas;
     }
 
     /** @return array<string, int> tallas que ya tiene el producto: "42.5" => id */
@@ -271,19 +447,46 @@ final class AlbaranServicio
      */
     private function leer(string $csv): array
     {
+        $lineas = preg_split('/\r\n|\n|\r/', self::textoUtf8($csv));
+        $separador = self::separador($lineas[0]);
+        $columnas = self::columnas($lineas[0], $separador);
+        return $this->leerFilas(array_slice($lineas, 1, preserve_keys: true), $columnas, $separador);
+    }
+
+    /**
+     * El archivo como texto UTF-8 sin BOM. El panel ya avisa antes de enviar un
+     * CSV que no es UTF-8, pero la API también la usan otros clientes.
+     *
+     * @throws HttpExcepcion 400 si no es UTF-8
+     */
+    private static function textoUtf8(string $csv): string
+    {
         // El BOM lo añade Excel al guardar en "CSV UTF-8": no forma parte de la primera columna
         if (str_starts_with($csv, "\xEF\xBB\xBF")) {
             $csv = substr($csv, 3);
         }
         if (!mb_check_encoding($csv, 'UTF-8')) {
-            throw HttpExcepcion::peticionIncorrecta('El archivo debe estar en UTF-8');
+            throw HttpExcepcion::peticionIncorrecta('El archivo debe estar en UTF-8', [
+                'archivo' => 'Guárdalo como «CSV UTF-8 (delimitado por comas)» en Excel',
+            ]);
         }
+        return $csv;
+    }
 
-        $lineas = preg_split('/\r\n|\n|\r/', $csv);
-        $cabecera = $lineas[0];
+    /** Excel en español guarda los CSV con punto y coma (la coma es el separador decimal) */
+    private static function separador(string $cabecera): string
+    {
+        return substr_count($cabecera, ';') > substr_count($cabecera, ',') ? ';' : ',';
+    }
 
-        // Excel en español guarda los CSV con punto y coma (la coma es el separador decimal)
-        $separador = substr_count($cabecera, ';') > substr_count($cabecera, ',') ? ';' : ',';
+    /**
+     * Nombres de las columnas de la cabecera, en minúsculas y en su orden.
+     *
+     * @return list<string>
+     * @throws HttpExcepcion 400 si falta alguna columna o hay alguna repetida
+     */
+    private static function columnas(string $cabecera, string $separador): array
+    {
         $columnas = array_map(static fn (?string $c): string => strtolower(trim((string) $c)), str_getcsv($cabecera, $separador, '"', ''));
 
         $faltan = array_diff(self::COLUMNAS, $columnas);
@@ -293,11 +496,22 @@ final class AlbaranServicio
                     . ($faltan === [] ? ' (sin columnas repetidas)' : '. Faltan: ' . implode(', ', $faltan)),
             ]);
         }
+        return $columnas;
+    }
 
+    /**
+     * Las filas de datos, cada una validada por separado.
+     *
+     * @param array<int, string> $lineas líneas tras la cabecera, con su índice del archivo
+     * @return array{0: list<array>, 1: array<string, string>} filas y errores
+     * @throws HttpExcepcion 400 si no hay filas o hay demasiadas
+     */
+    private function leerFilas(array $lineas, array $columnas, string $separador): array
+    {
         $filas = [];
         $errores = [];
         $leidas = 0;
-        foreach (array_slice($lineas, 1, preserve_keys: true) as $indice => $linea) {
+        foreach ($lineas as $indice => $linea) {
             if (trim($linea) === '') {
                 continue;   // líneas en blanco (ej. la del final del archivo)
             }

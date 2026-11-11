@@ -18,6 +18,22 @@ namespace App\Nucleo;
  */
 final class Validador
 {
+    /**
+     * Mayor valor de una columna INTEGER de PostgreSQL. Un id más grande no
+     * puede existir y, si llegara a la consulta, PostgreSQL respondería con un
+     * error 22003 (fuera de rango) que acabaría en un 500.
+     */
+    public const ID_MAXIMO = 2_147_483_647;
+
+    /** Los ids de la auditoría (y de los informes guardados en ella) son BIGINT */
+    public const ID_MAXIMO_BIGINT = PHP_INT_MAX;
+
+    /** Longitud máxima de ?buscar en todos los listados */
+    public const BUSQUEDA_MAXIMO = 60;
+    public const MENSAJE_BUSQUEDA = 'Texto de hasta 60 caracteres';
+
+    public const MENSAJE_TALLA = 'Talla entre 34 y 50 (admite medias tallas, ej. 42.5)';
+
     /** @var array<string, string> campo => motivo */
     private array $errores = [];
 
@@ -138,6 +154,56 @@ final class Validador
             throw HttpExcepcion::peticionIncorrecta('Hay datos no válidos', $this->errores);
         }
         return $this->limpios;
+    }
+
+    // =========================================================================
+    // Valores sueltos de la URL (parámetros de ruta y filtros de los listados).
+    // No van encadenados: cada servicio decide el mensaje y si el error es un
+    // 400 (filtro mal escrito) o un 404 (esa ruta no puede existir).
+    // =========================================================================
+
+    /**
+     * Identificador positivo dentro del rango de la columna, o null. Rechaza
+     * true y los arrays (?categoria[]=1), que filter_var convertiría o dejaría pasar.
+     */
+    public static function id(mixed $valor, int $maximo = self::ID_MAXIMO): ?int
+    {
+        if (is_bool($valor) || !is_scalar($valor)) {
+            return null;
+        }
+        $entero = filter_var($valor, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => $maximo]]);
+        return $entero === false ? null : $entero;
+    }
+
+    /**
+     * El {id} de la ruta: si no es un entero positivo en rango, ese recurso no
+     * puede existir y se responde 404 sin consultar la BD.
+     *
+     * @throws HttpExcepcion 404 con el mensaje de cada recurso
+     */
+    public static function idRuta(string $id, string $noEncontrado, int $maximo = self::ID_MAXIMO): int
+    {
+        return self::id($id, $maximo) ?? throw HttpExcepcion::noEncontrado($noEncontrado);
+    }
+
+    /** Texto de ?buscar sin espacios a los lados, o null si no es un texto de hasta 60 caracteres */
+    public static function busqueda(mixed $valor): ?string
+    {
+        return is_string($valor) && mb_strlen(trim($valor)) <= self::BUSQUEDA_MAXIMO ? trim($valor) : null;
+    }
+
+    /**
+     * Talla válida (34 a 50, enteras o medias) o null. Admite 42.5 o "42.5";
+     * rechaza true, un array o 42.3.
+     */
+    public static function talla(mixed $valor): ?float
+    {
+        if (is_bool($valor) || !is_scalar($valor)) {
+            return null;
+        }
+        $talla = filter_var($valor, FILTER_VALIDATE_FLOAT);
+        $valida = $talla !== false && $talla >= 34 && $talla <= 50 && fmod($talla * 2, 1.0) === 0.0;
+        return $valida ? (float) $talla : null;
     }
 
     /** Lee un campo como texto. Un array o un objeto donde se espera texto es un error */

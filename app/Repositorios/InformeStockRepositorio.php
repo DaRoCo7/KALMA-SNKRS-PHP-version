@@ -32,10 +32,11 @@ final class InformeStockRepositorio
     public const ENTIDAD = 'informe_stock';
 
     /**
-     * Solo lo que se vende hoy: producto y talla activos y ya lanzado. Un
-     * lanzamiento anunciado no tiene stock que reponer ni ventas que esperar.
+     * Solo lo que se vende hoy (producto activo y ya lanzado), la misma condición
+     * que el catálogo. Un lanzamiento anunciado no tiene stock que reponer ni
+     * ventas que esperar. Que la talla esté activa lo añade cada consulta.
      */
-    private const A_LA_VENTA = 'p.activo AND (p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)';
+    private const A_LA_VENTA = ProductoRepositorio::A_LA_VENTA;
 
     // =========================================================================
     // Cálculo de los informes
