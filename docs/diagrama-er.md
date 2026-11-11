@@ -1,6 +1,6 @@
 # Diagrama entidad/relación · KALMA SNKRS
 
-Modelo de datos de [`database/schema.sql`](../database/schema.sql): PostgreSQL 17 con 16 tablas.
+Modelo de datos de [`database/schema.sql`](../database/schema.sql): PostgreSQL 17 con 17 tablas.
 
 ```mermaid
 erDiagram
@@ -53,9 +53,6 @@ erDiagram
     clientes {
         int id PK
         int usuario_id FK, UK "1 a 1 con usuarios"
-        varchar tipo_cliente "particular, club o equipo"
-        varchar razon_social "obligatoria si es club o equipo"
-        varchar nif UK
         varchar telefono
         varchar direccion
         varchar codigo_postal
@@ -88,7 +85,7 @@ erDiagram
         varchar slug UK
         text descripcion
         numeric precio
-        bool personalizable
+        bool personalizable "admite bordado"
         varchar imagen
         bool activo
         timestamptz fecha_creacion
@@ -106,10 +103,12 @@ erDiagram
     }
     opciones_personalizacion {
         int id PK
-        varchar tipo "suela, cordones, texto, dorsal, logo"
+        varchar tipo "packaging, bordado, cordones, certificado"
         varchar nombre "único junto con tipo"
-        bool requiere_texto
-        numeric recargo
+        varchar descripcion
+        bool afecta_zapatilla "solo en productos personalizables"
+        smallint max_caracteres "NULL si no lleva texto"
+        numeric recargo "por par"
         bool activo
     }
     pedidos {
@@ -134,14 +133,14 @@ erDiagram
         varchar color "copia del colorway"
         int cantidad "de 1 a 20"
         numeric precio_unitario "precio aplicado"
-        numeric recargo_personalizacion
-        numeric importe "columna generada"
+        numeric recargo_personalizacion "por par"
+        numeric importe "generada: cantidad x (precio + recargo)"
     }
     linea_personalizacion {
         int id PK
         int linea_id FK
         int opcion_id FK "única dentro de la línea"
-        varchar texto "nombre o dorsal"
+        varchar texto "el nombre bordado"
         numeric recargo_aplicado
     }
     historial_estados_pedido {
@@ -184,6 +183,12 @@ erDiagram
         varchar estado "pendiente, respondida, cerrada"
         timestamptz fecha_consulta
     }
+    limites_peticiones {
+        varchar clave PK "hash SHA-256 de ámbito más IP o email"
+        varchar ambito "login:ip, login:email, registro:ip"
+        timestamptz inicio_ventana
+        int contador
+    }
 ```
 
 Leyenda: `||` exactamente uno · `|o` cero o uno · `o{` cero o muchos. La línea continua indica una entidad dependiente (`ON DELETE CASCADE`); la discontinua, una referencia.
@@ -210,33 +215,34 @@ Leyenda: `||` exactamente uno · `|o` cero o uno · `o{` cero o muchos. La líne
 | movimientos_stock → usuarios | N : 0..1 | `movimientos_stock.usuario_id` | SET NULL |
 | auditoria → usuarios | N : 0..1 | `auditoria.usuario_id` | SET NULL |
 
-`consultas` no tiene relaciones: la puede enviar un visitante anónimo.
+`consultas` no tiene relaciones: la puede enviar un visitante anónimo. `limites_peticiones` tampoco: sus claves son hashes, no referencias a otras tablas.
 
 ## Justificación de las tablas
 
 **Usuarios y acceso**
 - **roles**: los perfiles (admin, almacen, cliente) están en una tabla con FK en lugar de un CHECK, así que añadir un rol no obliga a cambiar el esquema. La matriz de permisos está en el middleware PHP.
 - **usuarios**: datos de acceso comunes a clientes y personal. Solo guarda el hash de la contraseña, y el email es único sin distinguir mayúsculas.
-- **clientes**: perfil comercial 1:1 separado del acceso. Solo los clientes tienen NIF y dirección, así el personal interno no deja columnas vacías. Distingue particular, club y equipo.
+- **clientes**: perfil 1:1 separado del acceso. Solo los clientes tienen teléfono y dirección de envío, así el personal interno no deja columnas vacías. KALMA vende a particulares por internet: no hay tipos de cliente ni se pide el DNI (minimización de datos personales).
 
 **Catálogo**
 - **categorias**: agrupa el catálogo (Lifestyle, Air Max, Jordan) para poder filtrar.
 - **marcas**: evita repetir la marca en cada producto y permite que el código de estilo sea único por marca.
 - **colores**: color principal normalizado (nombre y hex) para el filtro por color.
-- **productos**: un modelo en una combinación de colores, como en Nike.com, con su código de estilo real, su precio, su foto y si admite personalización.
+- **productos**: un modelo en una combinación de colores, como en Nike.com, con su código de estilo real, su precio, su foto y si admite bordado (`personalizable`).
 - **variantes**: producto + talla. Es lo que se vende y lo que tiene stock. Su `CHECK (stock >= 0)` es la última defensa contra la sobreventa. Aquí va también la etiqueta RFID de la tienda.
-- **opciones_personalizacion**: catálogo de personalizaciones válidas con su recargo. El servidor valida contra esta tabla en lugar de aceptar texto libre.
+- **opciones_personalizacion**: catálogo de personalizaciones de un producto exclusivo (caja, bordado del nombre, cordones de repuesto y certificado de autenticidad) con su recargo por par. `afecta_zapatilla` marca las que modifican la zapatilla, que solo se permiten en productos personalizables, y `max_caracteres` dice si la opción lleva texto y hasta qué longitud. El servidor valida contra esta tabla.
 
 **Pedidos**
 - **pedidos**: cabecera del pedido: cliente, estado (con CHECK), total y una copia de la dirección de envío del momento de la compra.
 - **lineas_pedido**: detalle del pedido con una copia del nombre, la talla, el color y el precio aplicado. El importe es una columna generada y la misma variante no se repite dentro de un pedido.
-- **linea_personalizacion**: opciones elegidas en cada línea de un pedido personalizado, con el texto (nombre o dorsal) y el recargo que se aplicó.
+- **linea_personalizacion**: opciones elegidas en cada línea, con el texto (el nombre bordado) y el recargo que se aplicó, para que el pedido no cambie si cambia el catálogo de opciones.
 - **historial_estados_pedido**: guarda cada transición de estado (estado anterior y nuevo, quién y cuándo), tal como pide el enunciado.
 - **movimientos_stock**: guarda cada cambio de stock (entrada, venta, cancelación, ajuste) con el stock resultante, para poder reconstruir y auditar el inventario.
 
 **Control**
 - **auditoria**: eventos de negocio con usuario, fecha, tipo, entidad y resultado. El detalle es JSONB y nunca guarda contraseñas ni tokens.
 - **consultas**: formulario de contacto público. No tiene FK porque lo puede enviar un visitante anónimo.
+- **limites_peticiones**: contadores del rate limiting (ej. 5 intentos de login por cuenta cada 15 minutos). Vive en la BD para que el límite lo compartan todos los procesos de Apache y no se pueda esquivar borrando cookies. Guarda hashes en vez de IPs o emails en claro.
 
 ## Códigos de producto: `codigo_marca` no es `rfid_tienda`
 

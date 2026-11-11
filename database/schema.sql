@@ -65,25 +65,19 @@ CREATE TRIGGER trg_usuarios_actualizacion
     BEFORE UPDATE ON usuarios
     FOR EACH ROW EXECUTE FUNCTION fn_tocar_fecha_actualizacion();
 
--- Perfil comercial (1:1 con usuarios). Solo lo tienen los usuarios con rol
--- cliente; el personal de almacén y los admin no necesitan dirección ni NIF.
+-- Perfil del cliente (1:1 con usuarios). Solo lo tienen los usuarios con rol
+-- cliente; el personal de almacén y los admin no necesitan teléfono ni dirección.
+-- KALMA vende a particulares por internet: no pide DNI (no lo necesita para
+-- vender ni para enviar, y no guardarlo es minimizar los datos personales).
 CREATE TABLE clientes (
     id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     usuario_id    INTEGER      NOT NULL UNIQUE
                   REFERENCES usuarios(id) ON DELETE CASCADE,
-    tipo_cliente  VARCHAR(20)  NOT NULL DEFAULT 'particular'
-                  CHECK (tipo_cliente IN ('particular', 'club', 'equipo')),
-    razon_social  VARCHAR(150),            -- nombre del club o equipo
-    nif           VARCHAR(15)  UNIQUE,
     telefono      VARCHAR(20),
     direccion     VARCHAR(200),
     codigo_postal VARCHAR(10)  CHECK (codigo_postal ~ '^[0-9]{5}$'),
     ciudad        VARCHAR(100),
-    provincia     VARCHAR(100),
-
-    -- Un club o equipo tiene que indicar su nombre
-    CONSTRAINT ck_clientes_razon_social
-        CHECK (tipo_cliente = 'particular' OR razon_social IS NOT NULL)
+    provincia     VARCHAR(100)
 );
 
 
@@ -135,8 +129,13 @@ CREATE TABLE productos (
                         CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
     descripcion         TEXT,
     precio              NUMERIC(10,2) NOT NULL CHECK (precio > 0),      -- igual para todas las tallas
+    -- ¿Admite opciones que modifican la zapatilla (bordado)? Las de presentación
+    -- (caja, cordones de repuesto, certificado) valen para cualquier modelo.
     personalizable      BOOLEAN       NOT NULL DEFAULT false,
     imagen              VARCHAR(255),  -- ruta relativa en public/img (pendiente de rediseño en el front)
+    -- Lanzamientos: con fecha futura la zapatilla se anuncia en la portada pero
+    -- todavía no sale en el catálogo ni se puede pedir. NULL = a la venta desde siempre.
+    fecha_lanzamiento   DATE,
     activo              BOOLEAN       NOT NULL DEFAULT true,
     fecha_creacion      TIMESTAMPTZ   NOT NULL DEFAULT now(),
     fecha_actualizacion TIMESTAMPTZ   NOT NULL DEFAULT now(),
@@ -176,16 +175,23 @@ CREATE TRIGGER trg_variantes_actualizacion
     BEFORE UPDATE ON variantes
     FOR EACH ROW EXECUTE FUNCTION fn_tocar_fecha_actualizacion();
 
--- Catálogo de opciones de personalización que se pueden elegir al pedir
--- (color de suela, dorsal, logo del club...). El recargo se suma al precio.
+-- Opciones de personalización de un producto exclusivo. Se eligen por línea de
+-- pedido y el recargo es por par. El servidor valida contra esta tabla: el
+-- cliente solo elige una opción por su id, nunca envía precios ni tipos.
+--   afecta_zapatilla: true si modifica la zapatilla (bordado); solo se permite
+--                     en productos personalizables
+--   max_caracteres:   NULL si la opción no lleva texto; si no, el texto es
+--                     obligatorio y no puede pasar de esa longitud
 CREATE TABLE opciones_personalizacion (
-    id             INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    tipo           VARCHAR(30)   NOT NULL
-                   CHECK (tipo IN ('color_suela', 'color_cordones', 'texto', 'dorsal', 'logo')),
-    nombre         VARCHAR(100)  NOT NULL,
-    requiere_texto BOOLEAN       NOT NULL DEFAULT false,   -- true para texto/dorsal: el cliente escribe un valor
-    recargo        NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (recargo >= 0),
-    activo         BOOLEAN       NOT NULL DEFAULT true,
+    id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tipo             VARCHAR(20)   NOT NULL
+                     CHECK (tipo IN ('packaging', 'bordado', 'cordones', 'certificado')),
+    nombre           VARCHAR(100)  NOT NULL,
+    descripcion      VARCHAR(255),
+    afecta_zapatilla BOOLEAN       NOT NULL DEFAULT false,
+    max_caracteres   SMALLINT      CHECK (max_caracteres BETWEEN 1 AND 30),
+    recargo          NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (recargo >= 0),
+    activo           BOOLEAN       NOT NULL DEFAULT true,
 
     CONSTRAINT uq_opciones_tipo_nombre UNIQUE (tipo, nombre)
 );
@@ -205,8 +211,10 @@ CREATE TABLE pedidos (
     estado              VARCHAR(20)   NOT NULL DEFAULT 'pendiente'
                         CHECK (estado IN ('pendiente', 'confirmado', 'preparacion',
                                           'enviado', 'entregado', 'cancelado')),
+    -- Dato derivado (alguna línea tiene personalización) que se guarda para poder
+    -- filtrar los pedidos personalizados sin recorrer sus líneas
     personalizado       BOOLEAN       NOT NULL DEFAULT false,
-    total               NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
+    total             NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (total >= 0),
     -- Copia de la dirección en el momento de pedir: si el cliente la cambia
     -- después, el pedido mantiene a dónde se envió de verdad.
     direccion_envio     VARCHAR(400)  NOT NULL,
@@ -235,6 +243,7 @@ CREATE TABLE lineas_pedido (
     color                   VARCHAR(100)  NOT NULL,   -- colorway del producto en el momento del pedido
     cantidad                INTEGER       NOT NULL CHECK (cantidad BETWEEN 1 AND 20),
     precio_unitario         NUMERIC(10,2) NOT NULL CHECK (precio_unitario >= 0),
+    -- Suma por par de los recargos de las opciones elegidas en esta línea
     recargo_personalizacion NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (recargo_personalizacion >= 0),
     -- Importe calculado por la propia BD: nunca se desincroniza
     importe                 NUMERIC(10,2) GENERATED ALWAYS AS
@@ -246,13 +255,13 @@ CREATE TABLE lineas_pedido (
 
 CREATE INDEX ix_lineas_variante ON lineas_pedido (variante_id);
 
--- Opciones de personalización elegidas en cada línea. Se copia el recargo
--- que se aplicó, por si el catálogo de opciones cambia más adelante.
+-- Opciones elegidas en cada línea, con el texto (el nombre bordado) y el
+-- recargo que se aplicó: si el catálogo de opciones cambia, el pedido no.
 CREATE TABLE linea_personalizacion (
     id               INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     linea_id         INTEGER       NOT NULL REFERENCES lineas_pedido(id) ON DELETE CASCADE,
     opcion_id        INTEGER       NOT NULL REFERENCES opciones_personalizacion(id),
-    texto            VARCHAR(30),           -- valor libre: nombre o dorsal
+    texto            VARCHAR(30),
     recargo_aplicado NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (recargo_aplicado >= 0),
 
     CONSTRAINT uq_linea_opcion UNIQUE (linea_id, opcion_id)
@@ -322,6 +331,18 @@ CREATE TABLE consultas (
     estado         VARCHAR(20)   NOT NULL DEFAULT 'pendiente'
                    CHECK (estado IN ('pendiente', 'respondida', 'cerrada')),
     fecha_consulta TIMESTAMPTZ   NOT NULL DEFAULT now()
+);
+
+-- Control de frecuencia (rate limiting): cuántos intentos lleva cada clave en
+-- su ventana de tiempo actual (ej. 5 intentos de login por cuenta cada 15 min).
+-- Está en la BD para que el límite lo compartan todos los procesos de Apache y
+-- no se pueda esquivar borrando las cookies. La clave es un hash SHA-256 de
+-- ámbito + IP o email: así esta tabla no guarda datos personales en claro.
+CREATE TABLE limites_peticiones (
+    clave          VARCHAR(64) PRIMARY KEY CHECK (clave ~ '^[0-9a-f]{64}$'),
+    ambito         VARCHAR(30) NOT NULL,          -- ej. login:ip, login:email, registro:ip
+    inicio_ventana TIMESTAMPTZ NOT NULL DEFAULT now(),
+    contador       INTEGER     NOT NULL DEFAULT 1 CHECK (contador > 0)
 );
 
 COMMIT;

@@ -3,7 +3,8 @@
 --
 -- compose.yaml lo monta como /docker-entrypoint-initdb.d/04_pedidos.sql
 --
--- 24 pedidos ficticios en todos los estados, 6 de ellos personalizados.
+-- 24 pedidos ficticios de clientes particulares, en todos los estados,
+-- 7 de ellos personalizados (caja, bordado, cordones o certificado).
 -- A mano solo se escriben los datos de negocio (quién, qué, cuándo y en qué
 -- estado está). Todo lo demás se CALCULA para que sea coherente:
 --   * precio aplicado  -> precio del producto en el catálogo
@@ -38,28 +39,28 @@ CREATE TEMP TABLE semilla_pedidos (
 
 INSERT INTO semilla_pedidos VALUES
     ('SF-2026-000001', 'paula.romero@correo.test',     'entregado',   '2026-07-03 11:20+02', NULL, NULL, NULL, NULL),
-    ('SF-2026-000002', 'cd.lasencinas@correo.test',    'entregado',   '2026-07-08 10:05+02', NULL, NULL, NULL, 'Entregar en la secretaría del club, de 9:00 a 14:00'),
+    ('SF-2026-000002', 'andres.lozano@correo.test',    'entregado',   '2026-07-08 10:05+02', NULL, NULL, NULL, 'Entregar por la mañana, de 9:00 a 14:00'),
     ('SF-2026-000003', 'javier.ortega@correo.test',    'entregado',   '2026-07-15 18:40+02', NULL, NULL, NULL, NULL),
     ('SF-2026-000004', 'cliente@kalma.test',           'entregado',   '2026-07-22 20:10+02', NULL, NULL, NULL, 'Es un regalo: no incluir la factura en la caja'),
     ('SF-2026-000005', 'irene.castro@correo.test',     'entregado',   '2026-08-04 09:30+02', NULL, NULL, NULL, NULL),
     ('SF-2026-000006', 'daniel.vidal@correo.test',     'cancelado',   '2026-08-12 13:15+02', 'pendiente',  'cliente', 'Cancelado por el cliente: se equivocó de talla', NULL),
-    ('SF-2026-000007', 'urbanrunners.sur@correo.test', 'entregado',   '2026-08-20 17:00+02', NULL, NULL, NULL, 'Equipación para la temporada 2026/27'),
+    ('SF-2026-000007', 'ruben.cano@correo.test',       'entregado',   '2026-08-20 17:00+02', NULL, NULL, NULL, NULL),
     ('SF-2026-000008', 'sara.medina@correo.test',      'entregado',   '2026-09-02 12:45+02', NULL, NULL, NULL, NULL),
     ('SF-2026-000009', 'hugo.serrano@correo.test',     'cancelado',   '2026-09-10 19:20+02', 'confirmado', 'admin',   'Cancelado por administración: el banco rechazó el pago', NULL),
     ('SF-2026-000010', 'marcos.gil@correo.test',       'entregado',   '2026-09-18 16:30+02', NULL, NULL, NULL, NULL),
-    ('SF-2026-000011', 'cb.riberanorte@correo.test',   'enviado',     '2026-10-06 10:00+02', NULL, NULL, NULL, 'Entregar en el pabellón municipal'),
+    ('SF-2026-000011', 'elena.pascual@correo.test',    'enviado',     '2026-10-06 10:00+02', NULL, NULL, NULL, 'Si no estoy, dejar en conserjería'),
     ('SF-2026-000012', 'paula.romero@correo.test',     'enviado',     '2026-10-14 21:05+02', NULL, NULL, NULL, NULL),
     ('SF-2026-000013', 'cliente@kalma.test',           'enviado',     '2026-10-21 18:30+02', NULL, NULL, NULL, NULL),
-    ('SF-2026-000014', 'asfalto.crew@correo.test',     'enviado',     '2026-10-27 12:00+01', NULL, NULL, NULL, NULL),
+    ('SF-2026-000014', 'nerea.blanco@correo.test',     'enviado',     '2026-10-27 12:00+01', NULL, NULL, NULL, NULL),
     ('SF-2026-000015', 'javier.ortega@correo.test',    'preparacion', '2026-11-03 09:40+01', NULL, NULL, NULL, NULL),
     ('SF-2026-000016', 'daniel.vidal@correo.test',     'preparacion', '2026-11-04 17:25+01', NULL, NULL, NULL, 'Dos pares iguales: uno es para mi hermano'),
-    ('SF-2026-000017', 'cd.lasencinas@correo.test',    'preparacion', '2026-11-05 11:10+01', NULL, NULL, NULL, 'Par para el capitán del primer equipo'),
+    ('SF-2026-000017', 'andres.lozano@correo.test',    'preparacion', '2026-11-05 11:10+01', NULL, NULL, NULL, 'Envolver para regalo'),
     ('SF-2026-000018', 'irene.castro@correo.test',     'confirmado',  '2026-11-06 20:50+01', NULL, NULL, NULL, NULL),
     ('SF-2026-000019', 'hugo.serrano@correo.test',     'confirmado',  '2026-11-07 13:35+01', NULL, NULL, NULL, NULL),
     ('SF-2026-000020', 'sara.medina@correo.test',      'cancelado',   '2026-11-07 18:00+01', 'confirmado', 'cliente', 'Cancelado por la clienta: ya no la necesita', NULL),
     ('SF-2026-000021', 'cliente@kalma.test',           'pendiente',   '2026-11-08 19:15+01', NULL, NULL, NULL, NULL),
     ('SF-2026-000022', 'marcos.gil@correo.test',       'pendiente',   '2026-11-08 22:40+01', NULL, NULL, NULL, NULL),
-    ('SF-2026-000023', 'urbanrunners.sur@correo.test', 'pendiente',   '2026-11-09 10:20+01', NULL, NULL, NULL, 'Para el cuerpo técnico'),
+    ('SF-2026-000023', 'ruben.cano@correo.test',       'pendiente',   '2026-11-09 10:20+01', NULL, NULL, NULL, NULL),
     ('SF-2026-000024', 'paula.romero@correo.test',     'cancelado',   '2026-11-09 12:05+01', 'pendiente',  'cliente', 'Cancelado por la clienta: pedido duplicado', NULL);
 
 -- Líneas: qué zapatilla (código Nike), qué talla y cuántos pares
@@ -72,30 +73,24 @@ CREATE TEMP TABLE semilla_lineas (
 
 INSERT INTO semilla_lineas VALUES
     ('SF-2026-000001', 'CW2288-111', 39,   1),
-    ('SF-2026-000002', 'CW2288-111', 41,   2),
-    ('SF-2026-000002', 'CW2288-111', 42,   3),
-    ('SF-2026-000002', 'CW2288-111', 43,   2),
+    ('SF-2026-000002', 'CW2288-111', 42,   1),
+    ('SF-2026-000002', 'DD1391-100', 42,   1),
     ('SF-2026-000003', 'CT1685-100', 42,   1),
     ('SF-2026-000003', 'DM4044-108', 42,   1),
     ('SF-2026-000004', 'DD1391-100', 39,   1),
     ('SF-2026-000005', 'BQ6806-100', 40,   1),
     ('SF-2026-000006', 'DH6927-111', 43,   1),
-    ('SF-2026-000007', 'DM4044-108', 40,   2),
-    ('SF-2026-000007', 'DM4044-108', 41,   3),
-    ('SF-2026-000007', 'DM4044-108', 42,   3),
-    ('SF-2026-000007', 'DM4044-108', 43,   2),
+    ('SF-2026-000007', 'DM4044-108', 42,   1),
     ('SF-2026-000008', 'CW2288-001', 40,   1),
     ('SF-2026-000008', 'DD1391-103', 40,   1),
     ('SF-2026-000009', 'DM0028-002', 44,   1),
     ('SF-2026-000010', 'DZ5485-612', 43,   1),
-    ('SF-2026-000011', 'CW2288-001', 42,   2),
-    ('SF-2026-000011', 'CW2288-001', 43,   3),
-    ('SF-2026-000011', 'CW2288-001', 44,   2),
+    ('SF-2026-000011', 'CW2288-001', 39,   1),
+    ('SF-2026-000011', 'DQ3989-100', 39,   1),
     ('SF-2026-000012', 'DQ3989-100', 39,   1),
     ('SF-2026-000013', 'DN3707-100', 40.5, 1),
-    ('SF-2026-000014', 'DD1391-100', 41,   1),
-    ('SF-2026-000014', 'DD1391-100', 42,   2),
-    ('SF-2026-000014', 'DD1391-100', 43,   1),
+    ('SF-2026-000014', 'DD1391-100', 39,   1),
+    ('SF-2026-000014', 'DD1391-103', 39,   1),
     ('SF-2026-000015', 'CW2288-111', 44,   1),
     ('SF-2026-000015', 'BQ6806-100', 44,   1),
     ('SF-2026-000016', 'CT1685-100', 43,   2),
@@ -109,27 +104,32 @@ INSERT INTO semilla_lineas VALUES
     ('SF-2026-000023', 'DH6927-111', 42,   1),
     ('SF-2026-000024', 'CW2288-001', 39,   1);
 
--- Personalizaciones. Se aplican a TODAS las líneas del pedido (un club quiere
--- el mismo escudo en todos los pares). El recargo de la opción es por par.
+-- Personalizaciones: qué opción lleva cada línea (pedido + zapatilla). El
+-- recargo de la opción es por par. Hay casos preparados para la defensa:
+--   * Unas Jordan con caja de coleccionista y certificado (SF-2026-000010): se
+--     permite porque no tocan la zapatilla; el bordado no se permitiría.
+--   * SF-2026-000021 (cliente@kalma.test, pendiente) lleva bordado: al
+--     cancelarlo en la demo se ve que el stock se repone igual.
 CREATE TEMP TABLE semilla_personalizacion (
     codigo_pedido VARCHAR(20)  NOT NULL,
-    tipo          VARCHAR(30)  NOT NULL,
+    codigo_marca  VARCHAR(10)  NOT NULL,
     opcion        VARCHAR(100) NOT NULL,
     texto         VARCHAR(30)
 ) ON COMMIT DROP;
 
 INSERT INTO semilla_personalizacion VALUES
-    ('SF-2026-000002', 'logo',           'Escudo del club o equipo en el lateral', NULL),
-    ('SF-2026-000002', 'color_cordones', 'Cordones con los colores del club',      NULL),
-    ('SF-2026-000004', 'texto',          'Nombre bordado en el talón',             'LUCÍA'),
-    ('SF-2026-000007', 'logo',           'Escudo del club o equipo en el lateral', NULL),
-    ('SF-2026-000007', 'color_cordones', 'Cordones rojos',                         NULL),
-    ('SF-2026-000011', 'logo',           'Escudo del club o equipo en el lateral', NULL),
-    ('SF-2026-000011', 'color_suela',    'Suela de goma natural',                  NULL),
-    ('SF-2026-000014', 'color_suela',    'Suela de goma natural',                  NULL),
-    ('SF-2026-000014', 'texto',          'Nombre bordado en el talón',             'ASFALTO CREW'),
-    ('SF-2026-000017', 'dorsal',         'Dorsal en la lengüeta',                  '10'),
-    ('SF-2026-000017', 'logo',           'Escudo del club o equipo en el lateral', NULL);
+    ('SF-2026-000002', 'CW2288-111', 'Caja de coleccionista',        NULL),
+    ('SF-2026-000002', 'DD1391-100', 'Cordones de repuesto rojos',   NULL),
+    ('SF-2026-000004', 'DD1391-100', 'Nombre bordado en el talón',   'LUCÍA'),
+    ('SF-2026-000004', 'DD1391-100', 'Caja edición KALMA',           NULL),
+    ('SF-2026-000010', 'DZ5485-612', 'Caja de coleccionista',        NULL),
+    ('SF-2026-000010', 'DZ5485-612', 'Certificado de autenticidad',  NULL),
+    ('SF-2026-000013', 'DN3707-100', 'Certificado de autenticidad',  NULL),
+    ('SF-2026-000014', 'DD1391-103', 'Cordones de repuesto blancos', NULL),
+    ('SF-2026-000017', 'BQ6806-100', 'Caja edición KALMA',           NULL),
+    ('SF-2026-000017', 'BQ6806-100', 'Nombre bordado en el talón',   'ALEX'),
+    ('SF-2026-000021', 'CW2288-111', 'Nombre bordado en el talón',   'LUCÍA'),
+    ('SF-2026-000021', 'CW2288-111', 'Cordones de repuesto negros',  NULL);
 
 -- Recorrido normal de un pedido y cuánto tarda cada paso desde que se crea
 CREATE TEMP TABLE flujo_estados (estado, paso, desfase) ON COMMIT DROP AS
@@ -176,12 +176,15 @@ JOIN productos pr ON pr.codigo_marca = sl.codigo_marca
 JOIN variantes v  ON v.producto_id = pr.id AND v.talla = sl.talla
 ORDER BY p.id, pr.id, v.talla;
 
+-- Cada opción se copia con el recargo que tiene hoy en el catálogo
 INSERT INTO linea_personalizacion (linea_id, opcion_id, texto, recargo_aplicado)
 SELECT l.id, o.id, sp.texto, o.recargo
 FROM semilla_personalizacion sp
-JOIN pedidos p       ON p.codigo = sp.codigo_pedido
-JOIN lineas_pedido l ON l.pedido_id = p.id
-JOIN opciones_personalizacion o ON o.tipo = sp.tipo AND o.nombre = sp.opcion
+JOIN pedidos p                  ON p.codigo = sp.codigo_pedido
+JOIN productos pr               ON pr.codigo_marca = sp.codigo_marca
+JOIN variantes v                ON v.producto_id = pr.id
+JOIN lineas_pedido l            ON l.pedido_id = p.id AND l.variante_id = v.id
+JOIN opciones_personalizacion o ON o.nombre = sp.opcion
 ORDER BY l.id, o.id;
 
 -- Recargo por par de cada línea = suma de los recargos de sus opciones
@@ -333,11 +336,36 @@ BEGIN
     IF (SELECT count(*) FROM lineas_pedido) <> (SELECT count(*) FROM semilla_lineas) THEN
         RAISE EXCEPTION 'Faltan líneas: algún código de marca o talla no existe en el catálogo';
     END IF;
-    IF (SELECT count(*) FROM linea_personalizacion) <>
-       (SELECT count(*) FROM semilla_personalizacion sp
-        JOIN pedidos p       ON p.codigo = sp.codigo_pedido
-        JOIN lineas_pedido l ON l.pedido_id = p.id) THEN
-        RAISE EXCEPTION 'Faltan personalizaciones: alguna opción no existe';
+    IF (SELECT count(*) FROM linea_personalizacion) <> (SELECT count(*) FROM semilla_personalizacion) THEN
+        RAISE EXCEPTION 'Faltan personalizaciones: alguna opción o línea no existe';
+    END IF;
+
+    -- Las mismas reglas que aplica PHP al crear un pedido: opción activa, el
+    -- bordado solo en productos personalizables, texto solo (y siempre) en las
+    -- opciones que lo llevan y sin pasar de su longitud, y una opción por tipo
+    IF EXISTS (SELECT 1 FROM linea_personalizacion lp
+               JOIN lineas_pedido l            ON l.id = lp.linea_id
+               JOIN variantes v                ON v.id = l.variante_id
+               JOIN productos pr               ON pr.id = v.producto_id
+               JOIN opciones_personalizacion o ON o.id = lp.opcion_id
+               WHERE NOT o.activo
+                  OR (o.afecta_zapatilla AND NOT pr.personalizable)
+                  OR (o.max_caracteres IS NULL) <> (lp.texto IS NULL)
+                  OR char_length(lp.texto) > o.max_caracteres) THEN
+        RAISE EXCEPTION 'Hay personalizaciones que no cumplen las reglas';
+    END IF;
+    IF EXISTS (SELECT 1 FROM linea_personalizacion lp
+               JOIN opciones_personalizacion o ON o.id = lp.opcion_id
+               GROUP BY lp.linea_id, o.tipo HAVING count(*) > 1) THEN
+        RAISE EXCEPTION 'Alguna línea tiene dos opciones del mismo tipo';
+    END IF;
+
+    -- personalizado = el pedido tiene alguna opción elegida
+    IF EXISTS (SELECT 1 FROM pedidos p
+               WHERE p.personalizado <> EXISTS (SELECT 1 FROM linea_personalizacion lp
+                                                JOIN lineas_pedido l ON l.id = lp.linea_id
+                                                WHERE l.pedido_id = p.id)) THEN
+        RAISE EXCEPTION 'La marca de pedido personalizado no coincide con sus líneas';
     END IF;
 
     -- El total de cada pedido es la suma de sus líneas
@@ -361,30 +389,10 @@ BEGIN
         RAISE EXCEPTION 'El stock de alguna talla no cuadra con sus movimientos';
     END IF;
 
-    -- personalizado = el pedido tiene alguna opción elegida
-    IF EXISTS (SELECT 1 FROM pedidos p
-               WHERE p.personalizado <> EXISTS (SELECT 1 FROM linea_personalizacion lp
-                                                JOIN lineas_pedido l ON l.id = lp.linea_id
-                                                WHERE l.pedido_id = p.id)) THEN
-        RAISE EXCEPTION 'La marca de pedido personalizado no coincide con sus líneas';
-    END IF;
-
-    -- Solo se personalizan productos personalizables, con opciones activas
-    -- y con texto cuando la opción lo exige
-    IF EXISTS (SELECT 1 FROM linea_personalizacion lp
-               JOIN lineas_pedido l            ON l.id = lp.linea_id
-               JOIN variantes v                ON v.id = l.variante_id
-               JOIN productos pr               ON pr.id = v.producto_id
-               JOIN opciones_personalizacion o ON o.id = lp.opcion_id
-               WHERE NOT pr.personalizable
-                  OR NOT o.activo
-                  OR (o.requiere_texto AND lp.texto IS NULL)) THEN
-        RAISE EXCEPTION 'Hay personalizaciones no válidas';
-    END IF;
-
-    -- Mínimos del enunciado: 10 clientes, 20 pedidos y 5 personalizados
+    -- Mínimos del enunciado: 10 clientes, 20 pedidos en varios estados y 5 personalizados
     IF (SELECT count(*) FROM clientes) < 10
        OR (SELECT count(*) FROM pedidos) < 20
+       OR (SELECT count(DISTINCT estado) FROM pedidos) < 4
        OR (SELECT count(*) FROM pedidos WHERE personalizado) < 5 THEN
         RAISE EXCEPTION 'La semilla no cumple los mínimos del enunciado';
     END IF;

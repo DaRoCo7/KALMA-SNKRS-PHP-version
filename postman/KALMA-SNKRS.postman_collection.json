@@ -1,0 +1,3360 @@
+{
+  "info": {
+    "name": "KALMA SNKRS API",
+    "description": "Pruebas de la API de KALMA SNKRS (Sneaker Factory).\n\nUso: importar esta colección y el entorno `KALMA-SNKRS.postman_environment.json`, seleccionar el entorno y ejecutar la colección completa (Run collection). Las peticiones están ordenadas: cada carpeta deja la sesión preparada para la siguiente.\n\n- Las respuestas correctas tienen la forma `{\"datos\": ...}` y los errores `{\"error\": {\"codigo\", \"mensaje\", \"detalles\"}}`.\n- Las peticiones que modifican datos necesitan la cabecera `X-CSRF-Token`: el script de la colección la obtiene sola de `GET /api/sesion`.\n- Postman guarda la cookie de sesión `KALMA_SESION` automáticamente.\n- Usuarios de prueba (contraseña `Kalma2026!`): admin@kalma.test, almacen@kalma.test, cliente@kalma.test.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Protección CSRF: las peticiones que modifican datos llevan el token de la sesión actual.",
+          "// Si la petición ya trae la cabecera (por ejemplo, una prueba con un token falso), se respeta.",
+          "const metodosSeguros = ['GET', 'HEAD', 'OPTIONS'];",
+          "if (!metodosSeguros.includes(pm.request.method) && !pm.request.headers.has('X-CSRF-Token')) {",
+          "    pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/sesion'), (error, respuesta) => {",
+          "        if (!error) {",
+          "            pm.request.headers.upsert({ key: 'X-CSRF-Token', value: respuesta.json().datos.csrf_token });",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Sistema",
+      "item": [
+        {
+          "name": "Estado del servicio (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "description": "GET /health · Público. Contrato con Despliegue: 200 si la app y la base de datos están disponibles, 503 si la base de datos no responde."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('App y base de datos disponibles', () => {",
+            "    const cuerpo = pm.response.json();",
+            "    pm.expect(cuerpo.app).to.eql('disponible');",
+            "    pm.expect(cuerpo.base_datos).to.eql('disponible');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Inicio de la API (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api", "description": "GET /api · Público. Punto de entrada de la API." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Responde en JSON', () => pm.response.to.have.header('Content-Type', 'application/json; charset=utf-8'));",
+            "pm.test('Nombre de la API', () => pm.expect(pm.response.json().datos.api).to.eql('KALMA SNKRS'));"
+          ] } }]
+        },
+        {
+          "name": "Ruta inexistente (404 en JSON)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/no-existe", "description": "Los errores de /api siempre se devuelven en JSON." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+            "pm.test('Error en formato JSON', () => pm.expect(pm.response.json().error.codigo).to.eql(404));"
+          ] } }]
+        },
+        {
+          "name": "Método no permitido (405)",
+          "request": { "method": "DELETE", "url": "{{base_url}}/api", "description": "La ruta existe pero solo con GET: 405 con la cabecera Allow." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('405 Method Not Allowed', () => pm.response.to.have.status(405));",
+            "pm.test('Cabecera Allow: GET', () => pm.response.to.have.header('Allow', 'GET'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "2. Registro y sesión",
+      "item": [
+        {
+          "name": "Sesión anónima (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/sesion", "description": "GET /api/sesion · Público. Indica si hay sesión y devuelve el token CSRF." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const datos = pm.response.json().datos;",
+            "pm.test('Sin sesión iniciada', () => pm.expect(datos.autenticado).to.be.false);",
+            "pm.test('Token CSRF de 64 caracteres', () => pm.expect(datos.csrf_token).to.match(/^[0-9a-f]{64}$/));"
+          ] } }]
+        },
+        {
+          "name": "Registro con datos no válidos (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/registro",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"\",\n  \"apellidos\": \"Prueba\",\n  \"email\": \"no-es-un-email\",\n  \"password\": \"corta\",\n  \"codigo_postal\": \"2800\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/registro · La validación del servidor devuelve todos los errores a la vez."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "const errores = pm.response.json().error.detalles.errores;",
+            "pm.test('Errores de cada campo', () => {",
+            "    pm.expect(errores).to.have.keys('nombre', 'email', 'password', 'codigo_postal');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Registro de cliente (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/registro",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carla\",\n  \"apellidos\": \"Prueba Postman\",\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Zapas2026\",\n  \"telefono\": \"600 000 999\",\n  \"codigo_postal\": \"28001\",\n  \"ciudad\": \"Madrid\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/registro · Público (limitado por IP). Crea la cuenta y el perfil de cliente en una transacción e inicia la sesión."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// Email distinto en cada ejecución para poder repetir la colección",
+              "pm.collectionVariables.set('email_nuevo', `cliente.${Date.now()}@correo.test`);"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('Cabecera Location', () => pm.response.to.have.header('Location'));",
+              "const usuario = pm.response.json().datos.usuario;",
+              "pm.test('Cuenta con rol cliente', () => pm.expect(usuario.rol).to.eql('cliente'));",
+              "pm.test('Nunca devuelve la contraseña', () => pm.expect(usuario).to.not.have.any.keys('password', 'password_hash'));"
+            ] } }
+          ]
+        },
+        {
+          "name": "Registro con email repetido (409)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/registro",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Carla\",\n  \"apellidos\": \"Duplicada\",\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Zapas2026\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "El email es único (sin distinguir mayúsculas): 409 Conflict."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }]
+        },
+        {
+          "name": "Cliente pide la lista de usuarios (403)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios", "description": "Un cliente no tiene el permiso usuarios.gestionar: 403 y queda en auditoría." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+          ] } }]
+        },
+        {
+          "name": "Cerrar sesión (204)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/logout", "description": "POST /api/logout · Requiere sesión." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ] } }]
+        },
+        {
+          "name": "Sin sesión (401)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios", "description": "Ruta interna sin sesión iniciada: 401." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }]
+        },
+        {
+          "name": "Login con contraseña incorrecta (401)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email_nuevo}}\",\n  \"password\": \"Incorrecta1\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Cuenta recién registrada con contraseña incorrecta (así el contador de intentos de la cuenta empieza de cero en cada ejecución). El mensaje es el mismo exista o no el email, para no revelar qué cuentas hay."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+            "pm.test('Mensaje genérico', () => pm.expect(pm.response.json().error.mensaje).to.eql('Email o contraseña incorrectos'));"
+          ] } }]
+        },
+        {
+          "name": "Login de administración (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/login · Público (limitado por IP y por cuenta). Devuelve el usuario y un token CSRF nuevo."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Rol admin', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('admin'));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "3. Usuarios (administración)",
+      "item": [
+        {
+          "name": "Listado paginado (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios?pagina=1&por_pagina=5", "description": "GET /api/usuarios · Permiso usuarios.gestionar (admin). Parámetros: pagina, por_pagina (máx. 50), rol." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const cuerpo = pm.response.json();",
+            "pm.test('Como mucho 5 usuarios', () => pm.expect(cuerpo.datos.length).to.be.at.most(5));",
+            "pm.test('Datos de paginación', () => pm.expect(cuerpo.paginacion).to.have.keys('pagina', 'por_pagina', 'total', 'paginas'));",
+            "pm.test('Sin hashes de contraseña', () => cuerpo.datos.forEach(u => pm.expect(u).to.not.have.property('password_hash')));"
+          ] } }]
+        },
+        {
+          "name": "Filtro por rol (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios?rol=almacen" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Solo personal de almacén', () => pm.response.json().datos.forEach(u => pm.expect(u.rol).to.eql('almacen')));"
+          ] } }]
+        },
+        {
+          "name": "Paginación no válida (400)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/usuarios?por_pagina=500", "description": "por_pagina tiene un máximo de 50." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "4. Catálogo",
+      "item": [
+        {
+          "name": "Listado paginado (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?pagina=1&por_pagina=4", "description": "GET /api/productos · Público. Parámetros: buscar, categoria, color, talla, precio_min, precio_max, personalizable, disponible, orden (novedades, precio_asc, precio_desc, nombre), pagina, por_pagina." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const cuerpo = pm.response.json();",
+            "pm.test('4 productos en la página', () => pm.expect(cuerpo.datos).to.have.lengthOf(4));",
+            "pm.test('Al menos 8 productos en total', () => pm.expect(cuerpo.paginacion.total).to.be.at.least(8));",
+            "pm.test('Precio, foto, color, tallas y stock', () => {",
+            "    pm.expect(cuerpo.datos[0]).to.include.keys('precio', 'imagen', 'color', 'tallas_disponibles', 'stock_total');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Filtros combinados: categoría y orden (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?categoria=3&orden=precio_desc" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const productos = pm.response.json().datos;",
+            "pm.test('Solo la categoría 3 (Jordan)', () => productos.forEach(p => pm.expect(p.categoria.id).to.eql(3)));",
+            "pm.test('Ordenados de mayor a menor precio', () => {",
+            "    for (let i = 1; i < productos.length; i++) pm.expect(productos[i - 1].precio).to.be.at.least(productos[i].precio);",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Búsqueda por texto y talla (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?buscar=dunk&talla=40" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.response.json().datos.forEach(p => {",
+            "    pm.test(`${p.codigo_marca}: es una Dunk con la talla 40`, () => {",
+            "        pm.expect(p.nombre).to.include('Dunk');",
+            "        pm.expect(p.tallas_disponibles).to.include(40);",
+            "    });",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Ficha de producto (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111", "description": "GET /api/productos/{slug} · Público. Tallas con su variante_id y su stock, otros colores del mismo modelo y las opciones de personalización que admite." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const producto = pm.response.json().datos;",
+            "pm.test('Código de estilo de Nike', () => pm.expect(producto.codigo_marca).to.eql('CW2288-111'));",
+            "pm.test('Otro color del mismo modelo (CW2288-001)', () => {",
+            "    pm.expect(producto.otros_colores.map(c => c.codigo_marca)).to.include('CW2288-001');",
+            "});",
+            "pm.test('Tallas con stock y su variante_id (lo que se envía al pedir)', () => {",
+            "    pm.expect(producto.tallas[0]).to.have.keys('variante_id', 'talla', 'stock', 'disponible');",
+            "});",
+            "pm.test('Personalizable: ofrece el bordado y las opciones de presentación', () => {",
+            "    pm.expect(producto.personalizable).to.be.true;",
+            "    pm.expect(producto.opciones_personalizacion.map(o => o.tipo)).to.include.members(['bordado', 'packaging', 'cordones', 'certificado']);",
+            "});",
+            "pm.test('La caja de madera está desactivada y no se ofrece', () => {",
+            "    pm.expect(producto.opciones_personalizacion.map(o => o.nombre)).to.not.include('Caja de madera grabada');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Las Jordan no ofrecen bordado (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/air-jordan-4-retro-dh6927-111", "description": "Las Jordan son reediciones de coleccionista: no son personalizables, así que la ficha no ofrece las opciones que modifican la zapatilla (el bordado). La caja, los cordones y el certificado sí." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const producto = pm.response.json().datos;",
+            "pm.test('No personalizable', () => pm.expect(producto.personalizable).to.be.false);",
+            "pm.test('Sin bordado, pero con caja', () => {",
+            "    const tipos = producto.opciones_personalizacion.map(o => o.tipo);",
+            "    pm.expect(tipos).to.not.include('bordado');",
+            "    pm.expect(tipos).to.include('packaging');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Producto inexistente (404)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos/no-existe" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }]
+        },
+        {
+          "name": "Valores para los filtros (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/catalogo/filtros", "description": "GET /api/catalogo/filtros · Público. Categorías, colores, tallas, rango de precios y ordenaciones." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Todos los grupos de filtros', () => {",
+            "    pm.expect(pm.response.json().datos).to.have.keys('categorias', 'colores', 'tallas', 'precio', 'ordenes');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Filtros no válidos (400)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/productos?talla=42.3&precio_min=200&precio_max=100&orden=raro" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "pm.test('Un error por cada filtro mal escrito', () => {",
+            "    pm.expect(pm.response.json().error.detalles.errores).to.have.keys('talla', 'precio_max', 'orden');",
+            "});"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "5. Seguridad",
+      "item": [
+        {
+          "name": "Token CSRF falso (403)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "header": [{ "key": "X-CSRF-Token", "value": "token-falso" }],
+            "description": "Una petición que modifica datos sin el token de la sesión se rechaza."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+            "pm.test('Motivo: CSRF', () => pm.expect(pm.response.json().error.mensaje).to.include('CSRF'));"
+          ] } }]
+        },
+        {
+          "name": "Fuerza bruta: sexto intento bloqueado (429)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email_ataque}}\",\n  \"password\": \"Incorrecta1\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Límite por cuenta: 5 intentos de login cada 15 minutos. El script previo hace 5 intentos fallidos contra un email inventado y esta petición (la sexta) recibe 429 con Retry-After."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// 5 intentos fallidos seguidos contra una cuenta inventada (no bloquea cuentas reales)",
+              "const base = pm.variables.replaceIn('{{base_url}}');",
+              "const email = `ataque.${Date.now()}@correo.test`;",
+              "pm.collectionVariables.set('email_ataque', email);",
+              "pm.sendRequest(base + '/api/sesion', (error, respuesta) => {",
+              "    const token = respuesta.json().datos.csrf_token;",
+              "    const intento = (quedan) => {",
+              "        if (quedan === 0) return;",
+              "        pm.sendRequest({",
+              "            url: base + '/api/login',",
+              "            method: 'POST',",
+              "            header: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },",
+              "            body: { mode: 'raw', raw: JSON.stringify({ email, password: 'Incorrecta1' }) }",
+              "        }, () => intento(quedan - 1));",
+              "    };",
+              "    intento(5);",
+              "});"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('429 Too Many Requests', () => pm.response.to.have.status(429));",
+              "pm.test('Cabecera Retry-After', () => pm.response.to.have.header('Retry-After'));"
+            ] } }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de administración (204)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/logout" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "6. Pedidos del cliente",
+      "item": [
+        {
+          "name": "Sin sesión (401)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos", "description": "GET /api/pedidos · Requiere sesión y el permiso pedidos.propios." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+          ] } }]
+        },
+        {
+          "name": "Login de la clienta (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"cliente@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}", "options": { "raw": { "language": "json" } } }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Rol cliente', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('cliente'));"
+          ] } }]
+        },
+        {
+          "name": "Mis pedidos (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos?por_pagina=50", "description": "Solo devuelve los pedidos de la clienta de la sesión. Filtro opcional ?estado=pendiente." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const cuerpo = pm.response.json();",
+            "pm.test('Todos son suyos', () => cuerpo.datos.forEach(p => pm.expect(p.cliente.email).to.eql('cliente@kalma.test')));",
+            "pm.test('Datos de paginación', () => pm.expect(cuerpo.paginacion).to.have.keys('pagina', 'por_pagina', 'total', 'paginas'));"
+          ] } }]
+        },
+        {
+          "name": "Pedido de otro cliente (404, IDOR)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos/SF-2026-000022", "description": "SF-2026-000022 es de otro cliente. Se responde 404 y no 403: así no se confirma que ese código exista." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+          ] } }]
+        },
+        {
+          "name": "Cantidad no válida (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"lineas\": [ { \"variante_id\": 1, \"cantidad\": 0 }, { \"variante_id\": 2, \"cantidad\": 25 } ]\n}", "options": { "raw": { "language": "json" } } },
+            "description": "Cada línea admite de 1 a 20 pares. Los errores llegan por línea para pintarlos junto a cada una."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "pm.test('Un error por cada línea mal escrita', () => {",
+            "    pm.expect(pm.response.json().error.detalles.errores).to.have.keys('lineas.0.cantidad', 'lineas.1.cantidad');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Pedido sin stock suficiente (409)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{{cuerpo_sin_stock}}", "options": { "raw": { "language": "json" } } },
+            "description": "El script previo busca la talla con menos stock y pide una unidad más de las que quedan."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+              "    const talla = respuesta.json().datos.tallas.filter(t => t.stock < 20).sort((a, b) => a.stock - b.stock)[0];",
+              "    pm.collectionVariables.set('cuerpo_sin_stock', JSON.stringify({ lineas: [{ variante_id: talla.variante_id, cantidad: talla.stock + 1 }] }));",
+              "});"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+              "pm.test('Dice qué talla falta y cuánto queda', () => {",
+              "    const falta = pm.response.json().error.detalles.sin_stock[0];",
+              "    pm.expect(falta.solicitado).to.be.above(falta.disponible);",
+              "});"
+            ] } }
+          ]
+        },
+        {
+          "name": "Bordar unas Jordan (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{{cuerpo_jordan_bordado}}", "options": { "raw": { "language": "json" } } },
+            "description": "El bordado modifica la zapatilla y las Jordan no son personalizables. El script previo toma el id del bordado de la ficha de las Air Force 1 y una talla con stock de las Air Jordan 4."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "const base = pm.variables.replaceIn('{{base_url}}');",
+              "pm.sendRequest(base + '/api/productos/nike-air-force-1-07-cw2288-111', (e1, af1) => {",
+              "    const bordado = af1.json().datos.opciones_personalizacion.find(o => o.tipo === 'bordado');",
+              "    pm.sendRequest(base + '/api/productos/air-jordan-4-retro-dh6927-111', (e2, aj4) => {",
+              "        const talla = aj4.json().datos.tallas.find(t => t.stock > 0);",
+              "        pm.collectionVariables.set('cuerpo_jordan_bordado', JSON.stringify({",
+              "            lineas: [{ variante_id: talla.variante_id, cantidad: 1, personalizacion: [{ opcion_id: bordado.id, texto: 'MICHAEL' }] }]",
+              "        }));",
+              "    });",
+              "});"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('El error señala la opción de la línea', () => {",
+              "    pm.expect(pm.response.json().error.detalles.errores['lineas.0.personalizacion.0.opcion_id']).to.include('no admite');",
+              "});"
+            ] } }
+          ]
+        },
+        {
+          "name": "Opción desactivada: caja de madera (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"lineas\": [ { \"variante_id\": 1, \"cantidad\": 1, \"personalizacion\": [ { \"opcion_id\": 3 } ] } ]\n}", "options": { "raw": { "language": "json" } } },
+            "description": "La opción 3 es la «Caja de madera grabada», desactivada en la semilla (activo = false): aunque alguien escriba su id a mano, el servidor la rechaza."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+            "pm.test('Opción no disponible', () => {",
+            "    pm.expect(pm.response.json().error.detalles.errores['lineas.0.personalizacion.0.opcion_id']).to.include('no disponible');",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Crear pedido personalizado con dos líneas (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{{cuerpo_pedido}}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/pedidos · Permiso pedidos.propios. Cuerpo: {direccion_envio?, notas?, lineas: [{variante_id, cantidad, personalizacion?: [{opcion_id, texto?}]}]}. Sin direccion_envio se usa la del perfil. Precio, recargos y total los calcula el servidor (aunque el navegador envíe un precio, se ignora). El script previo toma de la ficha dos tallas con stock, la caja edición KALMA y el bordado."
+          },
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+              "    const ficha = respuesta.json().datos;",
+              "    const tallas = ficha.tallas.filter(t => t.stock >= 2);",
+              "    const caja = ficha.opciones_personalizacion.find(o => o.nombre === 'Caja edición KALMA');",
+              "    const bordado = ficha.opciones_personalizacion.find(o => o.tipo === 'bordado');",
+              "    pm.collectionVariables.set('precio', ficha.precio);",
+              "    pm.collectionVariables.set('recargo_caja', caja.recargo);",
+              "    pm.collectionVariables.set('recargo_bordado', bordado.recargo);",
+              "    pm.collectionVariables.set('variante_1', tallas[0].variante_id);",
+              "    pm.collectionVariables.set('stock_antes', tallas[0].stock);",
+              "    pm.collectionVariables.set('cuerpo_pedido', JSON.stringify({",
+              "        notas: 'Pedido de prueba desde Postman',",
+              "        lineas: [",
+              "            { variante_id: tallas[0].variante_id, cantidad: 2, precio_unitario: 1, personalizacion: [{ opcion_id: caja.id }] },",
+              "            { variante_id: tallas[1].variante_id, cantidad: 1, personalizacion: [{ opcion_id: bordado.id, texto: 'LUCIA' }] }",
+              "        ]",
+              "    }));",
+              "});"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const pedido = pm.response.json().datos;",
+              "pm.collectionVariables.set('codigo_pedido', pedido.codigo);",
+              "pm.test('Location apunta al pedido nuevo', () => pm.expect(pm.response.headers.get('Location')).to.eql('/api/pedidos/' + pedido.codigo));",
+              "pm.test('Pendiente y personalizado', () => {",
+              "    pm.expect(pedido.estado).to.eql('pendiente');",
+              "    pm.expect(pedido.personalizado).to.be.true;",
+              "});",
+              "pm.test('Total calculado en el servidor: 2 pares con caja + 1 par bordado (el precio_unitario: 1 enviado se ignora)', () => {",
+              "    const precio = Number(pm.collectionVariables.get('precio'));",
+              "    const caja = Number(pm.collectionVariables.get('recargo_caja'));",
+              "    const bordado = Number(pm.collectionVariables.get('recargo_bordado'));",
+              "    pm.expect(pedido.total).to.eql(Math.round((2 * (precio + caja) + precio + bordado) * 100) / 100);",
+              "});",
+              "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+              "    const variante = Number(pm.collectionVariables.get('variante_1'));",
+              "    const talla = respuesta.json().datos.tallas.find(t => t.variante_id === variante);",
+              "    pm.test('Stock descontado (2 pares menos)', () => {",
+              "        pm.expect(talla.stock).to.eql(Number(pm.collectionVariables.get('stock_antes')) - 2);",
+              "    });",
+              "});"
+            ] } }
+          ]
+        },
+        {
+          "name": "Ver el pedido creado (200)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/pedidos/{{codigo_pedido}}", "description": "GET /api/pedidos/{codigo} · Detalle con líneas, personalización e historial de estados." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "const pedido = pm.response.json().datos;",
+            "pm.test('Dos líneas con el precio del catálogo', () => {",
+            "    pm.expect(pedido.lineas).to.have.lengthOf(2);",
+            "    pedido.lineas.forEach(l => pm.expect(l.precio_unitario).to.eql(Number(pm.collectionVariables.get('precio'))));",
+            "});",
+            "pm.test('La segunda línea conserva el nombre bordado y su recargo', () => {",
+            "    const bordado = pedido.lineas[1].personalizacion[0];",
+            "    pm.expect(bordado.texto).to.eql('LUCIA');",
+            "    pm.expect(bordado.recargo).to.eql(Number(pm.collectionVariables.get('recargo_bordado')));",
+            "});",
+            "pm.test('Historial: creado como pendiente', () => pm.expect(pedido.historial[0].estado_nuevo).to.eql('pendiente'));",
+            "pm.test('Se puede cancelar', () => pm.expect(pedido.se_puede_cancelar).to.be.true);"
+          ] } }]
+        },
+        {
+          "name": "Cancelar un pedido ya enviado (409)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/pedidos/SF-2026-000013/cancelar", "description": "SF-2026-000013 es de la clienta pero está enviado: solo se cancela desde pendiente o confirmado." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+            "pm.test('Indica el estado actual', () => pm.expect(pm.response.json().error.detalles.estado_actual).to.eql('enviado'));"
+          ] } }]
+        },
+        {
+          "name": "Cancelar el pedido creado (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos/{{codigo_pedido}}/cancelar",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"motivo\": \"Me equivoqué de talla\"\n}", "options": { "raw": { "language": "json" } } },
+            "description": "POST /api/pedidos/{codigo}/cancelar · Cuerpo opcional {motivo}. Es un cambio de estado (queda en el historial) y repone el stock."
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 OK', () => pm.response.to.have.status(200));",
+            "pm.test('Estado cancelado', () => pm.expect(pm.response.json().datos.estado).to.eql('cancelado'));",
+            "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+            "    const variante = Number(pm.collectionVariables.get('variante_1'));",
+            "    const talla = respuesta.json().datos.tallas.find(t => t.variante_id === variante);",
+            "    pm.test('Stock repuesto', () => pm.expect(talla.stock).to.eql(Number(pm.collectionVariables.get('stock_antes'))));",
+            "});"
+          ] } }]
+        },
+        {
+          "name": "Cancelarlo otra vez (409)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/pedidos/{{codigo_pedido}}/cancelar", "description": "Un pedido cancelado no se puede volver a cancelar: el stock se repone una sola vez." },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+          ] } }]
+        },
+        {
+          "name": "Cerrar la sesión de la clienta (204)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/logout" },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+          ] } }]
+        }
+      ]
+    },
+    {
+      "name": "7. Catálogo interno (admin)",
+      "item": [
+        {
+          "name": "Login de administración (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol admin', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('admin'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listado interno (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/productos?pagina=1&por_pagina=5",
+            "description": "GET /api/gestion/productos · Permiso productos.gestionar (solo admin). Incluye los productos desactivados. Parámetros: buscar (nombre, colorway o código), activo (true/false), pagina, por_pagina (máx. 50)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Como mucho 5 productos', () => pm.expect(cuerpo.datos.length).to.be.at.most(5));",
+                  "pm.test('Datos de paginación', () => pm.expect(cuerpo.paginacion).to.have.keys('pagina', 'por_pagina', 'total', 'paginas'));",
+                  "pm.test('Datos internos: activo, stock total y número de tallas', () => cuerpo.datos.forEach(p => {",
+                  "    pm.expect(p).to.include.keys('activo', 'stock_total', 'num_tallas', 'categoria', 'color', 'precio', 'personalizable');",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta con datos no válidos (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/productos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_marca\": \"CW2288\",\n  \"nombre\": \"\",\n  \"colorway\": \"White/White\",\n  \"categoria_id\": \"abc\",\n  \"color_id\": 0,\n  \"precio\": \"119,99\",\n  \"tallas\": [40, 40, 42.3]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El código de estilo debe tener el formato de Nike (CW2288-111), el precio usa punto decimal y las tallas van de 34 a 50 con medias tallas, sin repetir. Los errores de las tallas llegan por posición (tallas.1)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Un error por cada campo y por cada talla mal escrita', () => {",
+                  "    pm.expect(pm.response.json().error.detalles.errores).to.have.keys(",
+                  "        'codigo_marca', 'nombre', 'precio', 'categoria_id', 'color_id', 'tallas.1', 'tallas.2');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta con categoría que no existe (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/productos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_marca\": \"ZZ0000-001\",\n  \"nombre\": \"Zapatilla de prueba\",\n  \"colorway\": \"White/Black\",\n  \"categoria_id\": 999999,\n  \"color_id\": 1,\n  \"precio\": 99.99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Error en categoria_id', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('categoria_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta de una zapatilla de prueba (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/productos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_marca\": \"{{gp_codigo_minusculas}}\",\n  \"nombre\": \"Nike Prueba Interna\",\n  \"colorway\": \"White/Black\",\n  \"categoria_id\": 1,\n  \"color_id\": 1,\n  \"precio\": 99.99,\n  \"descripcion\": \"Zapatilla de prueba del área interna\",\n  \"tallas\": [42.5, 39, 42]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El script previo genera un código de estilo al azar (ZZ + 4 cifras) para que la colección se pueda ejecutar varias veces. Se envía en minúsculas: el servidor lo pasa a mayúsculas. Las tallas se crean con stock 0 (las unidades entran con un albarán) y el RFID se calcula con la misma fórmula que la semilla."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Código de estilo nuevo en cada ejecución (formato de Nike: 6 caracteres, guion y 3 cifras)",
+                  "const codigo = 'ZZ' + String(Math.floor(Math.random() * 10000)).padStart(4, '0') + '-' + String(Math.floor(Math.random() * 1000)).padStart(3, '0');",
+                  "pm.collectionVariables.set('gp_codigo', codigo);",
+                  "pm.collectionVariables.set('gp_codigo_minusculas', codigo.toLowerCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const p = pm.response.json().datos;",
+                  "pm.collectionVariables.set('gp_id', p.id);",
+                  "pm.collectionVariables.set('gp_slug', p.slug);",
+                  "const codigo = pm.collectionVariables.get('gp_codigo');",
+                  "pm.test('Cabecera Location', () => pm.expect(pm.response.headers.get('Location')).to.eql('/api/gestion/productos/' + p.id));",
+                  "pm.test('Código en mayúsculas', () => pm.expect(p.codigo_marca).to.eql(codigo));",
+                  "pm.test('Slug a partir del nombre y el código', () => pm.expect(p.slug).to.eql('nike-prueba-interna-' + codigo.toLowerCase()));",
+                  "pm.test('Imagen por convención', () => pm.expect(p.imagen).to.eql('/img/productos/' + codigo.toLowerCase() + '.webp'));",
+                  "pm.test('No personalizable por defecto', () => pm.expect(p.personalizable).to.eql(false));",
+                  "pm.test('Tallas ordenadas y con stock 0', () => {",
+                  "    pm.expect(p.variantes.map(v => v.talla)).to.eql([39, 42, 42.5]);",
+                  "    p.variantes.forEach(v => pm.expect(v.stock).to.eql(0));",
+                  "});",
+                  "pm.test('RFID con la fórmula de la semilla', () => p.variantes.forEach(v => {",
+                  "    const hex = (n, largo) => n.toString(16).toUpperCase().padStart(largo, '0');",
+                  "    pm.expect(v.rfid_tienda).to.eql('4B4C4D' + hex(p.id, 6) + hex(Math.round(v.talla * 10), 4) + '00000001');",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Alta con código repetido (409)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/productos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_marca\": \"{{gp_codigo}}\",\n  \"nombre\": \"Otra con el mismo código\",\n  \"colorway\": \"Black/White\",\n  \"categoria_id\": 1,\n  \"color_id\": 2,\n  \"precio\": 89.99\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El código de estilo es único por marca (UNIQUE en la BD): el error 23505 de PostgreSQL se convierte en un 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Dice qué código choca', () => pm.expect(pm.response.json().error.detalles.codigo_marca).to.eql(pm.collectionVariables.get('gp_codigo')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ficha interna con RFID (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/productos/{{gp_id}}",
+            "description": "A diferencia de la ficha pública, incluye el RFID de cada talla, el stock mínimo y las tallas desactivadas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().datos;",
+                  "pm.test('Tallas con stock mínimo, RFID y activo', () => p.variantes.forEach(v => {",
+                  "    pm.expect(v).to.have.keys('id', 'talla', 'stock', 'stock_minimo', 'rfid_tienda', 'activo');",
+                  "    pm.expect(v.rfid_tienda).to.match(/^[0-9A-F]{24}$/);",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Producto que no existe (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/productos/999999"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar el precio (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/productos/{{gp_id}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"precio\": 109.99,\n  \"personalizable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH cambia solo los campos enviados. El cambio de precio queda en la auditoría (antes y después) y no afecta a los pedidos ya hechos: cada línea de pedido guardó el precio del momento de la compra."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().datos;",
+                  "pm.test('Precio cambiado', () => pm.expect(p.precio).to.eql(109.99));",
+                  "pm.test('Personalizable', () => pm.expect(p.personalizable).to.eql(true));",
+                  "pm.test('El nombre no se ha tocado', () => pm.expect(p.nombre).to.eql('Nike Prueba Interna'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar el código de estilo (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/productos/{{gp_id}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_marca\": \"ZZ9999-999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El código de estilo identifica la zapatilla del fabricante y de él salen el slug, la imagen y el RFID: no se cambia."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Error en codigo_marca', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('codigo_marca'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edición sin campos (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/productos/{{gp_id}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"slug\": \"otro-slug\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "slug no es un campo editable: si no llega ninguno de los editables, es un 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desactivar (204)",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/gestion/productos/{{gp_id}}",
+            "description": "DELETE no borra la zapatilla: la desactiva (activo = false). Los pedidos antiguos y los movimientos de stock siguen apuntando a sus tallas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desactivada: no sale en el catálogo público (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/productos/{{gp_slug}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desactivada: sigue en el listado interno (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/productos?activo=false&buscar={{gp_codigo}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const datos = pm.response.json().datos;",
+                  "pm.test('Aparece desactivada', () => {",
+                  "    pm.expect(datos).to.have.lengthOf(1);",
+                  "    pm.expect(datos[0].activo).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Albarán con errores (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia=ALB-PRUEBA-ERR",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "codigo_marca,nombre,colorway,categoria,color,precio,talla,cantidad\nCW2288-111,,,,,,42,0\nCW2288-111,,,,,,51,1\nZZ0000-000,,,,,,42,1\n",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "Si una sola fila está mal no se carga nada. La línea 1 es la cabecera. ZZ0000-000 no existe, así que es una zapatilla nueva y necesita nombre, colorway, categoría, color y precio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Errores por número de línea del archivo', () => {",
+                  "    pm.expect(pm.response.json().error.detalles.errores).to.have.keys(",
+                  "        'fila.2.cantidad', 'fila.3.talla', 'fila.4.nombre', 'fila.4.colorway', 'fila.4.categoria', 'fila.4.color', 'fila.4.precio');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cargar albarán (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia=ALB-PRUEBA-{{gp_codigo}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{gp_csv}}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "Cuerpo text/csv con separador , o ; (el de Excel en español). Suma stock a una zapatilla de la semilla (Air Force 1, talla 42: dos filas que se suman), crea la talla 46 de la zapatilla de prueba (está desactivada: se suma el stock pero no se reactiva) y da de alta una zapatilla nueva no personalizable. Cada entrada deja un movimiento de stock con el motivo «Albarán <referencia>»."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Zapatilla nueva con otro código al azar y stock actual de la Air Force 1 en la 42 para comprobar la suma",
+                  "const nueva = 'ZY' + String(Math.floor(Math.random() * 10000)).padStart(4, '0') + '-' + String(Math.floor(Math.random() * 1000)).padStart(3, '0');",
+                  "pm.collectionVariables.set('gp_codigo_nuevo', nueva);",
+                  "const codigo = pm.collectionVariables.get('gp_codigo');",
+                  "pm.collectionVariables.set('gp_csv', [",
+                  "    'codigo_marca;nombre;colorway;categoria;color;precio;talla;cantidad',",
+                  "    'CW2288-111;;;;;;42;2',",
+                  "    'CW2288-111;;;;;;42;1',",
+                  "    codigo + ';;;;;;46;2',",
+                  "    nueva + ';Nike Prueba Albarán;White/University Blue;Lifestyle;Azul;119,99;41;4',",
+                  "    nueva + ';;;;;;41;1',",
+                  "].join('\\r\\n'));",
+                  "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+                  "    pm.collectionVariables.set('gp_stock_42', respuesta.json().datos.tallas.find(t => t.talla === 42).stock);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json().datos;",
+                  "const codigo = pm.collectionVariables.get('gp_codigo');",
+                  "const nueva = pm.collectionVariables.get('gp_codigo_nuevo');",
+                  "pm.test('Resumen del albarán', () => {",
+                  "    pm.expect(r.filas).to.eql(5);",
+                  "    pm.expect(r.unidades).to.eql(10);",
+                  "    pm.expect(r.productos_nuevos).to.eql([nueva]);",
+                  "    pm.expect(r.productos_actualizados).to.have.members(['CW2288-111', codigo]);",
+                  "    pm.expect(r.tallas_nuevas).to.eql(2);   // la 46 de la zapatilla de prueba y la 41 de la nueva",
+                  "});",
+                  "pm.test('Avisa de la zapatilla desactivada (no la reactiva)', () => {",
+                  "    pm.expect(r.desactivados).to.eql([codigo]);",
+                  "    pm.expect(r).to.have.property('aviso');",
+                  "});",
+                  "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-air-force-1-07-cw2288-111'), (error, respuesta) => {",
+                  "    const talla = respuesta.json().datos.tallas.find(t => t.talla === 42);",
+                  "    pm.test('El stock de la talla 42 ha subido 3 pares', () => {",
+                  "        pm.expect(talla.stock).to.eql(Number(pm.collectionVariables.get('gp_stock_42')) + 3);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reactivar (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/productos/{{gp_id}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().datos;",
+                  "pm.test('Vuelve a estar activa', () => pm.expect(p.activo).to.eql(true));",
+                  "pm.test('Tiene la talla 46 con los 2 pares del albarán', () => pm.expect(p.variantes.find(v => v.talla === 46).stock).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de administración (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin sesión (401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/productos"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de la clienta (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol cliente', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('cliente'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "La clienta no puede gestionar el catálogo (403)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/productos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_marca\": \"ZZ0000-002\",\n  \"nombre\": \"Intento de la clienta\",\n  \"colorway\": \"White\",\n  \"categoria_id\": 1,\n  \"color_id\": 1,\n  \"precio\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "productos.gestionar es solo de administración: el intento queda en la auditoría como acceso.denegado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de la clienta (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Gestión de pedidos y stock",
+      "item": [
+        {
+          "name": "Login de la clienta (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol cliente', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('cliente'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "La clienta crea su pedido (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/pedidos",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notas\": \"Pedido de prueba de la gestión interna\",\n  \"lineas\": [{ \"variante_id\": {{variante_gestion}}, \"cantidad\": 1 }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pedido propio de esta carpeta: así se puede mover por todos los estados sin tocar los pedidos de la semilla. El script previo elige en la ficha la talla con más stock."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest(pm.variables.replaceIn('{{base_url}}/api/productos/nike-dunk-low-retro-dd1391-100'), (error, respuesta) => {",
+                  "    const ficha = respuesta.json().datos;",
+                  "    const talla = ficha.tallas.reduce((a, b) => (b.stock > a.stock ? b : a));",
+                  "    pm.collectionVariables.set('producto_gestion', ficha.id);",
+                  "    pm.collectionVariables.set('variante_gestion', talla.variante_id);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const pedido = pm.response.json().datos;",
+                  "pm.collectionVariables.set('codigo_gestion', pedido.codigo);",
+                  "pm.test('Pendiente y sin personalizar', () => {",
+                  "    pm.expect(pedido.estado).to.eql('pendiente');",
+                  "    pm.expect(pedido.personalizado).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de la clienta (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin sesión (401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/pedidos",
+            "description": "GET /api/gestion/pedidos · Requiere sesión y el permiso pedidos.ver_todos (almacén y administración)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de almacén (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"almacen@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol almacen', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('almacen'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar el pedido por código (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/pedidos?buscar={{codigo_gestion}}&personalizado=0",
+            "description": "GET /api/gestion/pedidos?estado&buscar&personalizado&pagina&por_pagina · Permiso pedidos.ver_todos. Todos los pedidos de todos los clientes. buscar: código del pedido o email del cliente. personalizado: 1 o 0."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Encuentra solo el pedido creado', () => {",
+                  "    pm.expect(cuerpo.paginacion.total).to.eql(1);",
+                  "    pm.expect(cuerpo.datos[0].codigo).to.eql(pm.collectionVariables.get('codigo_gestion'));",
+                  "});",
+                  "pm.test('Incluye el cliente', () => pm.expect(cuerpo.datos[0].cliente.email).to.eql('cliente@kalma.test'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solo pedidos personalizados (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/pedidos?personalizado=1&por_pagina=50",
+            "description": "Los que el taller tiene que preparar a mano (bordado, caja...)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const pedidos = pm.response.json().datos;",
+                  "pm.test('Hay pedidos y todos son personalizados', () => {",
+                  "    pm.expect(pedidos).to.not.be.empty;",
+                  "    pedidos.forEach(p => pm.expect(p.personalizado).to.be.true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtros no válidos (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/pedidos?estado=perdido&personalizado=quizas"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Un error por filtro', () => {",
+                  "    const errores = pm.response.json().error.detalles.errores;",
+                  "    pm.expect(errores).to.have.property('estado');",
+                  "    pm.expect(errores).to.have.property('personalizado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle de gestión (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}",
+            "description": "GET /api/gestion/pedidos/{codigo} · Permiso pedidos.ver_todos. A diferencia de la vista del cliente, el historial dice el nombre de quién hizo cada cambio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const pedido = pm.response.json().datos;",
+                  "pm.test('El historial incluye el usuario', () => pm.expect(pedido.historial[0]).to.have.property('usuario'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pedido inexistente (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/pedidos/SF-2026-999999"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén no puede confirmar el pago (403)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"confirmado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/gestion/pedidos/{codigo}/estado · Permiso pedidos.cambiar_estado. Separación de funciones: el almacén lleva la logística (preparación, enviado, entregado); confirmar el pago o cancelar exige además pedidos.confirmar_cancelar (solo administración). El intento queda en auditoría como denegado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén no puede cancelar (403)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"cancelado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Cancelar repone el stock y supone devolver el pago: lo decide administración."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preparar sin confirmar el pago (409)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"preparacion\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Las transiciones válidas salen de PedidoServicio::TRANSICIONES: desde pendiente solo se confirma o se cancela."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Indica el estado actual y los permitidos', () => {",
+                  "    const detalles = pm.response.json().error.detalles;",
+                  "    pm.expect(detalles.estado_actual).to.eql('pendiente');",
+                  "    pm.expect(detalles.estados_permitidos).to.eql(['confirmado', 'cancelado']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de almacén (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de administración (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol admin', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('admin'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Volver a pendiente (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"pendiente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A pendiente no se vuelve nunca: no es un estado de destino válido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Error en estado', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('estado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Administración confirma el pago (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"confirmado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sin comentario, el historial guarda «Pago verificado»."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const pedido = pm.response.json().datos;",
+                  "const ultimo = pedido.historial[pedido.historial.length - 1];",
+                  "pm.test('Confirmado', () => pm.expect(pedido.estado).to.eql('confirmado'));",
+                  "pm.test('Historial: comentario por defecto y rol admin', () => {",
+                  "    pm.expect(ultimo.comentario).to.eql('Pago verificado');",
+                  "    pm.expect(ultimo.rol).to.eql('admin');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de administración (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de almacén (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"almacen@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol almacen', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('almacen'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén lo pasa a preparación (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"preparacion\",\n  \"comentario\": \"Caja revisada en almacén\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const pedido = pm.response.json().datos;",
+                  "const ultimo = pedido.historial[pedido.historial.length - 1];",
+                  "pm.test('En preparación con el comentario enviado', () => {",
+                  "    pm.expect(pedido.estado).to.eql('preparacion');",
+                  "    pm.expect(ultimo.comentario).to.eql('Caja revisada en almacén');",
+                  "    pm.expect(ultimo.rol).to.eql('almacen');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar sin código de seguimiento (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"enviado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Para pasar a enviado hace falta el código del transportista (hasta 50 caracteres: letras, números y guiones)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Error en codigo_seguimiento', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('codigo_seguimiento'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Código de seguimiento de otro pedido (409)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"enviado\",\n  \"codigo_seguimiento\": \"trk000013es\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "TRK000013ES es el seguimiento del pedido SF-2026-000013 de la semilla. Se pasa a mayúsculas antes de guardarlo, así que en minúsculas también choca con el UNIQUE de la columna."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén lo entrega al transportista (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"enviado\",\n  \"codigo_seguimiento\": \"{{seguimiento_gestion}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El script previo genera un código de seguimiento nuevo en cada ejecución."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('seguimiento_gestion', 'kalma-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const pedido = pm.response.json().datos;",
+                  "pm.test('Enviado con el seguimiento en mayúsculas', () => {",
+                  "    pm.expect(pedido.estado).to.eql('enviado');",
+                  "    pm.expect(pedido.codigo_seguimiento).to.eql(pm.collectionVariables.get('seguimiento_gestion').toUpperCase());",
+                  "});",
+                  "pm.test('Ya no se puede cancelar', () => pm.expect(pedido.se_puede_cancelar).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén lo marca como entregado (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"entregado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const pedido = pm.response.json().datos;",
+                  "const ultimo = pedido.historial[pedido.historial.length - 1];",
+                  "pm.test('Entregado', () => pm.expect(pedido.estado).to.eql('entregado'));",
+                  "pm.test('Historial completo: 5 estados', () => pm.expect(pedido.historial).to.have.lengthOf(5));",
+                  "pm.test('Comentario por defecto', () => pm.expect(ultimo.comentario).to.eql('Entregado al cliente'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Un pedido entregado ya no cambia (409)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/pedidos/{{codigo_gestion}}/estado",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"entregado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tallas bajo el stock mínimo (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/stock?bajo_minimo=1&por_pagina=100",
+            "description": "GET /api/gestion/stock?buscar&bajo_minimo&producto_id&pagina&por_pagina · Permiso stock.gestionar. buscar: nombre del modelo, código de Nike o etiqueta RFID completa. bajo_minimo=1: en o por debajo del mínimo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Todas están en o por debajo del mínimo', () => {",
+                  "    pm.response.json().datos.forEach(t => {",
+                  "        pm.expect(t.bajo_minimo).to.be.true;",
+                  "        pm.expect(t.stock).to.be.at.most(t.stock_minimo);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stock del modelo del pedido (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/stock?producto_id={{producto_gestion}}&por_pagina=100",
+            "description": "Guarda el stock de la talla del pedido para comprobar después los ajustes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const talla = pm.response.json().datos.find(t => t.variante_id === Number(pm.collectionVariables.get('variante_gestion')));",
+                  "pm.test('Aparece la talla del pedido con su RFID', () => {",
+                  "    pm.expect(talla).to.not.be.undefined;",
+                  "    pm.expect(talla.rfid_tienda).to.match(/^[0-9A-F]{24}$/);",
+                  "});",
+                  "pm.collectionVariables.set('stock_gestion', talla.stock);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajuste con cantidad 0 y sin motivo (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/variantes/{{variante_gestion}}/stock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": 0,\n  \"motivo\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/gestion/variantes/{id}/stock · Permiso stock.gestionar. Cuerpo: {cantidad (entero de -500 a 500, distinto de 0), motivo (obligatorio, hasta 255)}. Se envía la diferencia, no el stock final."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Error en los dos campos', () => {",
+                  "    const errores = pm.response.json().error.detalles.errores;",
+                  "    pm.expect(errores).to.have.property('cantidad');",
+                  "    pm.expect(errores).to.have.property('motivo');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajuste que dejaría el stock en negativo (409)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/variantes/{{variante_gestion}}/stock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": -500,\n  \"motivo\": \"Prueba de stock negativo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "La talla se bloquea (FOR UPDATE) antes de leer su stock. El 409 dice cuántas unidades hay."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('Indica el stock disponible', () => {",
+                  "    pm.expect(pm.response.json().error.detalles.stock_disponible).to.eql(Number(pm.collectionVariables.get('stock_gestion')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajustar: un par con la caja dañada (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/variantes/{{variante_gestion}}/stock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": -1,\n  \"motivo\": \"Recuento: un par con la caja dañada (prueba)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Deja un movimiento de tipo ajuste y un registro stock.ajustar en la auditoría."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const talla = pm.response.json().datos;",
+                  "pm.test('Un par menos', () => {",
+                  "    pm.expect(talla.stock).to.eql(Number(pm.collectionVariables.get('stock_gestion')) - 1);",
+                  "    pm.expect(talla.stock_resultante).to.eql(talla.stock);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deshacer el ajuste (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/variantes/{{variante_gestion}}/stock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": 1,\n  \"motivo\": \"Deshacer el ajuste de prueba\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El stock vuelve a como estaba: la colección se puede repetir sin ir perdiendo unidades."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Stock como estaba', () => pm.expect(pm.response.json().datos.stock).to.eql(Number(pm.collectionVariables.get('stock_gestion'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Movimientos de la talla (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/variantes/{{variante_gestion}}/movimientos?por_pagina=3",
+            "description": "GET /api/gestion/variantes/{id}/movimientos?pagina · Permiso stock.gestionar. Del más reciente al más antiguo, con el pedido y el usuario de cada movimiento."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const movimientos = pm.response.json().datos;",
+                  "pm.test('Los dos ajustes son los más recientes', () => {",
+                  "    pm.expect(movimientos[0].tipo).to.eql('ajuste');",
+                  "    pm.expect(movimientos[0].cantidad).to.eql(1);",
+                  "    pm.expect(movimientos[1].cantidad).to.eql(-1);",
+                  "    pm.expect(movimientos[1].usuario.rol).to.eql('almacen');",
+                  "});",
+                  "pm.test('Después, la venta del pedido creado', () => {",
+                  "    pm.expect(movimientos[2].tipo).to.eql('venta');",
+                  "    pm.expect(movimientos[2].pedido).to.eql(pm.collectionVariables.get('codigo_gestion'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Talla inexistente (404)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/variantes/999999/stock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cantidad\": 1,\n  \"motivo\": \"No existe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de almacén (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Perfil, consultas, informes y exportación",
+      "item": [
+        {
+          "name": "Login de la clienta (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"cliente@kalma.test\",\n    \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/login · Público."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol cliente', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('cliente'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mi perfil (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/perfil",
+            "description": "GET /api/perfil · Permiso perfil.propio. Siempre el perfil del usuario de la sesión (la ruta no lleva id). No incluye DNI: la tienda no lo pide. Guarda los datos editables para dejarlos como estaban al final."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const perfil = pm.response.json().datos;",
+                  "pm.test('Datos de la cuenta y del perfil de cliente', () => {",
+                  "    pm.expect(perfil).to.have.all.keys('id', 'nombre', 'apellidos', 'email', 'telefono', 'direccion', 'codigo_postal', 'ciudad', 'provincia');",
+                  "    pm.expect(perfil.email).to.eql('cliente@kalma.test');",
+                  "});",
+                  "pm.test('Sin DNI', () => pm.expect(perfil).to.not.have.property('dni'));",
+                  "const editables = ['nombre', 'apellidos', 'telefono', 'direccion', 'codigo_postal', 'ciudad', 'provincia'];",
+                  "const original = {};",
+                  "editables.forEach(campo => { original[campo] = perfil[campo]; });",
+                  "pm.collectionVariables.set('perfil_original', JSON.stringify(original));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar mi perfil (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/perfil",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"telefono\": \"+34 600 000 199\",\n    \"ciudad\": \"Getafe\",\n    \"email\": \"cambiado@kalma.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/perfil · Permiso perfil.propio. Solo cambia los campos enviados (nombre, apellidos, telefono, direccion, codigo_postal, ciudad, provincia) con las mismas reglas que el registro. El email y la contraseña no se editan aquí: si llegan, se ignoran. La auditoría (perfil.editar) guarda qué campos cambiaron, no sus valores."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const perfil = pm.response.json().datos;",
+                  "pm.test('Cambian el teléfono y la ciudad', () => {",
+                  "    pm.expect(perfil.telefono).to.eql('+34 600 000 199');",
+                  "    pm.expect(perfil.ciudad).to.eql('Getafe');",
+                  "});",
+                  "pm.test('El email no se puede cambiar desde el perfil', () => pm.expect(perfil.email).to.eql('cliente@kalma.test'));",
+                  "pm.test('Los campos no enviados no cambian', () => {",
+                  "    const original = JSON.parse(pm.collectionVariables.get('perfil_original'));",
+                  "    pm.expect(perfil.direccion).to.eql(original.direccion);",
+                  "    pm.expect(perfil.codigo_postal).to.eql(original.codigo_postal);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar el perfil con datos no válidos (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/perfil",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nombre\": \"\",\n    \"telefono\": \"abc\",\n    \"codigo_postal\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/perfil · El nombre no puede quedar vacío si se envía; teléfono y código postal con el mismo formato que en el registro. Se devuelven todos los errores juntos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Un error por cada campo no válido', () => {",
+                  "    const errores = pm.response.json().error.detalles.errores;",
+                  "    pm.expect(errores).to.have.all.keys('nombre', 'telefono', 'codigo_postal');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar el perfil sin campos editables (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/perfil",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"cambiado@kalma.test\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/perfil · Si no llega ningún campo editable (aquí solo el email), no hay nada que cambiar: 400."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dejar el perfil como estaba (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/perfil",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{perfil_original}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/perfil · Vuelve a enviar los datos guardados en «Mi perfil» para que la colección se pueda repetir."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Perfil restaurado', () => {",
+                  "    const original = JSON.parse(pm.collectionVariables.get('perfil_original'));",
+                  "    const perfil = pm.response.json().datos;",
+                  "    Object.keys(original).forEach(campo => pm.expect(perfil[campo]).to.eql(original[campo]));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de la clienta (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "description": "POST /api/logout · Sesión."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Perfil sin sesión (401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/perfil",
+            "description": "GET /api/perfil · Sin sesión: 401."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar una consulta de contacto (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/consultas",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nombre\": \"Marta Vidal\",\n    \"email\": \"Marta.Vidal@correo.test\",\n    \"asunto\": \"Envío a Canarias\",\n    \"mensaje\": \"¿Hacéis envíos a Canarias? Me interesan las Air Force 1 en la talla 38,5.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/consultas · Público (sin sesión, pero con token CSRF). Cuerpo: {nombre (hasta 100), email, asunto (hasta 150), mensaje (10 a 2000)}. Límite de 5 consultas por IP y hora (429 al superarlo), así que esta carpeta solo envía una por ejecución. La auditoría (consulta.crear) no guarda el mensaje."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const consulta = pm.response.json().datos;",
+                  "pm.collectionVariables.set('consulta_id', consulta.id);",
+                  "pm.test('Guardada como pendiente', () => pm.expect(consulta.estado).to.eql('pendiente'));",
+                  "pm.test('Email en minúsculas', () => pm.expect(consulta.email).to.eql('marta.vidal@correo.test'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de administración (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@kalma.test\",\n    \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/login · Público."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol admin', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('admin'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Panel resumen (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/resumen",
+            "description": "GET /api/gestion/resumen · Permiso informes.ver (solo administración). Indicadores calculados en la BD: pedidos por estado (los 6, con 0 si no hay), unidades e ingresos de los pedidos no cancelados, pedidos personalizados, tallas en el stock mínimo o por debajo y los 5 modelos con menos stock."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const resumen = pm.response.json().datos;",
+                  "pm.test('Los 6 estados de pedido', () => {",
+                  "    pm.expect(resumen.pedidos_por_estado).to.have.all.keys('pendiente', 'confirmado', 'preparacion', 'enviado', 'entregado', 'cancelado');",
+                  "});",
+                  "pm.test('Indicadores numéricos', () => {",
+                  "    ['unidades_vendidas', 'ingresos', 'pedidos_personalizados', 'tallas_bajo_minimo'].forEach(clave => pm.expect(resumen[clave]).to.be.a('number'));",
+                  "});",
+                  "pm.test('5 modelos ordenados de menos a más stock', () => {",
+                  "    const modelos = resumen.modelos_menos_stock;",
+                  "    pm.expect(modelos).to.have.lengthOf(5);",
+                  "    for (let i = 1; i < modelos.length; i++) pm.expect(modelos[i].stock_total).to.be.at.least(modelos[i - 1].stock_total);",
+                  "});",
+                  "pm.collectionVariables.set('unidades_vendidas', resumen.unidades_vendidas);",
+                  "pm.collectionVariables.set('ingresos', resumen.ingresos);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Informe: ventas por modelo (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes/ventas-por-modelo",
+            "description": "GET /api/gestion/informes/ventas-por-modelo?desde&hasta · Permiso informes.ver. Por producto (modelo + colorway): pedidos, unidades e ingresos, de más a menos ingresos. Sin pedidos cancelados."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const filas = pm.response.json().datos.filas;",
+                  "pm.test('Cada fila con el código de estilo de Nike', () => filas.forEach(f => pm.expect(f.codigo_marca).to.match(/^[A-Z0-9]{6}-[0-9]{3}$/)));",
+                  "pm.test('Ordenado por ingresos', () => {",
+                  "    for (let i = 1; i < filas.length; i++) pm.expect(filas[i].ingresos).to.be.at.most(filas[i - 1].ingresos);",
+                  "});",
+                  "pm.test('Las unidades suman lo mismo que el resumen', () => {",
+                  "    pm.expect(filas.reduce((suma, f) => suma + f.unidades, 0)).to.eql(Number(pm.collectionVariables.get('unidades_vendidas')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Informe: ventas por mes (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes/ventas-por-mes",
+            "description": "GET /api/gestion/informes/ventas-por-mes?desde&hasta · Permiso informes.ver. Por mes (AAAA-MM, en hora de España): pedidos, unidades e ingresos. Sin pedidos cancelados."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const filas = pm.response.json().datos.filas;",
+                  "pm.test('Meses con formato AAAA-MM', () => filas.forEach(f => pm.expect(f.mes).to.match(/^\\d{4}-\\d{2}$/)));",
+                  "pm.test('Los ingresos suman lo mismo que el resumen', () => {",
+                  "    const suma = filas.reduce((total, f) => total + f.ingresos, 0);",
+                  "    pm.expect(Math.round(suma * 100) / 100).to.eql(Number(pm.collectionVariables.get('ingresos')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Informe: ventas de octubre (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes/ventas-por-mes?desde=2026-10-01&hasta=2026-10-31",
+            "description": "GET /api/gestion/informes/ventas-por-mes?desde=2026-10-01&hasta=2026-10-31 · Las dos fechas son opcionales e inclusivas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const informe = pm.response.json().datos;",
+                  "pm.test('Devuelve el rango aplicado', () => {",
+                  "    pm.expect(informe.desde).to.eql('2026-10-01');",
+                  "    pm.expect(informe.hasta).to.eql('2026-10-31');",
+                  "});",
+                  "pm.test('Solo octubre', () => informe.filas.forEach(f => pm.expect(f.mes).to.eql('2026-10')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Informe: personalizaciones (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes/personalizaciones",
+            "description": "GET /api/gestion/informes/personalizaciones?desde&hasta · Permiso informes.ver. Por opción (tipo y nombre): veces elegida, pares e ingresos por el recargo aplicado. Sin pedidos cancelados."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const filas = pm.response.json().datos.filas;",
+                  "pm.test('Opciones del catálogo de personalización', () => {",
+                  "    pm.expect(filas.length).to.be.above(0);",
+                  "    filas.forEach(f => pm.expect(['packaging', 'bordado', 'cordones', 'certificado']).to.include(f.tipo));",
+                  "});",
+                  "pm.test('Se vende el nombre bordado', () => pm.expect(filas.map(f => f.tipo)).to.include('bordado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Informe inexistente (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes/clientes",
+            "description": "GET /api/gestion/informes/{nombre} · El nombre solo elige entre los informes ya escritos: cualquier otro es un 404 y nunca llega a la BD."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Informe con fechas no válidas (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes/ventas-por-mes?desde=2026-11-30&hasta=2026-02-30",
+            "description": "GET /api/gestion/informes/ventas-por-mes · 400 si una fecha no existe (30 de febrero) o si desde es posterior a hasta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Error en la fecha que no existe', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('hasta'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultas pendientes (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/consultas?estado=pendiente",
+            "description": "GET /api/gestion/consultas?estado&pagina · Permiso consultas.gestionar (solo administración). De la más reciente a la más antigua."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Solo pendientes, con paginación', () => {",
+                  "    cuerpo.datos.forEach(c => pm.expect(c.estado).to.eql('pendiente'));",
+                  "    pm.expect(cuerpo.paginacion).to.have.property('total');",
+                  "});",
+                  "pm.test('Incluye la consulta enviada', () => pm.expect(cuerpo.datos.map(c => c.id)).to.include(Number(pm.collectionVariables.get('consulta_id'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Marcar la consulta como respondida (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/consultas/{{consulta_id}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"estado\": \"respondida\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/gestion/consultas/{id} · Permiso consultas.gestionar. Cuerpo: {estado: pendiente | respondida | cerrada}. 404 si no existe. Auditoría consulta.cambiar_estado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Estado respondida', () => pm.expect(pm.response.json().datos.estado).to.eql('respondida'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estado de consulta no válido (400)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/consultas/{{consulta_id}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"estado\": \"borrada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/gestion/consultas/{id} · Solo pendiente, respondida o cerrada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consulta inexistente (404)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/consultas/999999",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"estado\": \"cerrada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PATCH /api/gestion/consultas/{id} · 404 si no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auditoría: cambios de estado de consultas (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/auditoria?tipo=consulta.cambiar_estado&por_pagina=5",
+            "description": "GET /api/gestion/auditoria?tipo&entidad&resultado&usuario_id&pagina&por_pagina · Permiso auditoria.ver (solo administración). Del evento más reciente al más antiguo, con el email del usuario."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const eventos = pm.response.json().datos;",
+                  "pm.test('El último evento es el cambio de la consulta enviada', () => {",
+                  "    pm.expect(eventos[0].tipo_evento).to.eql('consulta.cambiar_estado');",
+                  "    pm.expect(eventos[0].entidad_id).to.eql(Number(pm.collectionVariables.get('consulta_id')));",
+                  "    pm.expect(eventos[0].usuario.email).to.eql('admin@kalma.test');",
+                  "    pm.expect(eventos[0].detalle).to.eql({ de: 'pendiente', a: 'respondida' });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Auditoría: la edición del perfil no guarda los datos (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/auditoria?tipo=perfil.editar&por_pagina=1",
+            "description": "GET /api/gestion/auditoria?tipo=perfil.editar · El detalle solo dice qué campos cambiaron, nunca sus valores (son datos personales)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const evento = pm.response.json().datos[0];",
+                  "pm.test('Solo la lista de campos', () => {",
+                  "    pm.expect(evento.detalle).to.have.all.keys('campos');",
+                  "    pm.expect(JSON.stringify(evento.detalle)).to.not.include('cliente@kalma.test');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filtros de auditoría no válidos (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/auditoria?resultado=ok&usuario_id=-1",
+            "description": "GET /api/gestion/auditoria · resultado: exito, error o denegado; usuario_id: entero positivo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Un error por filtro', () => pm.expect(pm.response.json().error.detalles.errores).to.have.all.keys('resultado', 'usuario_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exportar pedidos en CSV (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/exportar/pedidos?formato=csv",
+            "description": "GET /api/gestion/exportar/pedidos?formato=csv&estado&desde&hasta · Permiso datos.exportar (solo administración). Una fila por línea de pedido, separador punto y coma y decimales con coma (Excel en español), UTF-8 con BOM y celdas de texto protegidas contra la inyección de fórmulas. El nombre del archivo lo pone el servidor."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Descarga kalma-pedidos-AAAAMMDD.csv', () => {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition')).to.match(/^attachment; filename=\"kalma-pedidos-\\d{8}\\.csv\"$/);",
+                  "});",
+                  "pm.test('Empieza por el BOM de UTF-8', () => {",
+                  "    const bytes = pm.response.stream;",
+                  "    if (bytes) {",
+                  "        pm.expect([bytes[0], bytes[1], bytes[2]]).to.eql([0xEF, 0xBB, 0xBF]);",
+                  "    } else {",
+                  "        pm.expect(pm.response.text().charCodeAt(0)).to.eql(0xFEFF);",
+                  "    }",
+                  "});",
+                  "pm.test('Cabecera con punto y coma', () => {",
+                  "    const cabecera = pm.response.text().replace(/^\\uFEFF/, '').split('\\r\\n')[0];",
+                  "    pm.expect(cabecera).to.eql('codigo;fecha;estado;cliente_email;producto;color;talla;cantidad;precio_unitario;recargo_personalizacion;importe;personalizacion;total_pedido');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exportar pedidos entregados en JSON (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/exportar/pedidos?formato=json&estado=entregado",
+            "description": "GET /api/gestion/exportar/pedidos?formato=json&estado=entregado · Lista de pedidos con sus líneas anidadas. Auditoría pedidos.exportar con el formato, los filtros y el número de filas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Descarga kalma-pedidos-AAAAMMDD.json', () => {",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition')).to.match(/^attachment; filename=\"kalma-pedidos-\\d{8}\\.json\"$/);",
+                  "});",
+                  "const pedidos = pm.response.json();",
+                  "pm.test('Solo entregados, cada uno con sus líneas', () => {",
+                  "    pm.expect(pedidos.length).to.be.above(0);",
+                  "    pedidos.forEach(p => {",
+                  "        pm.expect(p.estado).to.eql('entregado');",
+                  "        pm.expect(p.lineas.length).to.be.above(0);",
+                  "    });",
+                  "});",
+                  "pm.test('El total de cada pedido es la suma de sus líneas', () => {",
+                  "    pedidos.forEach(p => {",
+                  "        const suma = p.lineas.reduce((total, l) => total + l.importe, 0);",
+                  "        pm.expect(Math.round(suma * 100) / 100).to.eql(p.total);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formato de exportación no válido (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/exportar/pedidos?formato=xlsx",
+            "description": "GET /api/gestion/exportar/pedidos · Solo csv o json."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Error en el formato', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('formato'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de administración (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "description": "POST /api/logout · Sesión."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login del almacén (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"almacen@kalma.test\",\n    \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/login · Público."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol almacen', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('almacen'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén pide el panel resumen (403)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/resumen",
+            "description": "GET /api/gestion/resumen · El almacén no tiene informes.ver: 403 y el intento queda en la auditoría (acceso.denegado)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén intenta exportar (403)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/exportar/pedidos?formato=csv",
+            "description": "GET /api/gestion/exportar/pedidos · El almacén no tiene datos.exportar: 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión del almacén (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "description": "POST /api/logout · Sesión."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "email_nuevo", "value": "" },
+    { "key": "email_ataque", "value": "" },
+    { "key": "cuerpo_sin_stock", "value": "" },
+    { "key": "cuerpo_pedido", "value": "" },
+    { "key": "codigo_pedido", "value": "" },
+    { "key": "precio", "value": "" },
+    { "key": "recargo_caja", "value": "" },
+    { "key": "recargo_bordado", "value": "" },
+    { "key": "cuerpo_jordan_bordado", "value": "" },
+    { "key": "variante_1", "value": "" },
+    { "key": "stock_antes", "value": "" },
+    { "key": "codigo_gestion", "value": "" },
+    { "key": "consulta_id", "value": "" },
+    { "key": "gp_codigo", "value": "" },
+    { "key": "gp_codigo_minusculas", "value": "" },
+    { "key": "gp_codigo_nuevo", "value": "" },
+    { "key": "gp_csv", "value": "" },
+    { "key": "gp_id", "value": "" },
+    { "key": "gp_slug", "value": "" },
+    { "key": "gp_stock_42", "value": "" },
+    { "key": "ingresos", "value": "" },
+    { "key": "perfil_original", "value": "" },
+    { "key": "producto_gestion", "value": "" },
+    { "key": "seguimiento_gestion", "value": "" },
+    { "key": "stock_gestion", "value": "" },
+    { "key": "unidades_vendidas", "value": "" },
+    { "key": "variante_gestion", "value": "" }
+  ]
+}

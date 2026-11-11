@@ -1,0 +1,382 @@
+/*
+ * Sobre nosotros. Página de lectura: un solo rótulo grande (el h1) y el resto a
+ * tamaño de texto, con mucho aire entre bloques para que respire.
+ * Colores, tamaños y márgenes salen de las variables de estilos.css.
+ */
+
+/* Separación entre secciones: claramente mayor que cualquier hueco interno */
+.calle,
+.par-a-par,
+.valores {
+    padding: clamp(5rem, 12vw, 10rem) var(--margen);
+}
+
+/* Texto de lectura: 60-70 caracteres por línea y un interlineado cómodo */
+.capitulo p,
+.calle__texto p,
+.par-a-par__intro p,
+.cierre__texto p {
+    max-width: 62ch;
+    margin: 0 0 1.2em;
+    line-height: 1.6;
+}
+
+/* Pies de foto y créditos: pequeños y en gris, nunca compiten con el texto */
+.capitulo__figura figcaption,
+.calle__figura figcaption {
+    margin-top: 0.75rem;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    line-height: 1.45;
+}
+
+/* --- Escenario: el texto a un lado, el par fijo al otro -----------------------
+   El par se queda quieto mientras se lee: en esta cultura el par permanece y lo
+   que cambia es la historia que lleva encima. */
+
+.escenario {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.escenario__texto {
+    padding: 0 clamp(2rem, 5vw, 5rem) clamp(4rem, 10vw, 8rem) var(--margen);
+}
+
+.capitulo {
+    max-width: 38rem;
+    padding-top: clamp(5rem, 14svh, 9rem);
+}
+
+/* El primero ocupa la primera pantalla (menos la cabecera) y centra el título */
+.capitulo--inicio {
+    display: grid;
+    align-content: center;
+    min-height: calc(100svh - 4.5rem);
+    padding-top: 2rem;
+}
+
+/* El único momento tipográfico grande de la página */
+.nosotros__titulo {
+    margin: 0;
+}
+
+.capitulo .nosotros__entrada {
+    max-width: 34ch;
+    margin: clamp(1.5rem, 3vw, 2.25rem) 0 0;
+    font-size: var(--paso-entrada);
+    line-height: 1.35;
+}
+
+/* Títulos de capítulo modestos: marcan el tema sin gritar */
+.capitulo__titulo,
+.calle__titulo,
+.par-a-par__titulo,
+.valores__titulo,
+.cierre__titulo {
+    margin: 0 0 1.5rem;
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+}
+
+.capitulo__figura {
+    margin: 2.5rem 0;
+}
+
+.capitulo__figura img,
+.calle__figura img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* La columna del par: fija en pantalla mientras se lee el texto */
+.escenario__fijo {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100svh;
+}
+
+.escenario__suelo {
+    position: relative;
+    height: 100%;
+    background: var(--suelo);
+}
+
+/* Todas las escenas apiladas en el mismo sitio: solo una a la vista.
+   Mientras funde, la opacidad aísla la escena y la mezcla de la foto solo ve
+   lo que hay dentro, así que cada escena lleva el mismo fondo que el suelo. */
+.escena {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    padding: clamp(2rem, 5vw, 4rem);
+    background: var(--suelo);
+    opacity: 0;
+    transition: opacity 700ms ease;
+}
+
+.escena.es-actual {
+    z-index: 1;
+    opacity: 1;
+}
+
+.escena__foto {
+    display: block;
+    width: min(92%, 44rem);
+    height: auto;
+    max-height: 66svh;
+    object-fit: contain;
+    /* El blanco de la foto desaparece contra el suelo gris */
+    mix-blend-mode: multiply;
+}
+
+.escena__pie {
+    position: absolute;
+    left: clamp(2rem, 5vw, 4rem);
+    bottom: clamp(1.5rem, 4svh, 3rem);
+    display: grid;
+    gap: 0.15rem;
+    font-size: var(--paso-pequeno);
+}
+
+.escena__nombre {
+    font-weight: 700;
+}
+
+.escena__color {
+    color: var(--tenue);
+}
+
+/* --- La calle: la foto grande y el texto al lado ----------------------------- */
+
+.calle {
+    display: grid;
+    grid-template-columns: 7fr 5fr;
+    align-items: end;
+    gap: clamp(2rem, 5vw, 5rem);
+    background: var(--blanco);
+}
+
+.calle__figura {
+    margin: 0;
+}
+
+.calle__texto {
+    max-width: 34rem;
+}
+
+.calle__texto p:last-child {
+    margin-bottom: 0;
+}
+
+/* --- Par a par: campo negro, la explicación y los cuatro extras -------------- */
+
+.par-a-par {
+    display: grid;
+    grid-template-columns: 5fr 7fr;
+    gap: clamp(3rem, 6vw, 6rem);
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+.par-a-par__intro p {
+    max-width: 36ch;
+}
+
+.par-a-par__intro .boton {
+    margin-top: 0.75rem;
+}
+
+.extras-casa {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(2.5rem, 4vw, 3.5rem) clamp(2rem, 4vw, 3.5rem);
+    margin: 0;
+}
+
+.extras-casa dt,
+.valores__valor dt {
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+}
+
+.extras-casa dd {
+    max-width: 38ch;
+    margin: 0.75rem 0 0;
+    color: var(--tenue-oscuro);
+    line-height: 1.6;
+}
+
+/* --- Lo que nos mueve: una fila por palabra, la palabra y su porqué ---------- */
+
+.valores {
+    background: var(--blanco);
+}
+
+.valores__lista {
+    display: grid;
+    gap: clamp(2.5rem, 5vw, 4rem);
+    margin: clamp(1.5rem, 4vw, 3rem) 0 0;
+}
+
+.valores__valor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 1rem clamp(2rem, 5vw, 5rem);
+    align-items: baseline;
+}
+
+.valores__valor dd {
+    max-width: 52ch;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* --- Cierre: el par sobre el suelo y la invitación al lado ------------------- */
+
+.cierre {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--blanco);
+}
+
+/* Lleva el fondo propio porque la entrada animada aísla la mezcla de la foto */
+.cierre__suelo {
+    display: grid;
+    place-items: center;
+    padding: clamp(3rem, 7vw, 6rem) var(--margen);
+    background: var(--suelo);
+}
+
+.cierre__foto {
+    display: block;
+    width: min(100%, 32rem);
+    height: auto;
+    /* La foto original es cuadrada con la zapatilla en la mitad de abajo:
+       se recorta el blanco de arriba para que el par quede centrado */
+    aspect-ratio: 2 / 1;
+    object-fit: cover;
+    object-position: 50% 95%;
+    mix-blend-mode: multiply;
+}
+
+.cierre__texto {
+    align-self: center;
+    padding: clamp(3rem, 7vw, 6rem) var(--margen) clamp(3rem, 7vw, 6rem) clamp(2rem, 5vw, 5rem);
+}
+
+.cierre__texto p {
+    max-width: 40ch;
+}
+
+.cierre__acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* El segundo botón, un paso de tono por debajo del primero */
+.cierre__secundario {
+    background: var(--suelo);
+    color: var(--negro);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .cierre__secundario:hover {
+        background: #e2e2e2;
+    }
+}
+
+/* --- Pantallas estrechas: todo en una columna -------------------------------- */
+
+@media (max-width: 56rem) {
+    .escenario,
+    .calle,
+    .par-a-par,
+    .cierre {
+        grid-template-columns: 1fr;
+    }
+
+    /* El par deja de estar fijo: arriba, como portada, y el texto debajo */
+    .escenario__fijo {
+        position: relative;
+        order: -1;
+        height: 42svh;
+        min-height: 16rem;
+    }
+
+    /* Hueco abajo para que el nombre del par no pise la foto */
+    .escena {
+        padding-bottom: 5rem;
+    }
+
+    .escena__foto {
+        max-height: 30svh;
+    }
+
+    .escenario__texto {
+        padding-inline: var(--margen);
+    }
+
+    .capitulo--inicio {
+        min-height: 0;
+        padding-top: 2.5rem;
+    }
+
+    .capitulo {
+        padding-top: 4.5rem;
+    }
+
+    .valores__valor {
+        grid-template-columns: 1fr;
+    }
+
+    .cierre__texto {
+        padding-inline: var(--margen);
+    }
+}
+
+@media (max-width: 36rem) {
+    .extras-casa {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- Entradas: cada pieza llega una vez, al asomar por abajo ----------------
+   Solo se oculta contenido si hay JavaScript para volver a mostrarlo. */
+
+.con-js [data-entrada] {
+    opacity: 0;
+    transform: translateY(1.25rem);
+    transition: opacity 500ms var(--salida), transform 600ms var(--salida);
+    transition-delay: var(--retraso, 0ms);
+}
+
+.con-js [data-entrada].ha-entrado {
+    opacity: 1;
+    transform: none;
+}
+
+/* Con movimiento reducido se conserva el fundido y se quita el desplazamiento */
+@media (prefers-reduced-motion: reduce) {
+    .con-js [data-entrada] {
+        transform: none;
+        transition-duration: 200ms;
+        transition-delay: 0ms;
+    }
+
+    .escena {
+        transition-duration: 200ms;
+    }
+}

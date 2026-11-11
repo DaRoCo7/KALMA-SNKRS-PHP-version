@@ -1,0 +1,322 @@
+/*
+ * Login y registro: pantalla partida.
+ * A la izquierda, sobre negro, solo el logo: dice dónde estás sin pedir lectura.
+ * A la derecha, sobre blanco, el título y el formulario, con tipografía
+ * contenida y mucho aire para que entrar sea un trámite tranquilo.
+ * En móvil se apila: una franja negra corta con el logo y, debajo, el formulario.
+ */
+
+.acceso {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    /* Lo que queda de pantalla bajo la cabecera, como mínimo: con un formulario
+       corto el pie no sube a mitad de pantalla. Es un mínimo y no una altura:
+       si el formulario es largo, la rejilla crece y las dos mitades con ella */
+    min-height: calc(100svh - 4.5rem);
+}
+
+/* --- Escena: el logo ------------------------------------------------------ */
+
+/* El negro va en la propia columna de la rejilla, que se estira hasta el final
+   de la fila: así llega siempre al pie, mida lo que mida el formulario.
+   Antes el negro era un bloque pegajoso con la altura de la pantalla menos la
+   cabecera; al bajar se pegaba arriba y dejaba debajo una franja blanca de
+   esa misma altura. */
+.acceso__escena {
+    background: var(--negro);
+}
+
+/* Solo el logo es pegajoso, dentro de una columna que ya es negra entera: si su
+   altura no cuadra al milímetro con la pantalla, lo que asoma sigue siendo negro */
+.acceso__marca {
+    position: sticky;
+    top: 0;
+    display: grid;
+    place-items: center;
+    height: calc(100svh - 4.5rem);
+    max-height: 100%;
+    padding: var(--margen);
+}
+
+/* El logo es claro sobre transparente (el mismo de la cabecera y el pie):
+   sobre negro se ve tal cual, sin invertirlo */
+.acceso__marca img {
+    display: block;
+    width: clamp(12rem, 24vw, 21rem);
+    height: auto;
+}
+
+/* --- Panel: título y formulario ---------------------------------------------- */
+
+.acceso__panel {
+    display: grid;
+    /* Centrado en los dos ejes, a la altura del logo: si el formulario es más
+       alto que la pantalla, el panel crece con él y el centrado no cuenta */
+    place-items: center;
+    align-content: center;
+    padding: clamp(3rem, 10vh, 6rem) var(--margen);
+}
+
+.acceso__caja {
+    width: 100%;
+    max-width: 24rem;
+}
+
+/* Un título a la medida de un formulario, no de un cartel: se anulan las
+   mayúsculas y el interlineado apretado del h1 común, pensados para rótulos */
+.acceso__titulo {
+    margin: 0;
+    font-size: var(--paso-entrada);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    text-transform: none;
+}
+
+.acceso__entrada {
+    margin: 0.5rem 0 2.5rem;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    line-height: 1.5;
+    text-wrap: pretty;
+}
+
+/* Error general: un bloque negro, el único elemento de la página que lo es en este lado */
+.acceso__aviso {
+    margin: 0 0 1.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--negro);
+    color: var(--blanco);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+.acceso__formulario {
+    display: grid;
+    gap: 1.5rem;
+}
+
+/* Dos campos cortos en la misma fila (nombre y apellidos, código postal y ciudad) */
+.acceso__fila {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.acceso__fila--postal {
+    grid-template-columns: 8rem 1fr;
+}
+
+/* Los datos de envío se separan con una línea fina y no con un titular grande:
+   es una sección opcional y no debe pesar más que lo obligatorio */
+.acceso__grupo {
+    display: grid;
+    gap: 1.5rem;
+    margin: 1rem 0 0;
+    padding: 2rem 0 0;
+    border: 0;
+    border-top: 1px solid var(--suelo);
+    min-width: 0;
+}
+
+/* La leyenda de un fieldset no admite padding-top del grupo: se saca del flujo
+   del borde con float para que quede debajo de la línea y no encima */
+.acceso__grupo legend {
+    float: left;
+    width: 100%;
+    padding: 0;
+    font-size: var(--paso-cuerpo);
+    font-weight: 700;
+}
+
+/* Más específico que «.acceso .campo__pista», que va después y pone el margen a cero */
+.acceso .acceso__grupo > .acceso__grupo-pista {
+    /* Pegada a la leyenda: es su subtítulo, no un campo más */
+    margin-top: -1.2rem;
+}
+
+/* --- Campos ----------------------------------------------------------------- */
+
+/* Todo bajo .acceso: la cesta de la cabecera también usa .campo y cada
+   formulario debe quedarse con su propio aspecto */
+
+.acceso .campo {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.acceso .campo label {
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.acceso .campo input {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.7rem 0.85rem;
+    /* --tenue y no un gris más claro: el borde de un campo necesita contraste 3:1 para verse */
+    border: 1px solid var(--tenue);
+    border-radius: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    font: inherit;
+    /* 16 px o más: por debajo, Safari en iPhone amplía la página al tocar el campo */
+    font-size: max(1rem, var(--paso-cuerpo));
+    transition: border-color 150ms var(--salida), box-shadow 150ms var(--salida);
+}
+
+.acceso .campo input:focus {
+    outline: none;
+}
+
+/* Foco: borde negro y un anillo pegado, se ve de lejos sin cambiar el tamaño del campo */
+.acceso .campo input:focus-visible {
+    border-color: var(--negro);
+    box-shadow: 0 0 0 1px var(--negro);
+}
+
+/* Sin color de error en la paleta: el campo mal rellenado se marca con un borde
+   más grueso y el motivo en negrita debajo */
+.acceso .campo--error input {
+    border-color: var(--negro);
+    box-shadow: inset 0 0 0 1px var(--negro);
+}
+
+.acceso .campo--error input:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--negro), 0 0 0 1px var(--negro);
+}
+
+.acceso .campo__pista,
+.acceso .campo__error {
+    margin: 0;
+    font-size: var(--paso-pequeno);
+    line-height: 1.4;
+}
+
+.acceso .campo__pista {
+    color: var(--tenue);
+}
+
+.acceso .campo__error {
+    font-weight: 700;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .acceso .campo input:hover {
+        border-color: var(--negro);
+    }
+}
+
+/* --- Enviar y enlace cruzado --------------------------------------------------- */
+
+.acceso__enviar {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding-block: 1rem;
+    font-size: var(--paso-cuerpo);
+    text-align: center;
+}
+
+/* El foco del teclado en el botón: un contorno separado, porque el botón ya es negro */
+.acceso__enviar:focus-visible {
+    outline: 2px solid var(--negro);
+    outline-offset: 3px;
+}
+
+.acceso__enviar:disabled {
+    background: var(--tenue);
+    cursor: progress;
+    transform: none;
+}
+
+.acceso__cruce {
+    margin: 2rem 0 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.acceso__cruce a {
+    color: var(--negro);
+    font-weight: 700;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    transition: text-decoration-thickness 150ms var(--salida);
+}
+
+.acceso__cruce a:focus-visible {
+    outline: 2px solid var(--negro);
+    outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .acceso__cruce a:hover {
+        text-decoration-thickness: 2px;
+    }
+}
+
+/* --- Entrada ------------------------------------------------------------------ */
+
+/* Solo la caja del formulario, una vez, al cargar: lo justo para que la página
+   no aparezca de golpe */
+.acceso__caja {
+    animation: acceso-entrada 200ms var(--salida) both;
+}
+
+@keyframes acceso-entrada {
+    from {
+        opacity: 0;
+        transform: translateY(0.5rem);
+    }
+}
+
+/* Con movimiento reducido se queda el fundido y se quita el desplazamiento */
+@media (prefers-reduced-motion: reduce) {
+    .acceso__caja {
+        animation-name: acceso-fundido;
+    }
+
+    .acceso .campo input,
+    .acceso__cruce a {
+        transition: none;
+    }
+
+    @keyframes acceso-fundido {
+        from {
+            opacity: 0;
+        }
+    }
+}
+
+/* --- Pantallas estrechas ------------------------------------------------------ */
+
+/* En una columna, el lado negro se queda en una franja corta con el logo encima
+   del formulario: la página sigue diciendo dónde estás y el formulario empieza
+   en la primera pantalla */
+@media (max-width: 52rem) {
+    .acceso {
+        grid-template-columns: minmax(0, 1fr);
+        min-height: 0;
+    }
+
+    .acceso__marca {
+        position: static;
+        height: auto;
+        padding-block: 1.75rem;
+    }
+
+    .acceso__marca img {
+        width: 8.5rem;
+    }
+
+    .acceso__panel {
+        padding-block: 2.5rem 4rem;
+    }
+}
+
+@media (max-width: 26rem) {
+    .acceso__fila {
+        grid-template-columns: 1fr;
+    }
+}
