@@ -34,8 +34,10 @@ INSERT INTO colores (nombre, codigo_hex) VALUES
     ('Azul',   '#1F4E9C');
 
 -- -----------------------------------------------------------------------------
--- Productos: 12 combinaciones de color de 10 modelos distintos a la venta
+-- Productos: 14 combinaciones de color de 12 modelos distintos a la venta
 -- (el enunciado pide un mínimo de 8 modelos) y 7 lanzamientos anunciados.
+-- El Air Max 95 «Neon» y el Air Max 1 x Patta van al final de la lista, después
+-- de los lanzamientos, para no mover los id que ya usan los pedidos y las pruebas.
 --
 -- Los lanzamientos llevan fecha futura, calculada desde el día en que se carga
 -- la semilla: así siempre hay próximos lanzamientos en la portada, se monte la
@@ -117,7 +119,14 @@ FROM (VALUES
          'Apodada «Black Cement Reimagined» (2024): piel negra, estampado de elefante y el logo Nike Air en el talón como en el par de 1988.'),
     (19, 'Jordan',    'Negro',  'Air Jordan 5 Retro OG',        'Black/Metallic Silver-Fire Red',
          'HF3975-001', 209.99,
-         'Apodada «Black Metallic Reimagined» (2025): nobuk negro, lengüeta reflectante plateada y Nike Air bordado en el talón.')
+         'Apodada «Black Metallic Reimagined» (2025): nobuk negro, lengüeta reflectante plateada y Nike Air bordado en el talón.'),
+    -- Incorporaciones al catálogo a la venta
+    (20, 'Air Max',   'Gris',   'Nike Air Max 95 OG',           'Black/Neon Yellow-Light Graphite',
+         'CT1689-001', 189.99,
+         'Reedición de 2020 del «Neon» original de 1995: capas de malla y ante en degradado de negro a gris, como las costillas de un cuerpo, ojales en amarillo neón y cámaras Air visibles en el talón y la puntera.'),
+    (21, 'Air Max',   'Azul',   'Nike Air Max 1 x Patta',       'Metallic Silver/Noise Aqua/Pure Platinum',
+         'DH1348-004', 179.99,
+         'Colaboración «The Wave» con la tienda de Ámsterdam Patta (2021): refuerzo de ante ondulado en azul aqua, malla gris y Swoosh bordado en la puntera.')
 ) AS p(orden, categoria, color, nombre, colorway, codigo, precio, descripcion)
 -- Días que faltan para el lanzamiento, por código (los que no están aquí ya se venden)
 LEFT JOIN (VALUES ('IZ1800-200', 1), ('IQ9951-001', 9), ('IX8180-001', 16),
@@ -129,12 +138,13 @@ JOIN marcas m       ON m.nombre = 'Nike'
 ORDER BY p.orden;   -- los id siguen el orden de la lista
 
 -- -----------------------------------------------------------------------------
--- Variantes: 9 tallas por producto (171 en total; las 63 de los lanzamientos
+-- Variantes: 9 tallas por producto (189 en total; las 63 de los lanzamientos
 -- se crean con stock 0 y se llenarán con el albarán cuando lleguen)
 --
 -- Stock inicial = base del producto × factor de la talla (hay más pares de las
 -- tallas centrales). Algunos casos están preparados a propósito para las demos:
---   * Las Jordan y el Air Max 97 tienen poco stock (informe "menos existencias")
+--   * Las Jordan, el Air Max 97 y el Air Max 1 x Patta tienen poco stock
+--     (informe "menos existencias")
 --   * Air Jordan 1 en talla 42 está agotada (stock 0) para probar "pedido sin stock"
 -- -----------------------------------------------------------------------------
 WITH base(codigo, stock_base) AS (VALUES
@@ -142,7 +152,8 @@ WITH base(codigo, stock_base) AS (VALUES
     ('CT1685-100',  9), ('DM0028-002',  5), ('DQ3989-100',  6), ('BQ6806-100', 12),
     ('DM4044-108', 10), ('DZ5485-612',  3), ('DN3707-100',  4), ('DH6927-111',  2),
     ('IZ1800-200',  0), ('IQ9951-001',  0), ('IX8180-001',  0),
-    ('FV5029-006',  0), ('CT8012-104',  0), ('DN3707-010',  0), ('HF3975-001',  0)
+    ('FV5029-006',  0), ('CT8012-104',  0), ('DN3707-010',  0), ('HF3975-001',  0),
+    ('CT1689-001',  7), ('DH1348-004',  4)
 ), tallas(talla, factor) AS (VALUES
     (39.0, 0.5), (40.0, 0.8), (40.5, 0.8), (41.0, 1.2), (42.0, 1.4),
     (42.5, 1.2), (43.0, 1.2), (44.0, 0.8), (45.0, 0.5)

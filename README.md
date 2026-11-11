@@ -95,8 +95,8 @@ ni entra en la imagen.
   comprueban que todo cuadra: si algo no cuadra, la carga se aborta y el contenedor no arranca.
 - Para volver a los datos iniciales: `docker compose down -v && docker compose up -d`.
 
-**Datos de prueba** (todos ficticios): 13 clientes (uno desactivado), 12 zapatillas Nike reales de 10 modelos
-con 108 tallas, 8 opciones de personalización (una desactivada) y 24 pedidos en los 6 estados, 7 de ellos personalizados.
+**Datos de prueba** (todos ficticios): 13 clientes (uno desactivado), 14 zapatillas Nike reales de 12 modelos
+con 126 tallas, 8 opciones de personalización (una desactivada) y 24 pedidos en los 6 estados, 7 de ellos personalizados.
 
 ### Usuarios de prueba
 

@@ -29,6 +29,8 @@ para el proyecto de clase.
 | 10 | Air Jordan 1 Retro High OG · «Lost & Found» (Chicago) | DZ5485-612 | `img/productos/dz5485-612.webp` | [GOAT, lateral](https://image.goat.com/transform/v1/attachments/product_template_additional_pictures/images/080/963/037/original/920714_01.jpg.jpeg?action=crop&width=1600) | [KicksCrew](https://cdn.shopify.com/s/files/1/0603/3031/1875/files/main-square_20547cf0-313d-492e-841b-19bc12ed1281.jpg?v=1717156718) · [Forty Four, PNG transparente del par](https://fortyfour-sneaker.com/cdn/shop/files/nike_air_jordan_1_retro_high_og_chicago_lost_and_found_side.png?v=1745709593&width=1946) | [goat.com](https://www.goat.com/sneakers/air-jordan-1-retro-high-og-dz5485-612) |
 | 11 | Air Jordan 3 Retro · «White Cement Reimagined» | DN3707-100 | `img/productos/dn3707-100.webp` | [Flight Club](https://cdn.flightclub.com/TEMPLATE/348432/1.jpg) | [Nike SNKRS](https://static.nike.com/a/images/w_1280,q_auto,f_auto/a634997c-102f-4fdc-b56c-267c5d410d7c/air-jordan-3-white-cement-re-imagined-dn3707-100-release-date.jpg) | [flightclub.com](https://www.flightclub.com/air-jordan-3-retro-white-cement-reimagined-dn3707-100) |
 | 12 | Air Jordan 4 Retro · «Military Black» | DH6927-111 | `img/productos/dh6927-111.webp` | [Flight Club](https://cdn.flightclub.com/TEMPLATE/299066/1.jpg) | [SVD, el par](https://media.sivasdescalzo.com/media/catalog/product/D/H/DH6927-111_sivasdescalzo-Jordan-Air_Jordan_4_Retro_Military_Black_-1653999967-2.jpg) · [SVD, trasera](https://media.sivasdescalzo.com/media/catalog/product/D/H/DH6927-111_sivasdescalzo-Jordan-Air_Jordan_4_Retro_Military_Black_-1653999926-4.jpg?width=1920&quality=72&optimize=high&format=auto) | [flightclub.com](https://www.flightclub.com/air-jordan-4-retro-military-black-dh6927-111) |
+| 20 | Nike Air Max 95 OG · «Neon» (2020) | CT1689-001 | `img/productos/ct1689-001.webp` | [Flight Club](https://cdn.flightclub.com/TEMPLATE/181132/1.jpg) | [StockX](https://images.stockx.com/images/Nike-Air-Max-95-OG-Neon-2020-Product.jpg?fit=fill&bg=FFFFFF&w=700&h=500&fm=webp&auto=compress&q=90&dpr=2&trim=color) | [flightclub.com](https://www.flightclub.com/air-max-95-og-neon-2020-ct1689-001) |
+| 21 | Nike Air Max 1 x Patta · «Noise Aqua» | DH1348-004 | `img/productos/dh1348-004.webp` | [Flight Club](https://cdn.flightclub.com/TEMPLATE/283231/1.jpg) | [Nike SNKRS](https://static.nike.com/a/images/t_prod_ls/w_1920,c_limit/f42ff8c6-ca22-4038-9230-fd2e6d043099/air-max-1-x-patta-aqua-noise-dh1348-004-release-date.jpg) | [flightclub.com](https://www.flightclub.com/patta-x-air-max-1-noise-aqua-dh1348-004) |
 
 ## Lanzamientos
 
@@ -51,12 +53,39 @@ carga la base de datos.
 | Archivo | Uso | Origen |
 |---------|-----|--------|
 | `public/img/logo-kalma.png` | Logo de la cabecera, en blanco y gris | Logo original de KALMA SNKRS con el arco pasado a escala de grises |
-| `public/img/jordan1-chicago.png` | Silueta del hero animado de la portada | Foto lateral de GOAT (fila 10) con el fondo blanco recortado a transparente y reducida a 1200 px de ancho |
+| `public/img/siluetas/dz5485-612.png` | Silueta del hero animado de la portada (Air Jordan 1 «Lost & Found») | Foto lateral de GOAT (fila 10) con el fondo blanco recortado a transparente y reducida a 1200 px de ancho |
+| `public/img/siluetas/dn3707-010.png` | Silueta del hero (Air Jordan 3 «Black Cement Reimagined») | Foto del catálogo (fila 18) recortada a transparente |
+| `public/img/siluetas/fv5029-006.png` | Silueta del hero (Air Jordan 4 «Bred Reimagined») | Foto del catálogo (fila 16) recortada a transparente |
+| `public/img/siluetas/hf3975-001.png` | Silueta del hero (Air Jordan 5 «Black Metallic Reimagined») | Foto del catálogo (fila 19) recortada a transparente |
+| `public/img/siluetas/cw2288-001.png` | Silueta del hero (Air Force 1 '07 negra) | Foto del catálogo (fila 2) recortada a transparente |
+| `public/img/siluetas/ct1689-001.png` | Silueta del hero (Air Max 95 «Neon») | Foto del catálogo (fila 20) recortada a transparente |
+| `public/img/siluetas/dm0028-002.png` | Silueta del hero (Air Max 97 «Silver Bullet») | Foto del catálogo (fila 6) recortada a transparente |
+
+Las siluetas del hero están todas de perfil, con la puntera a la derecha, recortadas al borde
+de la zapatilla con unos píxeles de margen, sin la sombra del suelo y con 1200 px de ancho:
+así el encaje del shader (70 % del ancho y 60 % del alto) vale para todas. La portada sortea
+una en cada carga (`app/vistas/parciales/hero-light.php`). Las zapatillas blancas sobre fondo
+blanco se han descartado porque su contorno no sale limpio.
 
 ## Fotos descargadas
 
-Las 12 fotos principales están descargadas en `public/img/productos/`, con el nombre de la
+Las 14 fotos principales están descargadas en `public/img/productos/`, con el nombre de la
 columna «Archivo local». Todas son vistas laterales de una sola zapatilla, en WebP y con
 1200 px en el lado mayor. Las proporciones varían (cuadradas, apaisadas y verticales) y el
 fondo se ha igualado a blanco puro en las que venían con gris o degradado. Así se pueden
 fundir con el fondo de la página con `mix-blend-mode: multiply`, encajadas con `object-fit: contain`.
+
+## Página «Sobre nosotros»
+
+Fotos de cultura sneaker con licencia libre para uso comercial, en `public/img/nosotros/`.
+Son ajenas a KALMA: ilustran el mundo de las zapatillas y nunca se presentan como pares,
+tiendas ni clientes de la casa. Cada una lleva su crédito en el pie de foto de la página.
+Se han reducido de tamaño y pasado a WebP; no se han retocado de otra forma.
+
+| Archivo | Uso | Autor | Licencia | Origen |
+|---------|-----|-------|----------|--------|
+| `img/nosotros/air-jordan-1-en-la-mano.webp` | Capítulo «Lo que pasa de mano en mano» | Ting Him Mak | [CC BY 2.0](https://creativecommons.org/licenses/by/2.0) | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Air_Jordan_1_(29361675221).jpg) |
+| `img/nosotros/zapatillas-colgadas-berna.webp` | Sección «Viene de la calle» | PeterSherman42 | [CC0](https://creativecommons.org/publicdomain/zero/1.0/deed.es) | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Shoefiti_Europaplatz_Bern_12.jpg) |
+
+Las fotos de producto de la página salen del catálogo de arriba: DZ5485-612, CW2288-111,
+DQ3989-100, DH6927-111 y CW2288-001.
