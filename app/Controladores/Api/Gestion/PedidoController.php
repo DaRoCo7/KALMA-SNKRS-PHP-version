@@ -8,19 +8,19 @@ use App\Nucleo\Paginacion;
 use App\Nucleo\Peticion;
 use App\Nucleo\Respuesta;
 use App\Seguridad\Sesion;
-use App\Servicios\PedidoServicio;
+use App\Servicios\GestionPedidoServicio;
 
 /**
  * API de pedidos del área interna (almacén y administración). Los permisos de
  * cada ruta están en config/rutas/operaciones.php.
  *
  * A diferencia de /api/pedidos, aquí se ven los pedidos de todos los clientes.
- * Qué estados puede poner cada rol lo decide PedidoServicio (confirmar y
+ * Qué estados puede poner cada rol lo decide EstadosPedido (confirmar y
  * cancelar solo administración).
  */
 final class PedidoController
 {
-    public function __construct(private readonly PedidoServicio $pedidos = new PedidoServicio())
+    public function __construct(private readonly GestionPedidoServicio $pedidos = new GestionPedidoServicio())
     {
     }
 

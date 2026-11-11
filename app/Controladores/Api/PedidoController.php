@@ -8,7 +8,7 @@ use App\Nucleo\Paginacion;
 use App\Nucleo\Peticion;
 use App\Nucleo\Respuesta;
 use App\Seguridad\Sesion;
-use App\Servicios\PedidoServicio;
+use App\Servicios\PedidoClienteServicio;
 
 /**
  * API de los pedidos propios del cliente. Todas las rutas exigen sesión y el
@@ -19,7 +19,7 @@ use App\Servicios\PedidoServicio;
  */
 final class PedidoController
 {
-    public function __construct(private readonly PedidoServicio $pedidos = new PedidoServicio())
+    public function __construct(private readonly PedidoClienteServicio $pedidos = new PedidoClienteServicio())
     {
     }
 

@@ -8,7 +8,7 @@ declare(strict_types=1);
  *
  * El middleware de cada ruta comprueba el permiso general. La regla más fina
  * de los estados (confirmar el pago y cancelar solo administración) depende del
- * cuerpo de la petición y la aplica PedidoServicio::cambiarEstado().
+ * cuerpo de la petición y la aplica GestionPedidoServicio::cambiarEstado().
  */
 
 use App\Controladores\Api\Gestion\PedidoController as GestionPedidoController;

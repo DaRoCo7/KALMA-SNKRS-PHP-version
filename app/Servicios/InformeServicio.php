@@ -33,7 +33,7 @@ final class InformeServicio
         // adivinar qué estados faltan
         $porEstado = $this->informes->pedidosPorEstado();
         $pedidosPorEstado = [];
-        foreach (PedidoServicio::ESTADOS as $estado) {
+        foreach (EstadosPedido::ESTADOS as $estado) {
             $pedidosPorEstado[$estado] = $porEstado[$estado] ?? 0;
         }
 

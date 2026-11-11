@@ -161,8 +161,8 @@ final class ExportacionServicio
         try {
             $filtros = (new Validador($query))
                 ->opcion('formato', self::FORMATOS)
-                ->patron('estado', '/^(' . implode('|', PedidoServicio::ESTADOS) . ')$/',
-                    'Valores: ' . implode(', ', PedidoServicio::ESTADOS))
+                ->patron('estado', '/^(' . implode('|', EstadosPedido::ESTADOS) . ')$/',
+                    'Valores: ' . implode(', ', EstadosPedido::ESTADOS))
                 ->validar();
         } catch (HttpExcepcion $error) {
             $errores = $error->detalles['errores'] ?? [];

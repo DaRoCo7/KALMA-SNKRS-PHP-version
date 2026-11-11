@@ -16,7 +16,7 @@ Proyecto intermodular de 2.º DAW (XTART): **Desarrollo Web en Entorno Servidor*
 Documentación relacionada:
 - [`docs/contrato-integracion.md`](docs/contrato-integracion.md): contrato entre la aplicación, el despliegue y el front (servicios, variables, `/health` y la especificación completa de la API).
 - [`docs/diagrama-er.md`](docs/diagrama-er.md): diagrama entidad/relación y justificación de cada tabla.
-- [`postman/`](postman/): colección de pruebas con resultados esperados (218 peticiones).
+- [`postman/`](postman/): colección de pruebas con resultados esperados (269 peticiones).
 
 ---
 
@@ -105,7 +105,7 @@ Contraseña de todas las cuentas: **`Kalma2026!`**
 | Email | Rol | Qué puede hacer |
 |---|---|---|
 | `admin@kalma.test` | Administrador | Todo: productos, albaranes, confirmar y cancelar pedidos, informes, auditoría, exportación, consultas |
-| `almacen@kalma.test` | Almacén | Stock y logística de los pedidos (preparación, envío y entrega) |
+| `almacen@kalma.test` | Almacén | Stock, consulta de los albaranes cargados, logística de los pedidos (preparación, envío y entrega) e informes de stock para administración |
 | `cliente@kalma.test` | Cliente | Sus pedidos y su perfil |
 
 Pedidos preparados para la demostración:
@@ -162,8 +162,8 @@ Ejemplo: la clienta crea un pedido de dos pares de Air Force 1 con la caja edici
    tiene el permiso `pedidos.propios` (`RequierePermiso`). Si algo falla: 403 o 401 y, si es un acceso denegado,
    queda en la auditoría.
 4. **Controlador.** `PedidoController::crear()` pasa el usuario de la sesión y el cuerpo JSON al servicio.
-5. **Servicio.** `PedidoServicio::crear()` valida la forma de los datos (`LineasPedido::validar()`) y abre una
-   transacción en la que:
+5. **Servicio.** `PedidoClienteServicio::crear()` comprueba que la cuenta sea de cliente y `CreacionPedido::crear()`
+   valida la forma de los datos (`LineasPedido::validar()`) y abre una transacción en la que:
    - bloquea las tallas con `SELECT ... FOR UPDATE` (dos compras simultáneas no venden la misma unidad);
    - comprueba stock, personalización y precio con los datos del catálogo, nunca con los del navegador;
    - inserta el pedido, sus líneas y su personalización, descuenta el stock dejando su movimiento,
@@ -197,8 +197,10 @@ Formato común:
 | Cliente | `GET` y `PATCH /api/perfil` · `GET` y `POST /api/pedidos` · `GET /api/pedidos/{codigo}` · `POST /api/pedidos/{codigo}/cancelar` | Cliente |
 | Pedidos (interno) | `GET /api/gestion/pedidos` · `GET /api/gestion/pedidos/{codigo}` · `PATCH /api/gestion/pedidos/{codigo}/estado` | Almacén y admin |
 | Stock | `GET /api/gestion/stock` · `PATCH /api/gestion/variantes/{id}/stock` · `GET /api/gestion/variantes/{id}/movimientos` | Almacén y admin |
+| Albaranes cargados | `GET /api/gestion/albaranes` · `GET /api/gestion/albaranes/detalle?referencia=` | Almacén y admin |
 | Catálogo interno | `GET`, `POST /api/gestion/productos` · `GET`, `PATCH`, `DELETE /api/gestion/productos/{id}` · `POST /api/gestion/albaranes` | Admin |
 | Informes y control | `GET /api/gestion/resumen` · `GET /api/gestion/informes/{nombre}` · `GET /api/gestion/auditoria` · `GET /api/gestion/exportar/pedidos` · `GET`, `PATCH /api/gestion/consultas` · `GET /api/usuarios` | Admin |
+| Informes de stock | `GET /api/gestion/informes-stock/vista-previa` (y `/csv`) · `GET`, `POST /api/gestion/informes-stock` · `GET /api/gestion/informes-stock/{id}` (y `/csv`) · `PATCH /api/gestion/informes-stock/{id}/revisado` | Almacén los envía; admin los revisa |
 
 La especificación de cada ruta (parámetros, cuerpo, permisos y códigos de respuesta) está en el
 [punto 9 del contrato](docs/contrato-integracion.md#9-contrato-de-la-api-para-el-front) y cada una tiene
@@ -208,9 +210,9 @@ ejemplos de petición y respuesta en la colección de Postman.
 
 | Regla | Dónde |
 |---|---|
-| Estados: `pendiente → confirmado → preparacion → enviado → entregado`; cancelar solo desde pendiente o confirmado, reponiendo el stock una vez | `PedidoServicio::TRANSICIONES` |
-| El almacén lleva la logística; confirmar el pago y cancelar desde gestión son de administración | `PedidoServicio`, `Permisos` |
-| Pasar a enviado exige un código de seguimiento único | `PedidoServicio` |
+| Estados: `pendiente → confirmado → preparacion → enviado → entregado`; cancelar solo desde pendiente o confirmado, reponiendo el stock una vez | `EstadosPedido::TRANSICIONES` |
+| El almacén lleva la logística; confirmar el pago y cancelar desde gestión son de administración | `EstadosPedido`, `GestionPedidoServicio`, `Permisos` |
+| Pasar a enviado exige un código de seguimiento único | `GestionPedidoServicio`, `EstadosPedido` |
 | Personalización por línea con recargo por par: una opción de cada tipo, solo opciones activas, el bordado solo en modelos personalizables (no Air Max ni Jordan) y con hasta 12 letras | `LineasPedido`, tabla `opciones_personalizacion` |
 | Precios, recargos y totales los calcula el servidor | `LineasPedido::preparar()` y columna generada `importe` |
 | El albarán CSV suma stock y crea tallas o zapatillas nuevas; con una fila mal se rechaza entero | `AlbaranServicio` |
@@ -228,7 +230,7 @@ ejemplos de petición y respuesta en la colección de Postman.
 | Fuerza bruta | Límite por IP en Nginx y en PHP, y 5 intentos por cuenta cada 15 minutos, con auditoría |
 | Accesos indebidos | Matriz de permisos por rol en el servidor; el pedido de otro cliente responde 404 (IDOR) y queda en auditoría |
 | Errores | Nunca se muestran trazas: el cliente recibe un mensaje y una referencia que se busca en el log |
-| Exportación CSV | Las celdas que empiezan por `=`, `+`, `-` o `@` se neutralizan (inyección de fórmulas en Excel) |
+| Exportación CSV (pedidos e informes de stock) | Las celdas que empiezan por `=`, `+`, `-` o `@` se neutralizan (inyección de fórmulas en Excel) |
 | Datos personales | No se guarda el DNI; la auditoría y los logs nunca llevan contraseñas, tokens ni valores personales |
 
 ## 8. Auditoría y logs
@@ -237,6 +239,9 @@ ejemplos de petición y respuesta en la colección de Postman.
   pedidos creados y cancelados, cambios de estado, ajustes de stock, albaranes, cambios de productos y de perfil,
   consultas y exportaciones. Cada evento guarda usuario, fecha, tipo, entidad, resultado (`exito`, `error` o
   `denegado`), un detalle sin datos sensibles y la IP real del cliente.
+- **Informes de stock**: también viven en `auditoria`, sin tabla propia. Enviar uno es un evento `informe_stock.enviar`
+  con la foto de las filas en el detalle (su id es el número del informe); revisarlo, un evento `informe_stock.revisar`
+  que apunta a ese id. Pendiente = enviado y sin revisión.
 - **Log de la aplicación**: `docker compose logs app`, una línea JSON por evento con fecha, nivel y referencia.
 - **Movimientos de stock**: cada unidad que entra o sale queda en `movimientos_stock` con su motivo y el stock
   resultante (`GET /api/gestion/variantes/{id}/movimientos`).
@@ -256,7 +261,7 @@ Desde la terminal, con Node.js:
 npx newman run postman/KALMA-SNKRS.postman_collection.json -e postman/KALMA-SNKRS.postman_environment.json
 ```
 
-Resultado esperado con la base de datos recién creada: **218 peticiones y 276 comprobaciones sin fallos**.
+Resultado esperado con la base de datos recién creada: **269 peticiones y 353 comprobaciones sin fallos**.
 
 Hay que tener en cuenta dos cosas:
 - La colección inicia sesión muchas veces y Nginx limita el login a 30 peticiones por minuto e IP: si se lanza dos

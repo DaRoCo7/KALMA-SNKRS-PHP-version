@@ -9,7 +9,7 @@ use App\Nucleo\BaseDatos;
 /**
  * Acceso a datos de pedidos, sus líneas, su personalización y su historial.
  * Solo SQL: las reglas (quién puede ver qué, qué estados se permiten) están
- * en PedidoServicio.
+ * en los servicios de pedidos (EstadosPedido, PedidoClienteServicio, GestionPedidoServicio).
  */
 final class PedidoRepositorio
 {
