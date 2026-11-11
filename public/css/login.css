@@ -1,0 +1,241 @@
+/*
+ * Login mínimo: una columna centrada con el logo arriba y el formulario debajo.
+ * Hoja propia y no acceso.css, que sigue siendo del registro: así cambiar una
+ * pantalla no mueve la otra.
+ *
+ * Fondo negro y no blanco: el logo es claro sobre transparente y su arco lleva
+ * un degradado de blanco a gris. Con filter: invert(1) sobre blanco el arco
+ * saldría al revés (de negro a gris claro) y el logo dejaría de ser el de la
+ * casa; sobre negro se ve tal cual, como en la cabecera y el pie.
+ */
+
+/* El negro va en el body y no en un bloque: al rebotar el scroll o si el
+   formulario crece con errores, no asoma ninguna franja blanca */
+.pagina-login {
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+.login {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Mínimo y no altura: con errores el contenido crece y la página con él */
+    min-height: 100svh;
+    width: min(100% - 2 * var(--margen), 22rem);
+    margin-inline: auto;
+    padding-block: 3rem;
+    /* Entrada corta, una vez al cargar: lo justo para no aparecer de golpe */
+    animation: login-entrada 200ms var(--salida) both;
+}
+
+@keyframes login-entrada {
+    from {
+        opacity: 0;
+        transform: translateY(0.5rem);
+    }
+}
+
+/* --- Logo ------------------------------------------------------------------------ */
+
+.login__marca {
+    display: block;
+    margin-bottom: 2.5rem;
+    /* El área de toque crece sin mover el logo */
+    padding: 0.5rem;
+    transition: opacity 150ms var(--salida);
+}
+
+.login__marca img {
+    display: block;
+    width: clamp(9rem, 40vw, 12rem);
+    height: auto;
+}
+
+.login__marca:focus-visible {
+    outline: 2px solid var(--blanco);
+    outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .login__marca:hover {
+        opacity: 0.8;
+    }
+}
+
+/* --- Título y aviso ---------------------------------------------------------------- */
+
+/* Un título a la medida de un formulario: se anulan las mayúsculas y el tamaño
+   de cartel del h1 común */
+.login__titulo {
+    align-self: stretch;
+    margin: 0 0 1.75rem;
+    font-size: var(--paso-entrada);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    text-transform: none;
+}
+
+/* El error general, invertido: el único bloque blanco de la pantalla */
+.login__aviso {
+    align-self: stretch;
+    margin: 0 0 1.5rem;
+    padding: 0.85rem 1rem;
+    background: var(--blanco);
+    color: var(--negro);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+/* --- Formulario ---------------------------------------------------------------------- */
+
+.login__formulario {
+    display: grid;
+    gap: 1.25rem;
+    width: 100%;
+}
+
+.login .campo {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.login .campo label {
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.login .campo input {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.7rem 0.85rem;
+    /* --tenue-oscuro: el borde del campo necesita contraste 3:1 con el negro para verse */
+    border: 1px solid var(--tenue-oscuro);
+    border-radius: 0;
+    background: var(--negro);
+    color: var(--blanco);
+    font: inherit;
+    /* 16 px o más: por debajo, Safari en iPhone amplía la página al tocar el campo */
+    font-size: max(1rem, var(--paso-cuerpo));
+    transition: border-color 150ms var(--salida), box-shadow 150ms var(--salida);
+}
+
+/* El autocompletado de Chrome pinta el campo de claro: se tapa con una sombra
+   interior negra para que no rompa la pantalla */
+.login .campo input:-webkit-autofill {
+    -webkit-text-fill-color: var(--blanco);
+    box-shadow: inset 0 0 0 100px var(--negro);
+    caret-color: var(--blanco);
+}
+
+.login .campo input:focus {
+    outline: none;
+}
+
+/* Foco: borde blanco y un anillo pegado, se ve de lejos sin cambiar el tamaño */
+.login .campo input:focus-visible {
+    border-color: var(--blanco);
+    box-shadow: 0 0 0 1px var(--blanco);
+}
+
+.login .campo input:-webkit-autofill:focus-visible {
+    box-shadow: inset 0 0 0 100px var(--negro), 0 0 0 1px var(--blanco);
+}
+
+/* Sin color de error en la paleta: el campo mal rellenado lleva un borde blanco
+   más grueso y el motivo en negrita debajo */
+.login .campo--error input {
+    border-color: var(--blanco);
+    box-shadow: inset 0 0 0 1px var(--blanco);
+}
+
+.login .campo--error input:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--blanco), 0 0 0 1px var(--blanco);
+}
+
+.login .campo__error {
+    margin: 0;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    line-height: 1.4;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .login .campo input:hover {
+        border-color: var(--blanco);
+    }
+}
+
+/* --- Botón y enlace al registro -------------------------------------------------- */
+
+/* .boton--claro: el botón blanco es lo que más pesa sobre el negro.
+   El hover gris y el :active con scale(0.97) ya vienen de estilos.css */
+.login__enviar {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding-block: 1rem;
+    font-size: var(--paso-cuerpo);
+    text-align: center;
+}
+
+.login__enviar:focus-visible {
+    outline: 2px solid var(--blanco);
+    outline-offset: 3px;
+}
+
+.login__enviar:disabled {
+    background: var(--tenue-oscuro);
+    cursor: progress;
+    transform: none;
+}
+
+.login__cruce {
+    margin: 2rem 0 0;
+    color: var(--tenue-oscuro);
+    font-size: var(--paso-pequeno);
+    text-align: center;
+}
+
+.login__cruce a {
+    color: var(--blanco);
+    font-weight: 700;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    transition: text-decoration-thickness 150ms var(--salida);
+}
+
+.login__cruce a:focus-visible {
+    outline: 2px solid var(--blanco);
+    outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .login__cruce a:hover {
+        text-decoration-thickness: 2px;
+    }
+}
+
+/* --- Movimiento reducido ------------------------------------------------------------- */
+
+/* Se queda el fundido y se quita el desplazamiento */
+@media (prefers-reduced-motion: reduce) {
+    .login {
+        animation-name: login-fundido;
+    }
+
+    .login__marca,
+    .login .campo input,
+    .login__cruce a {
+        transition: none;
+    }
+
+    @keyframes login-fundido {
+        from {
+            opacity: 0;
+        }
+    }
+}

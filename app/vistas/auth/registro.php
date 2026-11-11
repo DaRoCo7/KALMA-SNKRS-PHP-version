@@ -67,15 +67,17 @@ $campo = static function (string $nombre, string $etiqueta, array $opciones = []
 require dirname(__DIR__) . '/parciales/cabecera.php';
 ?>
 <div class="acceso">
-    <section class="acceso__escena" aria-labelledby="titulo-acceso">
-        <h1 class="acceso__titulo" id="titulo-acceso">Únete</h1>
-        <figure class="acceso__foto">
-            <img src="/img/productos/dn3707-010.webp" alt="" width="1200" height="855">
-        </figure>
-    </section>
+    <!-- Solo la marca: el h1 está junto al formulario, así que este lado es
+         decorativo y el lector de pantalla se lo salta -->
+    <div class="acceso__escena" aria-hidden="true">
+        <div class="acceso__marca">
+            <img src="/img/logo-kalma.png" alt="" width="640" height="275">
+        </div>
+    </div>
 
     <div class="acceso__panel">
         <div class="acceso__caja">
+            <h1 class="acceso__titulo">Crea tu cuenta</h1>
             <p class="acceso__entrada">Una cuenta para comprar, seguir tus pedidos y bordar tu nombre en los pares exclusivos.</p>
 
             <?php if ($error !== null): ?>
