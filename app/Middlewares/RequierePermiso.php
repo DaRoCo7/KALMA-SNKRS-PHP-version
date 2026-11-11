@@ -15,6 +15,7 @@ use App\Seguridad\Sesion;
 /**
  * Exige un permiso de la matriz (App\Seguridad\Permisos). Va siempre después
  * de Autenticado. Si el rol no lo tiene: 403 y el intento queda en auditoría.
+ * En la API el 403 es JSON; en las páginas (/panel), la página de error HTML.
  */
 final class RequierePermiso implements Middleware
 {
@@ -32,7 +33,11 @@ final class RequierePermiso implements Middleware
                 ['metodo' => $peticion->metodo, 'ruta' => $peticion->ruta, 'permiso' => $this->permiso],
                 $peticion->ip
             );
-            throw HttpExcepcion::prohibido();
+            // En una página el 403 lo pinta ManejadorErrores como HTML (errores/error.php);
+            // el mensaje habla de la página porque ahí no hay ninguna «operación» a la vista
+            throw $peticion->esApi()
+                ? HttpExcepcion::prohibido()
+                : HttpExcepcion::prohibido('Tu cuenta no tiene acceso a esta página');
         }
 
         return $siguiente($peticion);

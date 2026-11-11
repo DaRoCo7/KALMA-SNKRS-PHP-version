@@ -8,8 +8,9 @@ namespace App\Seguridad;
  * Matriz de permisos: qué puede hacer cada rol.
  *
  * - admin:   todo.
- * - almacen: control de stock y logística de los pedidos (ver todos y
- *            avanzarlos de confirmado a preparación, enviado y entregado).
+ * - almacen: entra en el área interna (/panel), control de stock y
+ *            logística de los pedidos (ver todos y avanzarlos de
+ *            confirmado a preparación, enviado y entregado).
  *            Confirmar un pago o cancelar desde el área interna es decisión
  *            de administración (pedidos.confirmar_cancelar).
  * - cliente: sus propios pedidos y su propio perfil. El catálogo es público y
@@ -27,6 +28,7 @@ final class Permisos
 {
     /** Permisos que existen y qué permiten (sirve de documentación) */
     public const DESCRIPCIONES = [
+        'panel.acceder'              => 'Entrar en el área interna (/panel); cada sección pide además su propio permiso',
         'pedidos.propios'            => 'Crear, ver y cancelar sus propios pedidos',
         'perfil.propio'              => 'Ver y editar sus propios datos',
         'pedidos.ver_todos'          => 'Ver los pedidos de todos los clientes',
@@ -44,7 +46,7 @@ final class Permisos
     /** '*' = todos los permisos */
     public const MATRIZ = [
         'admin'   => ['*'],
-        'almacen' => ['stock.gestionar', 'pedidos.ver_todos', 'pedidos.cambiar_estado'],
+        'almacen' => ['panel.acceder', 'stock.gestionar', 'pedidos.ver_todos', 'pedidos.cambiar_estado'],
         'cliente' => ['pedidos.propios', 'perfil.propio'],
     ];
 

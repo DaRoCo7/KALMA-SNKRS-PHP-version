@@ -313,6 +313,25 @@ final class PedidoServicio
     }
 
     /**
+     * Para cada estado, los estados a los que ESTE rol puede llevar un pedido
+     * desde el área interna. El panel lo usa para pintar solo los botones que
+     * funcionarán; sale de las mismas tablas que cambiarEstado(), así la
+     * pantalla y la API no pueden contradecirse. La API sigue comprobándolo.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function transicionesPara(string $rol): array
+    {
+        return array_map(
+            static fn (array $destinos): array => array_values(array_filter(
+                $destinos,
+                static fn (string $destino): bool => self::puedeLlevarA($rol, $destino)
+            )),
+            self::TRANSICIONES
+        );
+    }
+
+    /**
      * ¿Puede este rol llevar un pedido a $estado desde el área interna?
      * Aplica la separación de funciones de PERMISO_EXTRA_POR_DESTINO: almacén
      * sí puede a preparación, enviado y entregado; a confirmado y cancelado, no.
