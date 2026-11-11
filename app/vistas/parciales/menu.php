@@ -10,6 +10,7 @@
  * #menu de la cabecera, y «Cerrar» lleva a # (ver menu.css).
  *
  * @var array|null $usuarioSesion  lo deja cabecera.php
+ * @var string     $areaSesion     también de cabecera.php: /cuenta o /panel según el rol
  */
 
 // Las categorías salen de la base de datos en cada página. Si la consulta
@@ -84,6 +85,7 @@ $rutaActual = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
                 <a class="boton boton--claro menu__registro" href="/registro">Crear cuenta</a>
 <?php else: ?>
                 <p class="menu__nombre">Hola, <?= e($usuarioSesion['nombre']) ?></p>
+                <a class="boton" href="<?= e($areaSesion) ?>"<?= $areaSesion === $rutaActual ? ' aria-current="page"' : '' ?>><?= $areaSesion === '/cuenta' ? 'Mi cuenta' : 'Panel interno' ?></a>
                 <form method="post" action="/logout" class="en-linea">
                     <input type="hidden" name="_csrf" value="<?= e(\App\Seguridad\Sesion::tokenCsrf()) ?>">
                     <button class="boton boton--claro menu__registro" type="submit">Cerrar sesión</button>

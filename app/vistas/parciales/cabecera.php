@@ -4,14 +4,19 @@
  * Tres columnas: el botón «Menú» a la izquierda, el logo en el centro y la
  * cuenta con la cesta a la derecha. Las páginas, el buscador y los atajos del
  * catálogo viven en el panel del menú (parciales/menu.php).
- * Si hay sesión, la derecha muestra el nombre del usuario y el botón de cerrar
- * sesión (un formulario POST con el token CSRF: cerrar sesión también modifica datos).
+ * Si hay sesión, la derecha muestra el nombre del usuario, que enlaza a su área
+ * (/cuenta para los clientes, /panel para las cuentas de la tienda), y el botón
+ * de cerrar sesión (un formulario POST con el token CSRF: cerrar sesión también
+ * modifica datos).
  *
  * @var string $titulo
  * @var string[]|null $estilos    hojas de estilo propias de la página (rutas desde public/)
  * @var string|null   $claseMain  clase de <main>; la portada la deja vacía para ocupar todo el ancho
  */
 $usuarioSesion = \App\Seguridad\Sesion::usuario();
+// Adónde lleva «mi cuenta»: el cliente tiene su área y la tienda, el panel interno.
+// Lo usa también menu.php; cesta.js repite la misma regla al entrar sin recargar
+$areaSesion = ($usuarioSesion['rol'] ?? null) === 'cliente' ? '/cuenta' : '/panel';
 $estilos ??= [];
 $claseMain ??= 'contenedor';
 ?>
@@ -67,7 +72,7 @@ $claseMain ??= 'contenedor';
                     <a href="/login">Entrar</a>
                     <a class="boton boton--claro cuenta__registro" href="/registro">Crear cuenta</a>
                 <?php else: ?>
-                    <span class="cuenta__nombre"><?= e($usuarioSesion['nombre']) ?></span>
+                    <a class="cuenta__nombre" href="<?= e($areaSesion) ?>"><?= e($usuarioSesion['nombre']) ?></a>
                     <form method="post" action="/logout" class="en-linea">
                         <input type="hidden" name="_csrf" value="<?= e(\App\Seguridad\Sesion::tokenCsrf()) ?>">
                         <button type="submit">Salir</button>

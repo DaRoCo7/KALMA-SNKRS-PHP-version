@@ -211,9 +211,9 @@ h1 {
     cursor: pointer;
 }
 
+/* El nombre es el enlace a la cuenta (o al panel): en gris para que no compita con Salir */
 .cuenta__nombre {
     color: var(--tenue-oscuro);
-    cursor: default;
 }
 
 .cuenta > a:not(.boton),
@@ -222,8 +222,13 @@ h1 {
 }
 
 @media (hover: hover) and (pointer: fine) {
+    /* El nombre ya va en gris: al pasar por encima se aclara en vez de apagarse */
+    .cuenta > a.cuenta__nombre:hover {
+        color: var(--blanco);
+    }
+
     .boton-menu:hover,
-    .cuenta > a:not(.boton):hover,
+    .cuenta > a:not(.boton):not(.cuenta__nombre):hover,
     .cuenta button:hover {
         color: var(--tenue-oscuro);
     }
@@ -247,12 +252,12 @@ h1 {
     }
 
     /* Un enlace oculto a la vista no debe seguir recibiendo el foco: fuera del todo */
-    .cuenta__registro {
+    .cuenta__registro,
+    .cuenta__nombre {
         display: none;
     }
 
-    .boton-menu__texto,
-    .cuenta__nombre {
+    .boton-menu__texto {
         /* Fuera de la vista pero no del lector: el botón sigue llamándose «Menú» */
         position: absolute;
         width: 1px;

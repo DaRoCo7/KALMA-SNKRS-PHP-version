@@ -1,0 +1,681 @@
+/*
+ * Área del cliente (/cuenta): pedidos con su detalle y el formulario de datos.
+ * Es una pantalla para leer y gestionar, no un escaparate: letra de lectura,
+ * filas limpias y el negro reservado para lo que se puede pulsar o lo que importa.
+ * El prefijo «mi-cuenta» evita chocar con .cuenta, que es el bloque de la cabecera.
+ */
+
+.mi-cuenta__cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.mi-cuenta__titulo {
+    margin-bottom: 0;
+}
+
+.mi-cuenta__saludo {
+    margin: 0;
+    color: var(--tenue);
+    font-size: var(--paso-entrada);
+}
+
+.mi-cuenta__aviso {
+    display: grid;
+    justify-items: start;
+    gap: 1.25rem;
+    max-width: 38rem;
+    padding: 1.5rem;
+    background: var(--suelo);
+    line-height: 1.5;
+}
+
+.mi-cuenta__aviso p {
+    margin: 0;
+}
+
+/* Pedidos a la izquierda y datos a la derecha; en estrecho, uno debajo de otro */
+.mi-cuenta__rejilla {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+    gap: 3rem clamp(2rem, 4vw, 4rem);
+    align-items: start;
+}
+
+@media (max-width: 60rem) {
+    .mi-cuenta__rejilla {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.mi-cuenta__seccion {
+    margin: 0 0 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--negro);
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+}
+
+/* --- Lista de pedidos ------------------------------------------------------------ */
+
+.pedidos__estado {
+    display: grid;
+    justify-items: start;
+    gap: 1rem;
+    padding: 1.5rem 0;
+    color: var(--tenue);
+    line-height: 1.5;
+}
+
+.pedidos__estado[hidden] {
+    display: none;
+}
+
+.pedidos__estado p {
+    margin: 0;
+    max-width: 34rem;
+}
+
+.pedidos__lista {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pedido {
+    border-bottom: 1px solid #dcdcdc;
+}
+
+/* La fila entera es el botón: área de pulsación grande y una sola parada de foco */
+.pedido__resumen {
+    display: grid;
+    grid-template-columns: minmax(9rem, auto) auto 1fr auto auto 1rem;
+    grid-template-areas: "codigo estado fecha pares total flecha";
+    align-items: center;
+    gap: 0.5rem 1.25rem;
+    width: 100%;
+    padding: 1.1rem 0.25rem;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+}
+
+.pedido__resumen:focus-visible {
+    outline-offset: -3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .pedido__resumen:hover {
+        background: var(--suelo);
+    }
+}
+
+.pedido__codigo {
+    grid-area: codigo;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.pedido__resumen .estado {
+    grid-area: estado;
+}
+
+.pedido__fecha {
+    grid-area: fecha;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.pedido__pares {
+    grid-area: pares;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.pedido__total {
+    grid-area: total;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* Un ángulo hecho con dos bordes: gira al abrir y dice que la fila se despliega */
+.pedido__flecha {
+    grid-area: flecha;
+    justify-self: end;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-25%) rotate(45deg);
+    transition: transform 200ms var(--salida);
+}
+
+.pedido__resumen[aria-expanded="true"] .pedido__flecha {
+    transform: translateY(25%) rotate(-135deg);
+}
+
+/* En el móvil, dos renglones: qué pedido y en qué estado; cuándo, cuánto y cuánto cuesta */
+@media (max-width: 36rem) {
+    .pedido__resumen {
+        grid-template-columns: auto 1fr auto 1rem;
+        grid-template-areas:
+            "codigo codigo total flecha"
+            "estado fecha  pares flecha";
+        gap: 0.5rem 0.75rem;
+    }
+
+    .pedido__fecha {
+        justify-self: start;
+    }
+}
+
+.pedidos__mas {
+    margin-top: 1.5rem;
+    box-shadow: inset 0 0 0 1px var(--negro);
+}
+
+/* .boton fija display y ganaría al [hidden] del navegador */
+.pedidos__mas[hidden] {
+    display: none;
+}
+
+/* --- Etiquetas de estado ----------------------------------------------------------- */
+/* Sin colores de acento: el relleno va de hueco a lleno según avanza el pedido,
+   y el texto siempre dice el estado, así no depende de distinguir grises */
+
+.estado {
+    display: inline-block;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid var(--negro);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.estado--pendiente {
+    border-style: dashed;
+}
+
+.estado--confirmado,
+.estado--preparacion {
+    background: #e6e6e6;
+    border-color: #e6e6e6;
+}
+
+.estado--enviado,
+.estado--entregado {
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+.estado--cancelado {
+    border-color: #c4c4c4;
+    color: var(--tenue);
+    text-decoration: line-through;
+}
+
+/* --- Detalle de un pedido ------------------------------------------------------------ */
+
+.pedido__detalle {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
+    gap: 2rem;
+    padding: 0.5rem 0.25rem 2rem;
+}
+
+.pedido__detalle[hidden] {
+    display: none;
+}
+
+@media (max-width: 48rem) {
+    .pedido__detalle {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* Entrada corta al abrir: solo opacidad y un desplazamiento mínimo */
+.pedido__resumen[aria-expanded="true"] + .pedido__detalle {
+    animation: aparecer 200ms var(--salida);
+}
+
+@keyframes aparecer {
+    from {
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+}
+
+.pedido__cargando {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--tenue);
+}
+
+.pedido__aviso {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--suelo);
+    font-weight: 700;
+}
+
+.pedido__subtitulo {
+    margin: 0 0 0.75rem;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.pedido__lineas {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.linea {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: start;
+    padding-block: 0.85rem;
+    border-top: 1px solid #ececec;
+}
+
+.linea:first-child {
+    border-top: 0;
+    padding-top: 0;
+}
+
+/* El fondo del suelo hace de marco: las fotos llevan fondo blanco o gris claro */
+.linea__foto {
+    display: block;
+    width: 4.5rem;
+    height: 4.5rem;
+    object-fit: contain;
+    background: var(--suelo);
+}
+
+.linea__foto--vacia {
+    color: transparent;   /* esconde el texto alternativo vacío del navegador */
+}
+
+.linea__texto {
+    display: grid;
+    gap: 0.2rem;
+    line-height: 1.4;
+}
+
+.linea__texto p {
+    margin: 0;
+}
+
+.linea__nombre {
+    color: inherit;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .linea__nombre:hover {
+        text-decoration: underline;
+        text-underline-offset: 0.15em;
+    }
+}
+
+.linea__color,
+.linea__talla {
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.linea__extras {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0.35rem 0 0;
+    padding: 0 0 0 0.75rem;
+    border-left: 2px solid var(--negro);
+    font-size: var(--paso-pequeno);
+    list-style: none;
+}
+
+.linea__bordado {
+    font-weight: 700;
+}
+
+.linea__recargo {
+    margin-left: 0.4rem;
+    color: var(--tenue);
+    font-variant-numeric: tabular-nums;
+}
+
+.linea__importe {
+    margin: 0;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 36rem) {
+    .linea {
+        grid-template-columns: 4rem minmax(0, 1fr);
+    }
+
+    .linea__foto {
+        width: 4rem;
+        height: 4rem;
+    }
+
+    .linea__importe {
+        grid-column: 2;
+    }
+}
+
+.pedido__suma {
+    display: flex;
+    justify-content: space-between;
+    margin: 0;
+    padding-block: 0.85rem;
+    border-top: 2px solid var(--negro);
+    font-weight: 700;
+}
+
+.pedido__suma-importe {
+    font-variant-numeric: tabular-nums;
+}
+
+.pedido__envio {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.35rem 1rem;
+    margin: 0.5rem 0 0;
+    font-size: var(--paso-pequeno);
+    line-height: 1.45;
+}
+
+.pedido__envio dt {
+    color: var(--tenue);
+}
+
+.pedido__envio dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.pedido__seguimiento {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.pedido__cancelar {
+    margin-top: 1.5rem;
+    box-shadow: inset 0 0 0 1px var(--negro);
+}
+
+/* --- Historial como línea de tiempo --------------------------------------------------- */
+
+.historial {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Cada paso es un punto sobre una línea vertical; el último, el estado actual, va relleno */
+.historial__paso {
+    position: relative;
+    display: grid;
+    gap: 0.15rem;
+    padding: 0 0 1.1rem 1.5rem;
+    font-size: var(--paso-pequeno);
+    line-height: 1.4;
+}
+
+.historial__paso::before {
+    content: "";
+    position: absolute;
+    top: 0.3rem;
+    left: 0;
+    width: 0.6rem;
+    height: 0.6rem;
+    border: 2px solid var(--negro);
+    border-radius: 50%;
+    background: var(--blanco);
+}
+
+.historial__paso:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 1.05rem;
+    bottom: 0.1rem;
+    left: calc(0.3rem - 1px);
+    width: 2px;
+    background: #c4c4c4;
+}
+
+.historial__paso[aria-current="step"]::before {
+    background: var(--negro);
+}
+
+.historial__paso--cancelado::before {
+    border-color: var(--tenue);
+}
+
+.historial__paso--cancelado[aria-current="step"]::before {
+    background: var(--tenue);
+}
+
+.historial__estado {
+    font-weight: 700;
+}
+
+.historial__fecha {
+    color: var(--tenue);
+    font-variant-numeric: tabular-nums;
+}
+
+.historial__comentario {
+    margin: 0;
+    color: var(--tenue);
+}
+
+/* --- Formulario de datos ----------------------------------------------------------------- */
+
+.datos__formulario {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+}
+
+/* Todo a lo ancho salvo código postal y ciudad, que son cortos y van a pares */
+.campo--fijo,
+.campo--nombre,
+.campo--apellidos,
+.campo--telefono,
+.campo--direccion,
+.campo--provincia,
+.datos__pie {
+    grid-column: 1 / -1;
+}
+
+.campo {
+    display: grid;
+    gap: 0.35rem;
+    align-content: start;
+}
+
+.campo label,
+.campo__etiqueta {
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.campo__opcional {
+    color: var(--tenue);
+    font-weight: 400;
+}
+
+.campo__valor {
+    overflow-wrap: anywhere;
+    color: var(--tenue);
+}
+
+.campo input,
+.campo textarea {
+    width: 100%;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid #c4c4c4;
+    border-radius: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    font: inherit;
+    /* 16px como mínimo: con menos, Safari en el móvil acerca la página al escribir */
+    font-size: max(1rem, var(--paso-pequeno));
+    resize: vertical;
+    transition: border-color 150ms ease;
+}
+
+.campo input:disabled {
+    background: var(--suelo);
+    color: var(--tenue);
+}
+
+.campo input:focus-visible,
+.campo textarea:focus-visible {
+    border-color: var(--negro);
+    outline: 2px solid var(--negro);
+    outline-offset: 0;
+}
+
+.campo [aria-invalid="true"] {
+    border-color: var(--negro);
+    border-width: 2px;
+}
+
+.campo__error {
+    margin: 0;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.campo__error:empty {
+    display: none;
+}
+
+.datos__pie {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-top: 0.5rem;
+}
+
+.boton:disabled {
+    cursor: progress;
+    opacity: 0.6;
+}
+
+.datos__aviso {
+    margin: 0;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+/* El «guardado» llega con una marca: se distingue de un error sin mirar el texto */
+.datos__aviso--ok::before {
+    content: "✓ ";
+}
+
+/* --- Confirmación de la cancelación ----------------------------------------------------- */
+
+.confirmar {
+    width: min(100% - 2 * var(--margen), 28rem);
+    max-height: calc(100% - 2 * var(--margen));
+    padding: 0;
+    border: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    opacity: 1;
+    transform: none;
+    transition: opacity 200ms var(--salida), transform 200ms var(--salida),
+        overlay 200ms allow-discrete, display 200ms allow-discrete;
+}
+
+.confirmar::backdrop {
+    background: rgb(1 1 1 / 0.5);
+    transition: opacity 200ms ease;
+}
+
+@starting-style {
+    .confirmar[open] {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+
+    .confirmar[open]::backdrop {
+        opacity: 0;
+    }
+}
+
+/* La salida es más corta que la entrada (cerrarDialogo espera 150 ms) */
+.confirmar.cerrando {
+    opacity: 0;
+    transform: scale(0.97);
+    transition-duration: 150ms;
+}
+
+.confirmar.cerrando::backdrop {
+    opacity: 0;
+}
+
+.confirmar__caja {
+    display: grid;
+    gap: 1rem;
+    padding: 1.5rem;
+}
+
+.confirmar__titulo {
+    margin: 0;
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    line-height: 1.15;
+}
+
+.confirmar__texto {
+    margin: 0;
+    color: var(--tenue);
+    line-height: 1.5;
+}
+
+.confirmar__botones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.confirmar__volver {
+    box-shadow: inset 0 0 0 1px var(--negro);
+}
+
+/* Quien pide menos movimiento ve el cambio sin desplazamientos ni giros */
+@media (prefers-reduced-motion: reduce) {
+    .pedido__flecha,
+    .confirmar {
+        transition: none;
+    }
+
+    .pedido__resumen[aria-expanded="true"] + .pedido__detalle {
+        animation: none;
+    }
+}

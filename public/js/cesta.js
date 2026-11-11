@@ -513,7 +513,8 @@ async function entrar(evento) {
 /**
  * La cabecera la pintó el servidor sin sesión: al entrar desde la cesta se
  * cambian «Entrar» y «Crear cuenta» por el nombre y el botón de salir, con el
- * token nuevo (cerrar sesión también es un POST protegido).
+ * token nuevo (cerrar sesión también es un POST protegido). El nombre enlaza a
+ * /cuenta o a /panel con la misma regla que parciales/cabecera.php.
  */
 function actualizarCuenta(usuario, token) {
     const cuenta = document.querySelector('.cuenta');
@@ -533,7 +534,9 @@ function actualizarCuenta(usuario, token) {
     salir.type = 'submit';
     form.append(oculto, salir);
 
-    cuenta.append(crear('span', 'cuenta__nombre', usuario.nombre), form);
+    const nombre = crear('a', 'cuenta__nombre', usuario.nombre);
+    nombre.href = usuario.rol === 'cliente' ? '/cuenta' : '/panel';
+    cuenta.append(nombre, form);
 }
 
 // --- Arranque ------------------------------------------------------------------------

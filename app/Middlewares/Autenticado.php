@@ -12,7 +12,8 @@ use App\Repositorios\UsuarioRepositorio;
 use App\Seguridad\Sesion;
 
 /**
- * Exige sesión iniciada: 401 en la API y redirección a /login en las páginas.
+ * Exige sesión iniciada: 401 en la API y, en las páginas, redirección a
+ * /login?volver=<página pedida>.
  *
  * En cada petición vuelve a leer el usuario de la BD: si un administrador lo
  * desactiva o le cambia el rol, el cambio se aplica al momento y no cuando
@@ -30,12 +31,31 @@ final class Autenticado implements Middleware
                 Sesion::cerrar();   // la cuenta se ha desactivado o ya no existe
             }
             if (!$peticion->esApi()) {
-                return Respuesta::redireccion('/login');
+                return Respuesta::redireccion(self::urlLogin($peticion));
             }
             throw HttpExcepcion::noAutenticado();
         }
 
         Sesion::actualizarUsuario($actual);
         return $siguiente($peticion);
+    }
+
+    /**
+     * /login con la página pedida en ?volver=, para que tras entrar el usuario
+     * acabe donde quería ir y no en el catálogo. Solo en los GET: tras un POST
+     * caducado no tiene sentido volver a una URL que no se puede abrir.
+     * La query original se conserva; el filtro de rutas no fiables lo hace
+     * AuthController::destinoSeguro al leer el parámetro.
+     */
+    private static function urlLogin(Peticion $peticion): string
+    {
+        if ($peticion->metodo !== 'GET') {
+            return '/login';
+        }
+        $volver = $peticion->ruta;
+        if ($peticion->query !== []) {
+            $volver .= '?' . http_build_query($peticion->query);
+        }
+        return '/login?volver=' . rawurlencode($volver);
     }
 }
