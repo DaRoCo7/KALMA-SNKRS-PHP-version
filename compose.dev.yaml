@@ -10,6 +10,15 @@
 # (las clases nuevas se encuentran igualmente por PSR-4).
 # =============================================================================
 services:
+  proxy:
+    environment:
+      KALMA_HTTPS_ORIGIN: https://localhost:8443
+    ports: !override
+      - "127.0.0.1:8081:80"
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./public:/var/www/html/public:ro
+
   app:
     environment:
       # En desarrollo, las respuestas de error 500 incluyen el motivo para depurar

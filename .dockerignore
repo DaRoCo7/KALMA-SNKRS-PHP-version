@@ -13,3 +13,7 @@ Thumbs.db
 
 # Dependencias PHP
 vendor/
+
+# Certificados locales y copias de seguridad
+docker/nginx/certs/
+backups/
