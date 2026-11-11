@@ -197,9 +197,14 @@ Permisos: ver la matriz en `app/Seguridad/Permisos.php` (admin tiene todos).
 | GET | `/api/productos?buscar&categoria&color&talla&precio_min&precio_max&personalizable&disponible&orden&pagina&por_pagina` | 200, 400 |
 | GET | `/api/productos/{slug}` | 200, 404 |
 | GET | `/api/catalogo/filtros` | 200 |
+| GET | `/api/lanzamientos` | 200 |
 | POST | `/api/consultas` | 201, 400, 429 (5 por IP y hora) |
 
 `orden`: `novedades` (por defecto), `precio_asc`, `precio_desc`, `nombre`.
+La ficha trae `fecha_lanzamiento` (`AAAA-MM-DD`, o `null` si no es un lanzamiento). Si la fecha es futura, la zapatilla
+está anunciada pero no se vende: la ficha devuelve `tallas: []`, `stock_total: 0` y `opciones_personalizacion: []`.
+`GET /api/lanzamientos` devuelve todos los lanzamientos futuros, del más cercano al más lejano, con `id`, `slug`, `nombre`,
+`colorway`, `codigo_marca`, `descripcion`, `precio`, `imagen` y `fecha_lanzamiento`. No salen en `/api/productos`.
 Cada talla de la ficha trae `variante_id`, `talla`, `stock` y `disponible`: el `variante_id` es lo que se envía al hacer un pedido.
 La ficha incluye `opciones_personalizacion` con las opciones que admite ese modelo (`id`, `tipo`, `nombre`, `descripcion`,
 `max_caracteres` y `recargo` por par). Si `max_caracteres` no es `null`, la opción lleva texto (el nombre bordado).
@@ -284,12 +289,26 @@ rellena el contenido con `fetch` a la API. Ningún dato de productos ni de pedid
 | Ruta | Acceso | Contenido |
 |---|---|---|
 | `/` | Público | Landing |
-| `/catalogo` | Público | Catálogo con filtros |
-| `/producto/{slug}` | Público | Ficha, tallas y stock |
+| `/catalogo` | Público | Catálogo con filtros, ficha de cada zapatilla en un panel y compra (`?producto={slug}` abre la ficha) |
+| `/lanzamientos` | Público | Zapatillas anunciadas con su fecha de salida; la ficha se abre en el panel en modo consulta (`?producto={slug}` abre la ficha) |
 | `/login`, `/registro` | Público | Formularios de acceso |
 | `/contacto` | Público | Formulario de consulta |
 | `/cuenta` | Cliente | Perfil y pedidos propios |
-| `/pedido` | Cliente | Carrito y confirmación del pedido |
 | `/panel` | Admin y almacén | Área interna |
 
 Las páginas privadas sin sesión redirigen a `/login`. Las de otro perfil muestran la página de error 403.
+
+**Ficha y cesta sin cambiar de página.** La ficha de producto no es una página propia: es un panel
+(`<dialog>`) que se abre encima del catálogo con el fondo difuminado (`public/js/panel-producto.js`,
+reutilizable desde otras páginas con `abrirPanelProducto(slug, { modo: 'compra' | 'consulta' })`).
+La cesta está en todas las páginas: un botón en la cabecera abre un panel lateral (`public/js/cesta.js`).
+
+- La cesta se guarda en el navegador (`localStorage`, clave `kalma.cesta`) con una línea por talla, como
+  exige `POST /api/pedidos`. Si el almacenamiento no está disponible funciona en memoria.
+- Los precios de la cesta son una estimación; al pedido solo se envían `variante_id`, `cantidad` y
+  `personalizacion` (`opcion_id` y `texto`), y el importe lo calcula el servidor.
+- Sin sesión, «Hacer pedido» convierte el panel en un formulario de entrar (`POST /api/login`); al entrar
+  se usa el token CSRF nuevo de la respuesta y se vuelve a la cesta con la dirección del perfil (`GET /api/perfil`).
+- Respuestas tratadas: 400 (errores junto a cada línea por la clave `lineas.N...` o junto al campo),
+  401 (vuelve al formulario de entrar), 403 (cuenta que no es de cliente, o token caducado: se pide otro
+  con `GET /api/sesion` y se reintenta una vez) y 409 (cantidad ajustada a `detalles.sin_stock[].disponible`).

@@ -1,0 +1,194 @@
+/*
+ * Página de lanzamientos. La cuadrícula es pariente de la del catálogo (foto
+ * sobre el gris claro, sin bordes ni sombras) pero con menos columnas y la
+ * fecha en negro macizo: aquí lo que se mira es cuándo sale, no cuánto cuesta.
+ */
+
+.lanzamientos-pagina {
+    width: min(100% - 2 * var(--margen), 90rem);
+    margin-inline: auto;
+    padding-bottom: clamp(4rem, 10vw, 7rem);
+}
+
+.lanzamientos-pagina__titulo {
+    margin-block: clamp(2rem, 5vw, 3.5rem) clamp(1.75rem, 3.5vw, 3rem);
+}
+
+.lanzamientos-pagina__aviso {
+    max-width: 36rem;
+    color: var(--tenue);
+}
+
+.lanzamientos-pagina__aviso a {
+    color: var(--negro);
+    font-weight: 700;
+}
+
+/* Sin JavaScript no hay nada que esperar: solo queda el aviso */
+html:not(.con-js) .lanzamientos-pagina__estado {
+    display: none;
+}
+
+/* --- Estados: cargando, vacío y error ---------------------------------------- */
+
+.lanzamientos-pagina__estado {
+    display: grid;
+    justify-items: start;
+    gap: 1rem;
+    padding-block: 3rem;
+}
+
+.lanzamientos-pagina__estado[hidden] {
+    display: none;
+}
+
+.lanzamientos-pagina__estado p {
+    margin: 0;
+    font-size: var(--paso-entrada);
+    font-weight: 700;
+}
+
+/* --- Cuadrícula ----------------------------------------------------------------- */
+
+.anuncios {
+    display: grid;
+    /* Tarjetas más anchas que en el catálogo: hay menos pares y cada uno pesa más */
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: clamp(2.5rem, 4vw, 3.5rem) clamp(0.75rem, 1.5vw, 1.25rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Entrada en cascada corta. La animación va en el <li> y no en la foto: la foto
+   lleva su propio fondo gris, así la mezcla de la imagen sigue funcionando */
+.con-js .anuncio {
+    animation: anuncio-entra 380ms var(--salida) var(--retraso, 0ms) both;
+}
+
+@keyframes anuncio-entra {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+}
+
+/* Columna que llena la fila: la fecha baja al pie y queda alineada en toda la
+   fila aunque un nombre ocupe dos líneas y el de al lado una */
+.anuncio {
+    display: flex;
+}
+
+.anuncio__enlace {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    color: inherit;
+    text-decoration: none;
+}
+
+.anuncio__foto {
+    aspect-ratio: 4 / 3;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    background: var(--suelo);
+}
+
+.anuncio__foto img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    /* El blanco de la foto desaparece contra el gris */
+    mix-blend-mode: multiply;
+    transition: transform 400ms var(--salida);
+}
+
+.anuncio__nombre {
+    margin: 0;
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    /* Dos líneas como mucho: los nombres largos se cortan antes que romper la fila */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+}
+
+.anuncio__color {
+    margin: 0.35rem 0 0.9rem;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+/* La fecha, en negro macizo, igual que en la portada */
+.anuncio__fecha {
+    align-self: flex-start;
+    margin: auto 0 0;
+    padding: 0.4rem 0.75rem;
+    background: var(--negro);
+    color: var(--blanco);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.anuncio__enlace:focus-visible {
+    outline: none;
+}
+
+.anuncio__enlace:focus-visible .anuncio__foto {
+    outline: 3px solid var(--negro);
+    outline-offset: 3px;
+}
+
+/* Al pulsar, la foto cede un poco: se nota que la tarjeta ha oído el clic */
+.anuncio__enlace:active .anuncio__foto img {
+    transform: scale(0.97);
+    transition-duration: 160ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .anuncio__enlace:hover .anuncio__foto img {
+        transform: scale(1.04);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Sin desplazamiento: las tarjetas solo aparecen */
+    .con-js .anuncio {
+        animation: anuncio-aparece 200ms ease both;
+    }
+
+    .anuncio__foto img {
+        transition: none;
+    }
+
+    .anuncio__enlace:hover .anuncio__foto img,
+    .anuncio__enlace:active .anuncio__foto img {
+        transform: none;
+    }
+}
+
+@keyframes anuncio-aparece {
+    from {
+        opacity: 0;
+    }
+}
+
+/* --- Pantallas estrechas ------------------------------------------------------- */
+
+@media (max-width: 44rem) {
+    .anuncios {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 2rem 0.75rem;
+    }
+
+    .anuncio__nombre {
+        font-size: var(--paso-cuerpo);
+    }
+}

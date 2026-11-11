@@ -21,6 +21,7 @@ use App\Controladores\SaludController;
 use App\Controladores\Web\AuthController as WebAuthController;
 use App\Controladores\Web\CatalogoController;
 use App\Controladores\Web\InicioController as WebInicioController;
+use App\Controladores\Web\LanzamientosController;
 use App\Middlewares\Autenticado;
 use App\Middlewares\IniciarSesion;
 use App\Middlewares\LimitarTasa;
@@ -28,6 +29,7 @@ use App\Middlewares\RequierePermiso;
 use App\Middlewares\VerificarCsrf;
 use App\Nucleo\Entorno;
 use App\Controladores\Api\CatalogoController as ApiCatalogoController;
+use App\Controladores\Api\LanzamientosController as ApiLanzamientosController;
 
 /** @var \App\Nucleo\Router $router */
 
@@ -48,6 +50,7 @@ $router->get('/health', [SaludController::class, 'comprobar']);
 // --- Páginas HTML --------------------------------------------------------------
 $router->get('/', [WebInicioController::class, 'index']);
 $router->get('/catalogo', [CatalogoController::class, 'index']);
+$router->get('/lanzamientos', [LanzamientosController::class, 'index']);
 
 $router->get('/login', [WebAuthController::class, 'formularioLogin']);
 $router->post('/login', [WebAuthController::class, 'login'], [$limiteLogin]);
@@ -67,6 +70,8 @@ $router->post('/api/logout', [ApiAuthController::class, 'logout'], [Autenticado:
 $router->get('/api/productos', [ApiCatalogoController::class, 'index']);
 $router->get('/api/productos/{slug}', [ApiCatalogoController::class, 'ver']);
 $router->get('/api/catalogo/filtros', [ApiCatalogoController::class, 'filtros']);
+// Los anunciados que todavía no se venden: el catálogo de arriba no los lista
+$router->get('/api/lanzamientos', [ApiLanzamientosController::class, 'index']);
 
 // Pedidos propios del cliente. Que el pedido sea SUYO lo comprueba el servicio:
 // el de otro cliente responde 404, como si no existiera (protección IDOR)

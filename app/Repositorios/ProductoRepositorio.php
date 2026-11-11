@@ -64,7 +64,9 @@ final class ProductoRepositorio
         $consulta = BaseDatos::conexion()->prepare(
             'SELECT p.id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.descripcion, p.precio,
                     p.personalizable, p.imagen, c.id AS categoria_id, c.nombre AS categoria,
-                    col.nombre AS color, col.codigo_hex
+                    col.nombre AS color, col.codigo_hex, p.fecha_lanzamiento,
+                    -- Se decide con el reloj de la base de datos, el mismo que filtra el catálogo
+                    COALESCE(p.fecha_lanzamiento > CURRENT_DATE, false) AS por_lanzar
              FROM productos p
              JOIN categorias c ON c.id = p.categoria_id
              JOIN colores col  ON col.id = p.color_id
@@ -104,8 +106,9 @@ final class ProductoRepositorio
     /**
      * Lanzamientos anunciados: zapatillas con fecha de lanzamiento futura, del
      * más cercano al más lejano. Todavía no se pueden comprar.
+     * Sin límite devuelve todos (LIMIT NULL en PostgreSQL no limita).
      */
-    public function proximosLanzamientos(int $limite): array
+    public function proximosLanzamientos(?int $limite = null): array
     {
         $consulta = BaseDatos::conexion()->prepare(
             'SELECT p.id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.descripcion, p.precio,

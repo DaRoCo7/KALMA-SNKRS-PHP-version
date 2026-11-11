@@ -46,7 +46,13 @@ final class CatalogoServicio
 
         $ficha = $this->resumen($producto);
         $ficha['descripcion'] = $producto['descripcion'];
-        $ficha['tallas'] = array_map(static fn (array $t): array => [
+        $ficha['fecha_lanzamiento'] = $producto['fecha_lanzamiento'];   // AAAA-MM-DD o null
+        $porLanzar = (bool) $producto['por_lanzar'];
+
+        // Un lanzamiento anunciado se enseña, pero no se ofrece nada que se pueda
+        // pedir: el pedido ya lo rechaza el servidor, y así ninguna interfaz
+        // llega a pintar una talla o un extra que luego no se puede comprar
+        $ficha['tallas'] = $porLanzar ? [] : array_map(static fn (array $t): array => [
             'variante_id' => (int) $t['id'],
             'talla'       => (float) $t['talla'],
             'stock'       => (int) $t['stock'],
@@ -69,7 +75,7 @@ final class CatalogoServicio
             $this->productos->opcionesPersonalizacion(),
             static fn (array $o): bool => !$o['afecta_zapatilla'] || $producto['personalizable']
         );
-        $ficha['opciones_personalizacion'] = array_values(array_map($this->opcion(...), $aplicables));
+        $ficha['opciones_personalizacion'] = $porLanzar ? [] : array_values(array_map($this->opcion(...), $aplicables));
 
         return $ficha;
     }
@@ -85,14 +91,16 @@ final class CatalogoServicio
     }
 
     /**
-     * Lanzamientos anunciados para la portada: se enseñan con su fecha, sin
-     * tallas ni stock porque todavía no se venden.
+     * Lanzamientos anunciados (la portada y la página de lanzamientos): se
+     * enseñan con su fecha, sin tallas ni stock porque todavía no se venden.
+     * Sin $cuantos, todos los anunciados.
      * @return list<array>
      */
-    public function lanzamientos(int $cuantos): array
+    public function lanzamientos(?int $cuantos = null): array
     {
         return array_map(static fn (array $p): array => [
             'id'                => (int) $p['id'],
+            'slug'              => $p['slug'],   // para abrir su ficha en el panel
             'nombre'            => $p['nombre'],
             'colorway'          => $p['colorway'],
             'codigo_marca'      => $p['codigo_marca'],
