@@ -20,6 +20,7 @@ use App\Controladores\Api\UsuarioController;
 use App\Controladores\SaludController;
 use App\Controladores\Web\AuthController as WebAuthController;
 use App\Controladores\Web\CatalogoController;
+use App\Controladores\Web\InicioController as WebInicioController;
 use App\Middlewares\Autenticado;
 use App\Middlewares\IniciarSesion;
 use App\Middlewares\LimitarTasa;
@@ -45,7 +46,7 @@ $limiteRegistro = new LimitarTasa('registro', (int) Entorno::obtener('LIMITE_REG
 $router->get('/health', [SaludController::class, 'comprobar']);
 
 // --- Páginas HTML --------------------------------------------------------------
-$router->get('/', [CatalogoController::class, 'index']);
+$router->get('/', [WebInicioController::class, 'index']);
 $router->get('/catalogo', [CatalogoController::class, 'index']);
 
 $router->get('/login', [WebAuthController::class, 'formularioLogin']);

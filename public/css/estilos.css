@@ -1,33 +1,294 @@
+/*
+ * Estilos comunes a todas las páginas: paleta, tipografía, cabecera, botones y pie.
+ * Paleta en blanco y negro, sin color de acento: el contraste hace ese trabajo.
+ */
+:root {
+    --negro: #010101;
+    --blanco: #ffffff;
+    --suelo: #f4f4f4;          /* fondo claro: las fotos de producto se funden con él */
+    --tenue: #5c5c5c;          /* texto secundario sobre claro */
+    --tenue-oscuro: #a8a8a8;   /* texto secundario sobre negro */
+
+    --fuente: "Chivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+    /* Solo cuatro tamaños en toda la web; el rótulo gigante de cada sección va aparte */
+    --paso-pequeno: clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem);
+    --paso-cuerpo: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem);
+    --paso-entrada: clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem);
+    --paso-titulo: clamp(2.5rem, 1.2rem + 5vw, 5.5rem);
+
+    /* Un único par de márgenes exteriores para toda la página */
+    --margen: clamp(1rem, 2.2vw, 2rem);
+
+    /* Curva de salida con más carácter que el ease-out del navegador */
+    --salida: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 * {
     box-sizing: border-box;
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}
+
 body {
     margin: 0;
-    background: #fafaf8;
-    color: #202020;
-    font-family: Arial, sans-serif;
+    background: var(--blanco);
+    color: var(--negro);
+    font-family: var(--fuente);
+    font-size: var(--paso-cuerpo);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+}
+
+img {
+    max-width: 100%;
 }
 
 .contenedor {
-    width: min(100% - 2rem, 68rem);
+    width: min(100% - 2 * var(--margen), 68rem);
     margin-inline: auto;
-}
-
-.cabecera {
-    padding-block: 1.25rem;
-    border-bottom: 1px solid #ddd;
-    background: white;
-}
-
-.marca {
-    color: inherit;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-decoration: none;
+    padding-bottom: 6rem;
 }
 
 h1 {
     margin-block: 2.5rem 1.5rem;
-    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    font-size: var(--paso-titulo);
+    font-weight: 900;
+    line-height: 0.88;
+    letter-spacing: -0.05em;
+    text-transform: uppercase;
+}
+
+:focus-visible {
+    outline: 3px solid currentColor;
+    outline-offset: 3px;
+}
+
+/* --- Botón: rectángulo liso, esquinas rectas, el mismo en toda la web -------- */
+
+.boton {
+    display: inline-block;
+    padding: 0.8rem 1.25rem;
+    border: 0;
+    background: var(--negro);
+    color: var(--blanco);
+    font: inherit;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 150ms ease, transform 160ms var(--salida);
+}
+
+.boton--claro {
+    background: var(--blanco);
+    color: var(--negro);
+}
+
+/* Solo un icono: cuadrado, del tamaño mínimo cómodo para el dedo */
+.boton--icono {
+    display: grid;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+}
+
+.boton--icono svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* El cierre de una sección: ocupa todo el ancho y se lee de lejos */
+.boton--grande {
+    padding: clamp(1.25rem, 3vw, 2.25rem) 1.5rem;
+    font-size: var(--paso-entrada);
+    text-align: center;
+}
+
+/* Respuesta al pulsar: el botón cede un poco, así se nota que ha oído el clic */
+.boton:active {
+    transform: scale(0.97);
+}
+
+/* El hover solo existe con ratón: en táctil se quedaría pegado tras el toque */
+@media (hover: hover) and (pointer: fine) {
+    .boton:hover {
+        background: #333333;
+    }
+
+    .boton--claro:hover {
+        background: #d6d6d6;
+    }
+}
+
+/* --- Cabecera -------------------------------------------------------------- */
+
+.cabecera {
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+/* Tres columnas con los lados iguales: así la navegación queda centrada en la
+   página y no en el hueco que dejan el logo y la cuenta. */
+.cabecera__interior {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1.5rem;
+    min-height: 4.5rem;
+    padding-inline: var(--margen);
+}
+
+.marca {
+    justify-self: start;
+    display: block;
+}
+
+.marca img {
+    display: block;
+    width: auto;
+    height: 2.75rem;
+}
+
+.navegacion {
+    display: flex;
+    gap: 2rem;
+}
+
+.cuenta {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.navegacion a,
+.cuenta > a:not(.boton),
+.cuenta button,
+.cuenta__nombre {
+    padding-block: 0.75rem;
+    border: 0;
+    background: none;
+    color: var(--blanco);
+    font: inherit;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.cuenta__nombre {
+    color: var(--tenue-oscuro);
+    cursor: default;
+}
+
+.navegacion a,
+.cuenta > a:not(.boton),
+.cuenta button {
+    transition: color 150ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .navegacion a:hover,
+    .cuenta > a:not(.boton):hover,
+    .cuenta button:hover {
+        color: var(--tenue-oscuro);
+    }
+}
+
+.cuenta button:active {
+    transform: scale(0.97);
+}
+
+.en-linea {
+    display: inline;
+    margin: 0;
+}
+
+/* En pantallas estrechas la navegación baja a una segunda fila */
+@media (max-width: 44rem) {
+    .cabecera__interior {
+        grid-template-columns: 1fr auto;
+        row-gap: 0;
+        padding-block: 0.5rem;
+    }
+
+    .navegacion {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .cuenta {
+        gap: 0.9rem;
+    }
+}
+
+/* --- Pie: logo, enlaces y línea legal ------------------------------------------ */
+
+.pie {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 1.5rem 3rem;
+    padding: clamp(2.5rem, 5vw, 4rem) var(--margen) 2rem;
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+.pie__marca img {
+    display: block;
+    width: auto;
+    height: 3.5rem;
+}
+
+.pie__enlaces {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem 2rem;
+}
+
+.pie__enlaces a {
+    padding-block: 0.5rem;
+    color: inherit;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 150ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .pie__enlaces a:hover {
+        color: var(--tenue-oscuro);
+    }
+}
+
+.pie__legal {
+    grid-column: 1 / -1;
+    margin: 1rem 0 0;
+    color: var(--tenue-oscuro);
+    font-size: var(--paso-pequeno);
+}
+
+@media (max-width: 44rem) {
+    .pie {
+        grid-template-columns: 1fr;
+    }
+
+    .pie__enlaces {
+        justify-content: flex-start;
+    }
 }

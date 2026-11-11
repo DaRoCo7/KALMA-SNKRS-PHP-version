@@ -1,0 +1,541 @@
+/*
+ * Secciones de la portada, debajo del hero: lanzamientos, disponibles y
+ * personalización. Los colores, tamaños y márgenes salen de las variables de estilos.css.
+ */
+
+/* Rótulo gigante: el mismo en las dos secciones de zapatillas */
+.lanzamientos__palabra,
+.disponibles__titulo {
+    margin: 0;
+    font-size: clamp(2.6rem, 11.6vw, 13rem);
+    font-weight: 900;
+    line-height: 0.88;
+    letter-spacing: -0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* --- Lanzamientos: carrusel de pares que todavía no se venden ----------------
+   Todo cabe en una pantalla: título arriba, la zapatilla en el centro y la
+   palabra de la casa abajo, que cambia con cada par. */
+
+.lanzamientos {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: clamp(1rem, 3svh, 2rem);
+    min-height: 100svh;
+    padding: clamp(1.5rem, 4svh, 3rem) var(--margen) clamp(1.25rem, 3svh, 2rem);
+    overflow: hidden;
+    background: var(--suelo);
+}
+
+.lanzamientos__cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 0.5rem 2rem;
+}
+
+.lanzamientos__titulo {
+    margin: 0;
+    font-size: var(--paso-titulo);
+    font-weight: 900;
+    line-height: 0.88;
+    letter-spacing: -0.05em;
+    text-transform: uppercase;
+}
+
+.lanzamientos__nota {
+    max-width: 30ch;
+    margin: 0;
+    font-weight: 700;
+}
+
+/* Sin JavaScript el carrusel es una fila que se desplaza con el dedo o la rueda */
+.carrusel {
+    display: flex;
+    gap: var(--margen);
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+    list-style: none;
+    scroll-snap-type: x mandatory;
+}
+
+.diapositiva {
+    flex: 0 0 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(1.5rem, 4vw, 4rem);
+    scroll-snap-align: start;
+}
+
+.diapositiva__foto {
+    display: block;
+    width: 100%;
+    height: min(46svh, 34rem);
+    object-fit: contain;
+    /* El blanco de la foto desaparece contra el fondo de la sección */
+    mix-blend-mode: multiply;
+    user-select: none;
+}
+
+/* La fecha, en negro macizo bajo el nombre: es lo que distingue un lanzamiento
+   de un par que ya se puede comprar */
+.diapositiva__fecha {
+    display: inline-block;
+    margin: 1.1rem 0 0;
+    padding: 0.35rem 0.7rem;
+    background: var(--negro);
+    color: var(--blanco);
+    font-size: var(--paso-cuerpo);
+    font-weight: 700;
+}
+
+.diapositiva__nombre {
+    max-width: 14ch;
+    margin: 0;
+    font-size: clamp(1.75rem, 1rem + 2.4vw, 3.25rem);
+    font-weight: 900;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+}
+
+.diapositiva__color {
+    margin: 0.6rem 0 0;
+    color: var(--tenue);
+    font-weight: 700;
+}
+
+.diapositiva__texto {
+    max-width: 40ch;
+    margin: 1rem 0 0;
+}
+
+/* Con JavaScript las diapositivas se apilan y solo se ve la activa.
+   --sentido vale 1 al avanzar y -1 al retroceder: la que entra viene siempre
+   del lado contrario al que sale la otra. */
+.con-js .carrusel {
+    display: grid;
+    overflow: visible;
+    touch-action: pan-y;   /* el arrastre horizontal es del carrusel, el vertical de la página */
+    cursor: grab;
+}
+
+.con-js .diapositiva {
+    grid-area: 1 / 1;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(calc(var(--sentido, 1) * -9%));
+}
+
+.con-js .diapositiva.es-activa {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition: opacity 520ms var(--salida), transform 620ms var(--salida);
+}
+
+/* La que se va sigue su camino hacia la derecha, más rápido que la que entra */
+.con-js .diapositiva.es-saliente {
+    opacity: 0;
+    visibility: visible;
+    transform: translateX(calc(var(--sentido, 1) * 9%));
+    transition: opacity 260ms ease, transform 320ms ease;
+}
+
+.lanzamientos__pie {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+/* Las palabras ocupan la misma celda: solo se ve la activa */
+.lanzamientos__palabras {
+    display: grid;
+    min-width: 0;
+}
+
+.lanzamientos__palabra {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transform: translateY(0.08em);
+    filter: blur(8px);
+    /* Al salir va rápido; el desenfoque funde una palabra con la siguiente */
+    transition: opacity 140ms ease, transform 140ms ease, filter 140ms ease;
+}
+
+.lanzamientos__palabra.es-activa {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: opacity 360ms var(--salida) 120ms, transform 360ms var(--salida) 120ms, filter 360ms var(--salida) 120ms;
+}
+
+.lanzamientos__mandos {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.4rem;
+}
+
+.lanzamientos__mandos[hidden] {
+    display: none;
+}
+
+.lanzamientos__cuenta {
+    margin: 0 0.75rem 0 0;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 52rem) {
+    .diapositiva {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        align-content: center;
+    }
+
+    .diapositiva__foto {
+        height: min(32svh, 18rem);
+    }
+
+    .diapositiva__texto {
+        display: none;
+    }
+
+    .lanzamientos__pie {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .lanzamientos__mandos {
+        justify-content: flex-end;
+    }
+}
+
+/* --- Disponibles: el rótulo se queda fijo y tres pares pasan por debajo ------ */
+
+.disponibles {
+    background: var(--blanco);
+}
+
+/* Franja fija con fondo propio: los pares se meten por debajo, como bajo un
+   dintel, y el rótulo se lee siempre aunque el par sea negro. */
+.disponibles__fijo {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: grid;
+    gap: 0.75rem;
+    padding: clamp(1.25rem, 4svh, 3rem) var(--margen) 1.25rem;
+    background: var(--blanco);
+}
+
+.disponibles__nota {
+    max-width: 44ch;
+    margin: 0;
+    font-weight: 700;
+}
+
+.disponibles__pares {
+    display: grid;
+    margin: 0;
+    padding: clamp(2rem, 6svh, 4rem) var(--margen) 0;
+    list-style: none;
+}
+
+/* Cada par empieza antes de que acabe el anterior: como van en mitades
+   opuestas no se pisan y la sección no se hace eterna. */
+.par {
+    width: min(32vw, 32rem);
+    margin-left: 10%;
+}
+
+.par + .par {
+    margin-top: -9svh;
+}
+
+/* Alternan a izquierda y derecha */
+.par:nth-child(even) {
+    margin-left: auto;
+    margin-right: 10%;
+}
+
+/* Todas las fotos en el mismo marco; el blanco de la foto se funde con el fondo */
+.par__foto {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.par__datos {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 1rem;
+    margin-top: 0.75rem;
+}
+
+.par__nombre,
+.par__precio {
+    margin: 0;
+    font-size: var(--paso-entrada);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+}
+
+.par__precio {
+    grid-column: 2;
+    grid-row: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.par__color {
+    grid-column: 1 / -1;
+    margin: 0.2rem 0 0;
+    color: var(--tenue);
+}
+
+.disponibles__cierre {
+    display: grid;
+    padding: clamp(3rem, 9svh, 6rem) var(--margen) clamp(4rem, 12svh, 8rem);
+}
+
+@media (max-width: 44rem) {
+    .disponibles__nota {
+        font-size: var(--paso-pequeno);
+    }
+
+    .par {
+        width: 74%;
+        margin-left: 0;
+    }
+
+    .par:nth-child(even) {
+        margin-right: 0;
+    }
+
+    .par + .par {
+        margin-top: 3rem;
+    }
+}
+
+/* --- Personalización: una sola pantalla, dos mitades iguales -----------------
+   A la izquierda la zapatilla y la prueba del bordado; a la derecha los extras
+   en cuatro bloques. Sin precios: se ven al comprar. */
+
+.personalizacion {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 100svh;
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+.personalizacion__escena {
+    display: grid;
+    align-content: center;
+    padding: 2rem var(--margen);
+    background: var(--suelo);
+    color: var(--negro);
+}
+
+.personalizacion__foto {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: min(46svh, 30rem);
+    margin-inline: auto;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+/* El nombre "bordado": letras sin relleno con el contorno a puntadas */
+.bordado {
+    display: grid;
+    gap: 0.75rem;
+    width: min(100%, 24rem);
+    margin-inline: auto;
+}
+
+.bordado__muestra {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.bordado__muestra text {
+    fill: none;
+    stroke: var(--negro);
+    stroke-width: 2.4;
+    stroke-dasharray: 5 3.2;
+    stroke-linecap: round;
+    font-family: var(--fuente);
+    font-size: 78px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+}
+
+.bordado__campo {
+    display: grid;
+    gap: 0.4rem;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.bordado__campo input {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border: 0;
+    border-radius: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    font: inherit;
+    font-size: 1rem;
+}
+
+.personalizacion__carta {
+    display: grid;
+    align-content: center;
+    gap: 1.25rem;
+    padding: 2rem var(--margen) 2rem clamp(1.5rem, 4vw, 4rem);
+}
+
+.personalizacion__titulo {
+    margin: 0;
+    font-size: clamp(1.9rem, 1rem + 2.6vw, 3.5rem);
+    font-weight: 900;
+    line-height: 0.92;
+    letter-spacing: -0.045em;
+    text-transform: uppercase;
+}
+
+.personalizacion__texto {
+    max-width: 38ch;
+    margin: 0;
+    color: var(--tenue-oscuro);
+}
+
+/* Cuatro bloques iguales en cuadrícula de 2 x 2, separados por un paso de tono */
+.extras {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: 1fr;
+    gap: 0.6rem;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.extra {
+    padding: 1.1rem 1.2rem 1.25rem;
+    background: #171717;
+}
+
+.extra__tipo {
+    margin: 0 0 0.6rem;
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+}
+
+.extra__lista {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0;
+    padding: 0;
+    color: var(--tenue-oscuro);
+    font-size: var(--paso-pequeno);
+    list-style: none;
+}
+
+@media (max-width: 56rem) {
+    .personalizacion {
+        grid-template-columns: 1fr;
+        min-height: 0;
+    }
+
+    .personalizacion__escena {
+        padding-block: 2.5rem;
+    }
+
+    .personalizacion__foto {
+        height: min(34svh, 16rem);
+    }
+
+    .personalizacion__carta {
+        padding: 2.5rem var(--margen) 3rem;
+    }
+
+    /* En columna estrecha cada bloque mide lo que su contenido, sin huecos */
+    .extras {
+        grid-auto-rows: auto;
+    }
+}
+
+/* --- Entradas: cada pieza llega una vez, al asomar por abajo ----------------
+   Solo se oculta contenido si hay JavaScript para volver a mostrarlo. */
+
+.con-js [data-entrada] {
+    opacity: 0;
+    transform: translateY(1.5rem);
+    transition: opacity 500ms var(--salida), transform 500ms var(--salida);
+    transition-delay: var(--retraso, 0ms);
+}
+
+.con-js [data-entrada].ha-entrado {
+    opacity: 1;
+    transform: none;
+}
+
+/* Las fotos de los pares no suben: se asientan desde un poco más pequeñas */
+.con-js .par__foto {
+    opacity: 0;
+    transform: scale(0.94);
+    transition: opacity 500ms var(--salida), transform 700ms var(--salida);
+}
+
+.con-js .par.ha-entrado .par__foto {
+    opacity: 1;
+    transform: none;
+}
+
+.con-js .par__datos {
+    opacity: 0;
+    transform: translateY(0.75rem);
+    transition: opacity 400ms var(--salida) 90ms, transform 400ms var(--salida) 90ms;
+}
+
+.con-js .par.ha-entrado .par__datos {
+    opacity: 1;
+    transform: none;
+}
+
+/* Con movimiento reducido se conserva el fundido y se quita el desplazamiento */
+@media (prefers-reduced-motion: reduce) {
+    .con-js [data-entrada],
+    .con-js .par__foto,
+    .con-js .par__datos,
+    .con-js .diapositiva,
+    .con-js .diapositiva.es-activa,
+    .con-js .diapositiva.es-saliente,
+    .lanzamientos__palabra,
+    .lanzamientos__palabra.es-activa {
+        transform: none;
+        filter: none;
+        transition-duration: 200ms;
+        transition-delay: 0ms;
+    }
+}
