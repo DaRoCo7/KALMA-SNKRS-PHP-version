@@ -21,3 +21,5 @@ Thumbs.db
 /vendor/
 # Certificados HTTPS locales (no subir a Git)
 /docker/nginx/certs/
+
+/backups/
