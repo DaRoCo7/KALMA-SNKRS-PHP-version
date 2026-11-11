@@ -19,10 +19,15 @@ $claseMain ??= 'contenedor';
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($titulo) ?> | KALMA SNKRS</title>
+    <?php // El JavaScript lo lee para las peticiones que modifican datos (contrato, punto 9.2) ?>
+    <meta name="csrf-token" content="<?= e(\App\Seguridad\Sesion::tokenCsrf()) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/estilos.css">
+    <link rel="stylesheet" href="/css/cesta.css">
+    <?php // La cesta está en todas las páginas: el contador de la cabecera y su panel ?>
+    <script type="module" src="/js/cesta.js"></script>
     <?php // Marca que hay JavaScript antes de pintar: las entradas animadas solo ocultan contenido si alguien lo va a mostrar ?>
     <script>document.documentElement.classList.add('con-js');</script>
 <?php foreach ($estilos as $hoja): ?>
@@ -37,10 +42,15 @@ $claseMain ??= 'contenedor';
             </a>
             <nav class="navegacion" aria-label="Principal">
                 <a href="/catalogo">Catálogo</a>
-                <a href="/#lanzamientos">Lanzamientos</a>
+                <a href="/lanzamientos">Lanzamientos</a>
                 <a href="/#personalizacion">Personalización</a>
             </nav>
             <div class="cuenta">
+                <?php // Sin JavaScript no hay cesta (vive en el navegador): el botón solo se ve con JS ?>
+                <button class="boton-cesta" type="button" data-cesta-abrir aria-haspopup="dialog" aria-controls="cesta" aria-label="Cesta vacía">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1 12H6L5 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+                    <span class="boton-cesta__numero" data-cesta-numero aria-hidden="true">0</span>
+                </button>
                 <?php if ($usuarioSesion === null): ?>
                     <a href="/login">Entrar</a>
                     <a class="boton boton--claro" href="/registro">Crear cuenta</a>
@@ -54,4 +64,5 @@ $claseMain ??= 'contenedor';
             </div>
         </div>
     </header>
+<?php require __DIR__ . '/cesta.php'; ?>
     <main<?= $claseMain !== '' ? ' class="' . e($claseMain) . '"' : '' ?>>

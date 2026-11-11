@@ -1,0 +1,346 @@
+/*
+ * Página del catálogo: título, filtros y la cuadrícula de zapatillas.
+ * Tarjetas planas, sin bordes ni sombras: la foto sobre el gris claro hace de marco.
+ */
+
+.catalogo {
+    width: min(100% - 2 * var(--margen), 90rem);
+    margin-inline: auto;
+    padding-bottom: clamp(4rem, 10vw, 7rem);
+}
+
+.catalogo__cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 0.5rem 2rem;
+    margin-block: clamp(2rem, 5vw, 3.5rem) clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.catalogo__titulo {
+    margin: 0;
+}
+
+.catalogo__recuento {
+    margin: 0 0 0.4rem;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    font-variant-numeric: tabular-nums;
+}
+
+.catalogo__aviso {
+    max-width: 36rem;
+    color: var(--tenue);
+}
+
+/* Sin JavaScript no hay nada que filtrar ni que esperar: solo queda el aviso */
+html:not(.con-js) .filtros,
+html:not(.con-js) .catalogo__estado {
+    display: none;
+}
+
+/* --- Filtros: buscar, categoría y orden en una fila ------------------------- */
+
+.filtros {
+    display: grid;
+    grid-template-columns: minmax(14rem, 22rem) 1fr auto;
+    align-items: end;
+    gap: 1rem 2rem;
+    margin-bottom: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.filtros__etiqueta {
+    display: block;
+    margin-bottom: 0.4rem;
+    padding: 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.filtros input[type="search"],
+.filtros select {
+    width: 100%;
+    height: 2.75rem;
+    padding: 0 0.85rem;
+    border: 1px solid #c4c4c4;
+    border-radius: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    font: inherit;
+    /* 16px como mínimo: con menos, Safari en el móvil acerca la página al escribir */
+    font-size: max(1rem, var(--paso-pequeno));
+    transition: border-color 150ms ease;
+}
+
+.filtros select {
+    padding-right: 2.25rem;
+    appearance: none;
+    /* Flecha dibujada en el mismo negro de la paleta */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23010101' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+    cursor: pointer;
+}
+
+.filtros input[type="search"]:focus-visible,
+.filtros select:focus-visible {
+    border-color: var(--negro);
+    outline: 2px solid var(--negro);
+    outline-offset: 0;
+}
+
+.filtros__categorias {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.filtros__categorias[hidden] {
+    display: none;
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Cada categoría es un radio: se elige una y el teclado se mueve con las flechas */
+.chip {
+    position: relative;
+}
+
+.chip input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.chip span {
+    display: block;
+    padding: 0 1rem;
+    line-height: 2.75rem;
+    background: var(--suelo);
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    white-space: nowrap;
+    transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--salida);
+}
+
+.chip input:checked + span {
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+.chip input:focus-visible + span {
+    outline: 3px solid var(--negro);
+    outline-offset: 3px;
+}
+
+.chip input:active + span {
+    transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .chip input:not(:checked):hover + span {
+        background: #e4e4e4;
+    }
+}
+
+/* --- Estados del listado: cargando, vacío y error ------------------------------ */
+
+.catalogo__estado {
+    display: grid;
+    justify-items: start;
+    gap: 1rem;
+    padding-block: 3rem;
+    color: var(--tenue);
+}
+
+.catalogo__estado[hidden] {
+    display: none;
+}
+
+.catalogo__estado p {
+    margin: 0;
+    font-size: var(--paso-entrada);
+    font-weight: 700;
+    color: var(--negro);
+}
+
+/* --- Cuadrícula ---------------------------------------------------------------------- */
+
+.rejilla {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
+    gap: clamp(2rem, 3.5vw, 3rem) clamp(0.75rem, 1.5vw, 1.25rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    transition: opacity 150ms ease;
+}
+
+/* Al cambiar un filtro las tarjetas viejas se apagan mientras llegan las nuevas */
+.rejilla--cargando {
+    opacity: 0.4;
+}
+
+.tarjeta__enlace {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
+/* La tarjeta entra con una cascada corta. La animación va en la tarjeta y no en
+   la foto: la foto lleva su propio fondo gris, así la mezcla no se rompe */
+.con-js .tarjeta {
+    animation: tarjeta-entra 360ms var(--salida) var(--retraso, 0ms) both;
+}
+
+@keyframes tarjeta-entra {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+}
+
+.tarjeta__foto {
+    aspect-ratio: 1;
+    margin-bottom: 0.85rem;
+    overflow: hidden;
+    background: var(--suelo);
+}
+
+.tarjeta__foto img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+    transition: transform 400ms var(--salida);
+}
+
+.tarjeta__nombre {
+    margin: 0;
+    font-size: var(--paso-cuerpo);
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.tarjeta__color {
+    margin: 0.15rem 0 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.tarjeta__precio {
+    margin: 0.5rem 0 0;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.tarjeta__aviso {
+    color: var(--tenue);
+    font-weight: 400;
+}
+
+.tarjeta__enlace:focus-visible {
+    outline: none;
+}
+
+.tarjeta__enlace:focus-visible .tarjeta__foto {
+    outline: 3px solid var(--negro);
+    outline-offset: 3px;
+}
+
+.tarjeta__enlace:active .tarjeta__foto img {
+    transform: scale(0.98);
+    transition-duration: 160ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .tarjeta__enlace:hover .tarjeta__foto img {
+        transform: scale(1.04);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .con-js .tarjeta {
+        animation: none;
+    }
+
+    .tarjeta__foto img {
+        transition: none;
+    }
+
+    .tarjeta__enlace:hover .tarjeta__foto img,
+    .tarjeta__enlace:active .tarjeta__foto img {
+        transform: none;
+    }
+}
+
+.catalogo__mas {
+    display: flex;
+    justify-content: center;
+    margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+/* Sobre blanco el botón claro necesita el gris del suelo para verse */
+.catalogo__boton-mas {
+    min-width: min(100%, 20rem);
+    background: var(--suelo);
+}
+
+.catalogo__boton-mas[hidden] {
+    display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .catalogo__boton-mas:hover {
+        background: #e4e4e4;
+    }
+}
+
+/* --- Pantallas estrechas ----------------------------------------------------------------- */
+
+@media (max-width: 60rem) {
+    .filtros {
+        grid-template-columns: 1fr auto;
+    }
+
+    .filtros__categorias {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+}
+
+@media (max-width: 44rem) {
+    .filtros {
+        grid-template-columns: 1fr;
+    }
+
+    .filtros__categorias {
+        grid-row: auto;
+    }
+
+    /* Las categorías pasan en una fila que se desliza en vez de apilarse */
+    .chips {
+        flex-wrap: nowrap;
+        margin-inline: calc(-1 * var(--margen));
+        padding-inline: var(--margen);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .rejilla {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

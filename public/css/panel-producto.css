@@ -1,0 +1,480 @@
+/*
+ * Panel de producto: la ficha encima de la página, la foto a la izquierda y
+ * la información a la derecha. En el móvil ocupa la pantalla con la foto arriba.
+ * El fondo difuminado es común con la cesta y está en cesta.css.
+ */
+
+.panel-producto {
+    width: min(100% - 2 * var(--margen), 76rem);
+    max-width: none;
+    height: min(100dvh - 2 * var(--margen), 50rem);
+    max-height: none;
+    padding: 0;
+    border: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    /* Flota sobre la página: aquí sí hay sombra */
+    box-shadow: 0 30px 80px rgb(1 1 1 / 0.25);
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 220ms var(--salida), transform 220ms var(--salida);
+}
+
+@starting-style {
+    .panel-producto[open] {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+}
+
+/* Sale más rápido de lo que entra */
+.panel-producto.cerrando {
+    opacity: 0;
+    transform: scale(0.98);
+    transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .panel-producto,
+    .panel-producto.cerrando {
+        transform: none;
+    }
+}
+
+.panel-producto__caja {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    height: 100%;
+}
+
+.panel-producto__cerrar {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 2;
+}
+
+/* La transformación del panel aísla la mezcla de la foto: por eso la columna
+   de la foto lleva el mismo gris que la foto debe fundir */
+/* Bloque y no grid: con una fila automática la foto crecería a su tamaño
+   natural en vez de ajustarse a la altura de la columna */
+.panel-producto__foto {
+    display: block;
+    min-height: 0;
+    padding: clamp(1rem, 3vw, 3rem);
+    background: var(--suelo);
+}
+
+.panel-producto__foto img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.panel-producto__foto img:not([src]),
+.panel-producto__foto img.sin-foto {
+    visibility: hidden;
+}
+
+.panel-producto__info {
+    min-height: 0;
+    padding: clamp(1.5rem, 3vw, 2.75rem) clamp(1.25rem, 3vw, 2.75rem) 2rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.panel-producto__info:focus {
+    /* Recibe el foco al abrir para no marcar el botón de cerrar; el Tab sigue por dentro */
+    outline: none;
+}
+
+.panel-producto__estado {
+    margin: 3rem 0 0;
+    font-size: var(--paso-entrada);
+    font-weight: 700;
+}
+
+.panel-producto__estado[hidden],
+.panel-producto__ficha[hidden],
+.panel-producto__compra[hidden],
+.panel-producto [hidden] {
+    display: none;
+}
+
+.panel-producto__nombre {
+    margin: 0 3rem 0 0;
+    font-size: clamp(1.75rem, 1.2rem + 2vw, 2.75rem);
+    font-weight: 900;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    text-transform: uppercase;
+    /* Dos líneas como mucho: los nombres de Nike son largos */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.panel-producto__color {
+    margin: 0.5rem 0 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.panel-producto__precio {
+    margin: 1rem 0 0;
+    font-size: var(--paso-entrada);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.panel-producto__descripcion {
+    max-width: 34rem;
+    margin: 1rem 0 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    line-height: 1.5;
+}
+
+.panel-producto__etiqueta {
+    margin: 0 0 0.6rem;
+    padding: 0;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.panel-producto__colores {
+    margin-top: 1.5rem;
+}
+
+.panel-producto__colores ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.panel-producto__otro {
+    display: block;
+    width: 4.5rem;
+    aspect-ratio: 1;
+    background: var(--suelo);
+    transition: transform 160ms var(--salida);
+}
+
+.panel-producto__otro img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.panel-producto__otro:active {
+    transform: scale(0.95);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .panel-producto__otro:hover {
+        background: #e4e4e4;
+    }
+}
+
+/* Modo consulta: la fecha de salida ocupa el sitio de la compra */
+.panel-producto__salida {
+    margin: 2rem 0 0;
+    font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -0.04em;
+}
+
+/* --- Compra -------------------------------------------------------------------- */
+
+.panel-producto__compra {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 1.75rem;
+}
+
+.tallas,
+.extras__grupo {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.tallas__lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(4.25rem, 1fr));
+    gap: 0.4rem;
+}
+
+/* Cada talla es un radio: el grupo entero se recorre con las flechas */
+.talla {
+    position: relative;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    min-height: 3.25rem;
+    padding: 0.35rem 0.25rem;
+    background: var(--suelo);
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease, transform 160ms var(--salida);
+}
+
+.talla input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: inherit;
+}
+
+.talla__numero {
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.talla__aviso {
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+.talla:has(input:checked) {
+    background: var(--negro);
+    color: var(--blanco);
+}
+
+.talla:has(input:focus-visible) {
+    outline: 3px solid var(--negro);
+    outline-offset: 2px;
+}
+
+.talla:active:not(.talla--agotada) {
+    transform: scale(0.96);
+}
+
+/* Agotada: se ve, para saber que existe, pero no se puede elegir */
+.talla--agotada {
+    color: var(--tenue);
+    background: var(--blanco);
+    box-shadow: inset 0 0 0 1px #dcdcdc;
+    cursor: not-allowed;
+}
+
+.talla--agotada .talla__numero {
+    text-decoration: line-through;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .talla:not(.talla--agotada):not(:has(input:checked)):hover {
+        background: #e4e4e4;
+    }
+}
+
+.tallas__stock {
+    margin: 0.6rem 0 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.panel-producto__cantidad .panel-producto__etiqueta {
+    margin-bottom: 0.4rem;
+}
+
+/* --- Personalización ----------------------------------------------------------- */
+
+.extras__grupos {
+    display: grid;
+    gap: 1rem;
+}
+
+.extras__tipo {
+    margin-bottom: 0.35rem;
+    padding: 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.extra + .extra {
+    margin-top: 0.15rem;
+}
+
+.extra__etiqueta {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: start;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--suelo);
+    cursor: pointer;
+    transition: background-color 150ms ease;
+}
+
+.extra__etiqueta:has(input:checked) {
+    background: #e4e4e4;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .extra__etiqueta:hover {
+        background: #e9e9e9;
+    }
+}
+
+.extra__etiqueta input {
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0.1rem 0 0;
+    accent-color: var(--negro);
+}
+
+.extra__textos {
+    display: grid;
+    gap: 0.1rem;
+}
+
+.extra__nombre,
+.extra__recargo {
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.extra__recargo {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.extra__descripcion {
+    color: var(--tenue);
+    font-size: 0.8125rem;
+}
+
+.extra__campo {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.75rem;
+    background: #e4e4e4;
+}
+
+.extra__rotulo {
+    font-size: var(--paso-pequeno);
+}
+
+.extra__campo input {
+    width: 100%;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid #c4c4c4;
+    border-radius: 0;
+    background: var(--blanco);
+    color: var(--negro);
+    font: inherit;
+    font-size: max(1rem, var(--paso-pequeno));
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.extra__campo input:focus-visible {
+    border-color: var(--negro);
+    outline: 2px solid var(--negro);
+    outline-offset: 0;
+}
+
+.extra__campo input[aria-invalid="true"] {
+    border: 2px solid var(--negro);
+}
+
+/* --- Total y botón ------------------------------------------------------------------- */
+
+.panel-producto__total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #dcdcdc;
+    font-weight: 700;
+}
+
+.panel-producto__total strong {
+    font-size: var(--paso-entrada);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+}
+
+.panel-producto__nota {
+    margin: -1rem 0 0;
+    color: var(--tenue);
+    font-size: var(--paso-pequeno);
+}
+
+.panel-producto__mensaje {
+    margin: 0;
+    font-size: var(--paso-pequeno);
+    font-weight: 700;
+}
+
+.panel-producto__mensaje:empty {
+    display: none;
+}
+
+.panel-producto__acciones {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.panel-producto__anadir {
+    width: 100%;
+}
+
+.panel-producto__anadir:disabled {
+    background: var(--tenue);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.panel-producto__ver-cesta {
+    width: 100%;
+    background: var(--suelo);
+}
+
+/* --- Móvil: a pantalla completa, la foto arriba y todo se desliza junto ---------- */
+
+@media (max-width: 52rem) {
+    .panel-producto {
+        width: 100%;
+        height: 100dvh;
+        margin: 0;
+        box-shadow: none;
+    }
+
+    .panel-producto__caja {
+        display: block;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .panel-producto__cerrar {
+        position: fixed;
+    }
+
+    /* Alto fijo y no aspect-ratio: la foto necesita una altura conocida para ajustarse dentro */
+    .panel-producto__foto {
+        height: min(72vw, 45dvh);
+        padding: 1.25rem;
+    }
+
+    .panel-producto__info {
+        overflow: visible;
+        padding-bottom: 3rem;
+    }
+}
