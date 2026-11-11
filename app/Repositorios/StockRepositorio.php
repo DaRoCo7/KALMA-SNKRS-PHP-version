@@ -106,7 +106,8 @@ final class StockRepositorio
             $parametros += ['buscar_nombre' => $patron, 'buscar_codigo' => $patron, 'buscar_rfid' => $filtros['buscar']];
         }
         if (!empty($filtros['bajo_minimo'])) {
-            $sql[] = 'v.stock <= v.stock_minimo';
+            // Un lanzamiento sin stock no es una talla agotada: aún no ha llegado
+            $sql[] = 'v.stock <= v.stock_minimo AND (p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)';
         }
         if (isset($filtros['producto_id'])) {
             $sql[] = 'v.producto_id = :producto_id';
@@ -140,7 +141,9 @@ final class StockRepositorio
 
         $consulta = BaseDatos::conexion()->prepare(
             'SELECT v.id, v.producto_id, v.talla, v.stock, v.activo,
-                    p.nombre, p.colorway, p.precio, p.personalizable, p.activo AS producto_activo
+                    p.nombre, p.colorway, p.precio, p.personalizable, p.activo AS producto_activo,
+                    -- Un lanzamiento anunciado no se vende hasta su fecha, aunque ya haya llegado stock
+                    (p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE) AS lanzado
              FROM variantes v
              JOIN productos p ON p.id = v.producto_id
              WHERE v.id = ANY(CAST(:ids AS integer[]))

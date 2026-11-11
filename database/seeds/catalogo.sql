@@ -34,11 +34,19 @@ INSERT INTO colores (nombre, codigo_hex) VALUES
     ('Azul',   '#1F4E9C');
 
 -- -----------------------------------------------------------------------------
--- Productos: 12 combinaciones de color de 10 modelos distintos
--- (el enunciado pide un mínimo de 8 modelos)
+-- Productos: 12 combinaciones de color de 10 modelos distintos a la venta
+-- (el enunciado pide un mínimo de 8 modelos) y 7 lanzamientos anunciados.
+--
+-- Los lanzamientos llevan fecha futura, calculada desde el día en que se carga
+-- la semilla: así siempre hay próximos lanzamientos en la portada, se monte la
+-- base de datos cuando se monte. Los tres primeros son lanzamientos reales de
+-- noviembre de 2026 y, cargando la semilla el 11/11/2026, caen en su fecha real
+-- en Europa: Jordan 11 «Magic Ball» el 12, Shox R419 x Corteiz el 20 y
+-- Jordan 4 «Bred» el 27. Los otros cuatro son reediciones ya publicadas a las
+-- que KALMA pone su propia fecha de llegada.
 -- -----------------------------------------------------------------------------
 INSERT INTO productos (categoria_id, marca_id, color_id, nombre, colorway, codigo_marca,
-                       slug, descripcion, precio, personalizable, imagen,
+                       slug, descripcion, precio, personalizable, imagen, fecha_lanzamiento,
                        fecha_creacion, fecha_actualizacion)
 SELECT cat.id, m.id, col.id, p.nombre, p.colorway, p.codigo,
        -- Slug a partir del nombre y el código: "Nike Air Force 1 '07" + "CW2288-111"
@@ -48,7 +56,8 @@ SELECT cat.id, m.id, col.id, p.nombre, p.colorway, p.codigo,
        -- Solo se borda la piel lisa de los Lifestyle. Las Air Max son de malla y
        -- ante, y las Jordan son reediciones de coleccionista: bordarlas les quita valor
        p.categoria = 'Lifestyle',
-       'img/productos/' || lower(p.codigo) || '.webp',   -- las fotos llegan en la fase de front
+       'img/productos/' || lower(p.codigo) || '.webp',
+       CURRENT_DATE + l.dias_hasta_lanzamiento,          -- NULL si ya está a la venta
        '2026-06-15 08:00+02', '2026-06-15 08:00+02'
 FROM (VALUES
     (1,  'Lifestyle', 'Blanco', 'Nike Air Force 1 ''07',        'White/White',
@@ -86,15 +95,42 @@ FROM (VALUES
          'Apodada «White Cement Reimagined» (2023): piel blanca, estampado de elefante en gris cemento y mediasuela envejecida por el 35 aniversario del modelo.'),
     (12, 'Jordan',    'Gris',   'Air Jordan 4 Retro',           'White/Black-Neutral Grey',
          'DH6927-111', 199.99,
-         'Apodada «Military Black» (2022): los bloques de color del «Military Blue» de 1989 en negro y gris neutro sobre piel blanca.')
+         'Apodada «Military Black» (2022): los bloques de color del «Military Blue» de 1989 en negro y gris neutro sobre piel blanca.'),
+    -- Lanzamientos anunciados (todavía sin stock)
+    (13, 'Jordan',    'Negro',  'Air Jordan 11 Retro',          'Magic Ball',
+         'IZ1800-200', 249.99,
+         'Apodada «Magic Ball» (2026): charol tornasolado que cambia de dorado a verde y morado, por los 30 años de Space Jam y el balón de los Monstars.'),
+    (14, 'Lifestyle', 'Plata',  'Nike Shox R419 x Corteiz',     'Metallic Silver',
+         'IQ9951-001', 189.99,
+         'La Shox R4 del año 2000 reinterpretada por la marca londinense Corteiz: pala plateada con relieve y los cuatro pilares de amortiguación en el talón.'),
+    (15, 'Jordan',    'Negro',  'Air Jordan 4 Retro OG',        'Black/Fire Red/Cement Grey/White',
+         'IX8180-001', 239.99,
+         'Apodada «Bred» (2026): vuelve el negro y rojo original de 1989 en nobuk, con Nike Air en el talón. Sale el Black Friday.'),
+    (16, 'Jordan',    'Negro',  'Air Jordan 4 Retro',           'Black/Fire Red-Cement Grey-Summit White',
+         'FV5029-006', 209.99,
+         'Apodada «Bred Reimagined» (2024): el negro y rojo de 1989 con la pala en piel en lugar de nobuk.'),
+    (17, 'Jordan',    'Blanco', 'Air Jordan 11 Retro',          'White/Legend Blue-Black',
+         'CT8012-104', 229.99,
+         'Apodada «Legend Blue» (2024): charol blanco, suela translúcida azul hielo y el Jumpman en azul leyenda del All-Star de 1996.'),
+    (18, 'Jordan',    'Negro',  'Air Jordan 3 Retro',           'Black/Fire Red-Cement Grey-Summit White',
+         'DN3707-010', 209.99,
+         'Apodada «Black Cement Reimagined» (2024): piel negra, estampado de elefante y el logo Nike Air en el talón como en el par de 1988.'),
+    (19, 'Jordan',    'Negro',  'Air Jordan 5 Retro OG',        'Black/Metallic Silver-Fire Red',
+         'HF3975-001', 209.99,
+         'Apodada «Black Metallic Reimagined» (2025): nobuk negro, lengüeta reflectante plateada y Nike Air bordado en el talón.')
 ) AS p(orden, categoria, color, nombre, colorway, codigo, precio, descripcion)
+-- Días que faltan para el lanzamiento, por código (los que no están aquí ya se venden)
+LEFT JOIN (VALUES ('IZ1800-200', 1), ('IQ9951-001', 9), ('IX8180-001', 16),
+                  ('FV5029-006', 24), ('CT8012-104', 31), ('DN3707-010', 38), ('HF3975-001', 45))
+       AS l(codigo, dias_hasta_lanzamiento) ON l.codigo = p.codigo
 JOIN categorias cat ON cat.nombre = p.categoria
 JOIN colores col    ON col.nombre = p.color
 JOIN marcas m       ON m.nombre = 'Nike'
 ORDER BY p.orden;   -- los id siguen el orden de la lista
 
 -- -----------------------------------------------------------------------------
--- Variantes: 9 tallas por producto (108 en total)
+-- Variantes: 9 tallas por producto (171 en total; las 63 de los lanzamientos
+-- se crean con stock 0 y se llenarán con el albarán cuando lleguen)
 --
 -- Stock inicial = base del producto × factor de la talla (hay más pares de las
 -- tallas centrales). Algunos casos están preparados a propósito para las demos:
@@ -104,7 +140,9 @@ ORDER BY p.orden;   -- los id siguen el orden de la lista
 WITH base(codigo, stock_base) AS (VALUES
     ('CW2288-111', 20), ('CW2288-001', 14), ('DD1391-100', 16), ('DD1391-103', 10),
     ('CT1685-100',  9), ('DM0028-002',  5), ('DQ3989-100',  6), ('BQ6806-100', 12),
-    ('DM4044-108', 10), ('DZ5485-612',  3), ('DN3707-100',  4), ('DH6927-111',  2)
+    ('DM4044-108', 10), ('DZ5485-612',  3), ('DN3707-100',  4), ('DH6927-111',  2),
+    ('IZ1800-200',  0), ('IQ9951-001',  0), ('IX8180-001',  0),
+    ('FV5029-006',  0), ('CT8012-104',  0), ('DN3707-010',  0), ('HF3975-001',  0)
 ), tallas(talla, factor) AS (VALUES
     (39.0, 0.5), (40.0, 0.8), (40.5, 0.8), (41.0, 1.2), (42.0, 1.4),
     (42.5, 1.2), (43.0, 1.2), (44.0, 0.8), (45.0, 0.5)

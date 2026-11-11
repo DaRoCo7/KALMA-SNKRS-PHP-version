@@ -67,7 +67,9 @@ final class InformeRepositorio
         return (int) BaseDatos::conexion()->query(
             'SELECT count(*)
              FROM variantes v JOIN productos p ON p.id = v.producto_id
-             WHERE v.activo AND p.activo AND v.stock <= v.stock_minimo'
+             WHERE v.activo AND p.activo AND v.stock <= v.stock_minimo
+               -- los lanzamientos anunciados aún no han llegado: no hay nada que reponer
+               AND (p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)'
         )->fetchColumn();
     }
 
@@ -81,7 +83,7 @@ final class InformeRepositorio
                     count(v.id) FILTER (WHERE v.stock <= v.stock_minimo) AS tallas_bajo_minimo
              FROM productos p
              LEFT JOIN variantes v ON v.producto_id = p.id AND v.activo
-             WHERE p.activo
+             WHERE p.activo AND (p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)
              GROUP BY p.id
              ORDER BY stock_total, tallas_bajo_minimo DESC, p.nombre, p.id
              LIMIT :limite'

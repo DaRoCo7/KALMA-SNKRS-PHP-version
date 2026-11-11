@@ -92,7 +92,7 @@ final class LineasPedido
 
         foreach ($lineas as $i => $linea) {
             $variante = $variantes[$linea['variante_id']] ?? null;
-            if ($variante === null || !$variante['activo'] || !$variante['producto_activo']) {
+            if ($variante === null || !$variante['activo'] || !$variante['producto_activo'] || !$variante['lanzado']) {
                 $errores["lineas.{$i}.variante_id"] = 'Esta talla no existe o no está a la venta';
                 continue;
             }

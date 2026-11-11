@@ -101,6 +101,24 @@ final class ProductoRepositorio
         return $consulta->fetchAll();
     }
 
+    /**
+     * Lanzamientos anunciados: zapatillas con fecha de lanzamiento futura, del
+     * más cercano al más lejano. Todavía no se pueden comprar.
+     */
+    public function proximosLanzamientos(int $limite): array
+    {
+        $consulta = BaseDatos::conexion()->prepare(
+            'SELECT p.id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.descripcion, p.precio,
+                    p.imagen, p.fecha_lanzamiento
+             FROM productos p
+             WHERE p.activo AND p.fecha_lanzamiento > CURRENT_DATE
+             ORDER BY p.fecha_lanzamiento, p.id
+             LIMIT :limite'
+        );
+        $consulta->execute(['limite' => $limite]);
+        return $consulta->fetchAll();
+    }
+
     /** Opciones de personalización que se pueden elegir hoy (las desactivadas no salen) */
     public function opcionesPersonalizacion(): array
     {
@@ -140,7 +158,8 @@ final class ProductoRepositorio
      */
     private function condiciones(array $filtros): array
     {
-        $sql = ['p.activo'];
+        // Los lanzamientos anunciados no salen en el catálogo hasta su fecha
+        $sql = ['p.activo', '(p.fecha_lanzamiento IS NULL OR p.fecha_lanzamiento <= CURRENT_DATE)'];
         $parametros = [];
 
         if (isset($filtros['buscar'])) {

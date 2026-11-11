@@ -133,6 +133,9 @@ CREATE TABLE productos (
     -- (caja, cordones de repuesto, certificado) valen para cualquier modelo.
     personalizable      BOOLEAN       NOT NULL DEFAULT false,
     imagen              VARCHAR(255),  -- ruta relativa en public/img (pendiente de rediseño en el front)
+    -- Lanzamientos: con fecha futura la zapatilla se anuncia en la portada pero
+    -- todavía no sale en el catálogo ni se puede pedir. NULL = a la venta desde siempre.
+    fecha_lanzamiento   DATE,
     activo              BOOLEAN       NOT NULL DEFAULT true,
     fecha_creacion      TIMESTAMPTZ   NOT NULL DEFAULT now(),
     fecha_actualizacion TIMESTAMPTZ   NOT NULL DEFAULT now(),

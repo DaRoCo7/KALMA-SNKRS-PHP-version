@@ -69,16 +69,48 @@ final class CatalogoServicio
             $this->productos->opcionesPersonalizacion(),
             static fn (array $o): bool => !$o['afecta_zapatilla'] || $producto['personalizable']
         );
-        $ficha['opciones_personalizacion'] = array_values(array_map(static fn (array $o): array => [
-            'id'             => (int) $o['id'],
-            'tipo'           => $o['tipo'],
-            'nombre'         => $o['nombre'],
-            'descripcion'    => $o['descripcion'],
-            'max_caracteres' => $o['max_caracteres'] === null ? null : (int) $o['max_caracteres'],   // null = sin texto
-            'recargo'        => (float) $o['recargo'],
-        ], $aplicables));
+        $ficha['opciones_personalizacion'] = array_values(array_map($this->opcion(...), $aplicables));
 
         return $ficha;
+    }
+
+    /**
+     * Las últimas zapatillas dadas de alta (las que entran con los albaranes),
+     * para la sección de lanzamientos de la portada.
+     * @return list<array>
+     */
+    public function novedades(int $cuantas): array
+    {
+        return array_map($this->resumen(...), $this->productos->buscar([], 'novedades', $cuantas, 0));
+    }
+
+    /**
+     * Lanzamientos anunciados para la portada: se enseñan con su fecha, sin
+     * tallas ni stock porque todavía no se venden.
+     * @return list<array>
+     */
+    public function lanzamientos(int $cuantos): array
+    {
+        return array_map(static fn (array $p): array => [
+            'id'                => (int) $p['id'],
+            'nombre'            => $p['nombre'],
+            'colorway'          => $p['colorway'],
+            'codigo_marca'      => $p['codigo_marca'],
+            'descripcion'       => $p['descripcion'],
+            'precio'            => (float) $p['precio'],
+            'imagen'            => '/' . $p['imagen'],
+            'fecha_lanzamiento' => $p['fecha_lanzamiento'],   // AAAA-MM-DD
+        ], $this->productos->proximosLanzamientos($cuantos));
+    }
+
+    /**
+     * Todas las opciones de personalización que se ofrecen hoy, sin mirar el
+     * modelo: la portada las enseña como carta, la ficha filtra las suyas.
+     * @return list<array>
+     */
+    public function opcionesPersonalizacion(): array
+    {
+        return array_map($this->opcion(...), $this->productos->opcionesPersonalizacion());
     }
 
     public function valoresFiltros(): array
@@ -95,6 +127,19 @@ final class CatalogoServicio
             'tallas'  => array_map('floatval', $valores['tallas']),
             'precio'  => ['minimo' => (float) $valores['precio']['minimo'], 'maximo' => (float) $valores['precio']['maximo']],
             'ordenes' => array_keys(ProductoRepositorio::ORDENES),
+        ];
+    }
+
+    /** Datos públicos de una opción de personalización */
+    private function opcion(array $o): array
+    {
+        return [
+            'id'             => (int) $o['id'],
+            'tipo'           => $o['tipo'],
+            'nombre'         => $o['nombre'],
+            'descripcion'    => $o['descripcion'],
+            'max_caracteres' => $o['max_caracteres'] === null ? null : (int) $o['max_caracteres'],   // null = sin texto
+            'recargo'        => (float) $o['recargo'],
         ];
     }
 
