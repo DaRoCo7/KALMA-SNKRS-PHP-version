@@ -1706,7 +1706,7 @@
                 }
               }
             },
-            "description": "Las transiciones válidas salen de PedidoServicio::TRANSICIONES: desde pendiente solo se confirma o se cancela."
+            "description": "Las transiciones válidas salen de EstadosPedido::TRANSICIONES: desde pendiente solo se confirma o se cancela."
           },
           "event": [
             {
@@ -3326,6 +3326,940 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Albaranes (lista y detalle)",
+      "description": "Lista y detalle de los albaranes ya cargados (permiso albaranes.ver: almacén y administración). No hay tabla de albaranes: la lista sale de la auditoría (albaran.cargar) y las tallas de cada uno, de sus movimientos de stock «Albarán <referencia>». Usa el albarán que carga la carpeta 7.",
+      "item": [
+        {
+          "name": "Login de almacén (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"almacen@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol almacen', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('almacen'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén ve la lista de albaranes (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes?por_pagina=5"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Lista paginada con al menos un albarán', () => {",
+                  "    pm.expect(cuerpo.datos).to.be.an('array').that.is.not.empty;",
+                  "    pm.expect(cuerpo.paginacion).to.include.keys('pagina', 'por_pagina', 'total', 'paginas');",
+                  "    pm.expect(cuerpo.paginacion.por_pagina).to.eql(5);",
+                  "});",
+                  "pm.test('Cada albarán trae su resumen, quién y cuándo', () => {",
+                  "    const a = cuerpo.datos[0];",
+                  "    pm.expect(a).to.include.keys('referencia', 'fecha', 'usuario', 'filas', 'unidades', 'productos_nuevos', 'productos_actualizados', 'tallas_nuevas', 'desactivados');",
+                  "    pm.expect(a.usuario.email).to.eql('admin@kalma.test');",
+                  "});",
+                  "pm.test('Del más reciente al más antiguo', () => {",
+                  "    const fechas = cuerpo.datos.map((a) => Date.parse(a.fecha));",
+                  "    pm.expect(fechas).to.eql([...fechas].sort((x, y) => y - x));",
+                  "});",
+                  "// La carpeta 7 acaba de cargar ALB-PRUEBA-<código>: es el más reciente y tiene que estar en la lista",
+                  "const esperada = 'ALB-PRUEBA-' + pm.collectionVariables.get('gp_codigo');",
+                  "pm.test('Incluye el albarán que cargó la carpeta 7', () => pm.expect(cuerpo.datos.map((a) => a.referencia)).to.include(esperada));",
+                  "pm.collectionVariables.set('alb_referencia', esperada);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle de un albarán que existe (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes/detalle?referencia={{alb_referencia}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const a = pm.response.json().datos;",
+                  "pm.test('Es el albarán pedido', () => pm.expect(a.referencia).to.eql(pm.collectionVariables.get('alb_referencia')));",
+                  "pm.test('Resumen igual que al cargarlo', () => {",
+                  "    pm.expect(a.filas).to.eql(5);",
+                  "    pm.expect(a.unidades).to.eql(10);",
+                  "    pm.expect(a.productos_nuevos).to.eql([pm.collectionVariables.get('gp_codigo_nuevo')]);",
+                  "    pm.expect(a.tallas_nuevas).to.eql(2);",
+                  "    pm.expect(a.cargas).to.eql(1);",
+                  "});",
+                  "pm.test('Las tallas que entraron suman las unidades del albarán', () => {",
+                  "    pm.expect(a.tallas).to.be.an('array').with.lengthOf(3);   // AF1 42 (dos filas sumadas), la 46 de la de prueba y la 41 de la nueva",
+                  "    pm.expect(a.tallas.reduce((s, t) => s + t.cantidad, 0)).to.eql(a.unidades);",
+                  "    a.tallas.forEach((t) => pm.expect(t).to.include.keys('variante_id', 'producto', 'talla', 'cantidad', 'stock_resultante'));",
+                  "});",
+                  "pm.test('La Air Force 1 en la 42 entró con 3 pares', () => {",
+                  "    const af1 = a.tallas.find((t) => t.producto.codigo_marca === 'CW2288-111' && t.talla === 42);",
+                  "    pm.expect(af1.cantidad).to.eql(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle de un albarán que no existe (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes/detalle?referencia=ALB/NO-EXISTE/0000",
+            "description": "La referencia puede llevar «/», por eso va en la consulta y no en la ruta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('Error en el formato de la API', () => pm.expect(pm.response.json().error.codigo).to.eql(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle sin referencia (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes/detalle"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Dice qué falta', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('referencia'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén no puede cargar un albarán (403)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/albaranes?referencia=ALB-ALMACEN",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/csv"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "codigo_marca,nombre,colorway,categoria,color,precio,talla,cantidad\nCW2288-111,,,,,,42,1",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de almacén (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de la clienta (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente@kalma.test\",\n  \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "La clienta pide la lista de albaranes (403)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de la clienta (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sin sesión (401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/albaranes"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Informes de stock",
+      "description": "El almacén genera los informes de poco stock y de zapatillas sin ventas, los descarga en CSV y los envía a administración, que los revisa. Se guardan en la tabla auditoria (informe_stock.enviar / informe_stock.revisar). Cada ejecución envía un informe nuevo y lo marca como revisado: la carpeta se puede repetir.",
+      "item": [
+        {
+          "name": "Login del almacén (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"almacen@kalma.test\",\n    \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/login · Público."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol almacen', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('almacen'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vista previa de poco stock (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/vista-previa?tipo=stock_bajo",
+            "description": "GET /api/gestion/informes-stock/vista-previa?tipo=stock_bajo · Permiso informes_stock.enviar. Calcula sin guardar: tallas activas de zapatillas a la venta en su stock mínimo o por debajo (el mismo umbral que el resumen)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test('Tipo y umbral', () => {",
+                  "    pm.expect(d.tipo).to.eql('stock_bajo');",
+                  "    pm.expect(d.parametros.umbral).to.eql('stock_minimo');",
+                  "});",
+                  "pm.test('Todas las tallas en su mínimo o por debajo', () => {",
+                  "    pm.expect(d.filas).to.be.an('array');",
+                  "    d.filas.forEach(f => pm.expect(f.stock).to.be.at.most(f.stock_minimo));",
+                  "});",
+                  "pm.test('total_filas cuadra con las filas', () => pm.expect(d.total_filas).to.eql(d.recortado ? d.total_filas : d.filas.length));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vista previa sin ventas en 60 días (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/vista-previa?tipo=sin_ventas&dias=60",
+            "description": "GET /api/gestion/informes-stock/vista-previa?tipo=sin_ventas&dias=60 · Zapatillas a la venta cuya última venta (pedido no cancelado) es de hace más de 60 días, o que no se han vendido nunca."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test('Parámetros: 60 días', () => pm.expect(d.parametros.dias).to.eql(60));",
+                  "pm.test('Ninguna se ha vendido en los últimos 60 días', () => {",
+                  "    d.filas.forEach(f => {",
+                  "        pm.expect(f).to.include.all.keys('codigo_marca', 'stock_total', 'ultima_venta', 'dias_sin_vender');",
+                  "        if (f.ultima_venta !== null) pm.expect(f.dias_sin_vender).to.be.at.least(60);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Días fuera de rango (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/vista-previa?tipo=sin_ventas&dias=366",
+            "description": "Los días van de 1 a 365."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('El error es de dias', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('dias'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Envío sin días (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/informes-stock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tipo\": \"sin_ventas\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/gestion/informes-stock · «sin_ventas» exige los días. Nada se guarda."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Falta dias', () => pm.expect(pm.response.json().error.detalles.errores.dias).to.eql('Obligatorio'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tipo no válido (400)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/vista-previa?tipo=ofertas",
+            "description": "Solo existen stock_bajo y sin_ventas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('El error es de tipo', () => pm.expect(pm.response.json().error.detalles.errores).to.have.property('tipo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vista previa en CSV (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/vista-previa/csv?tipo=sin_ventas&dias=60",
+            "description": "GET /api/gestion/informes-stock/vista-previa/csv · Mismo formato que la exportación de pedidos: separador «;», BOM UTF-8 y celdas protegidas contra la inyección de fórmulas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Descarga text/csv con nombre del servidor', () => {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition')).to.match(/^attachment; filename=\"kalma-sin-ventas-60dias-\\d{8}\\.csv\"$/);",
+                  "});",
+                  "pm.test('Cabecera con punto y coma (y BOM de UTF-8 delante)', () => {",
+                  "    const texto = pm.response.text();",
+                  "    // newman quita el BOM del texto: se miran los bytes si los hay",
+                  "    const bytes = pm.response.stream;",
+                  "    if (bytes) {",
+                  "        pm.expect([bytes[0], bytes[1], bytes[2]]).to.eql([0xEF, 0xBB, 0xBF]);",
+                  "    } else {",
+                  "        pm.expect(texto.charCodeAt(0)).to.eql(0xFEFF);",
+                  "    }",
+                  "    pm.expect(texto.replace(/^\\uFEFF/, '').split('\\r\\n')[0]).to.eql('codigo_marca;modelo;colorway;tallas;stock_total;ultima_venta;dias_sin_vender');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enviar el informe a administración (201)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/gestion/informes-stock",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tipo\": \"stock_bajo\",\n    \"comentario\": \"=Revisar las Air Max\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/gestion/informes-stock · El servidor vuelve a calcular las filas y guarda su foto en la auditoría (informe_stock.enviar). El comentario empieza por «=» a propósito: en el CSV no debe convertirse en fórmula."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().datos;",
+                  "pm.collectionVariables.set('is_informe_id', d.id);",
+                  "pm.test('Location apunta al informe', () => pm.expect(pm.response.headers.get('Location')).to.eql('/api/gestion/informes-stock/' + d.id));",
+                  "pm.test('Pendiente, con su foto y su comentario', () => {",
+                  "    pm.expect(d.estado).to.eql('pendiente');",
+                  "    pm.expect(d.revisado_en).to.eql(null);",
+                  "    pm.expect(d.filas).to.be.an('array');",
+                  "    pm.expect(d.comentario).to.eql('=Revisar las Air Max');",
+                  "    pm.expect(d.creado_por.email).to.eql('almacen@kalma.test');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis informes enviados (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock?por_pagina=50",
+            "description": "GET /api/gestion/informes-stock · El almacén solo ve los que ha enviado él; los pendientes primero."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Está el que acabo de enviar, pendiente', () => {",
+                  "    const informe = r.datos.find(i => i.id === Number(pm.collectionVariables.get('is_informe_id')));",
+                  "    pm.expect(informe).to.not.equal(undefined);",
+                  "    pm.expect(informe.estado).to.eql('pendiente');",
+                  "});",
+                  "pm.test('Solo los suyos y sin la foto en el listado', () => r.datos.forEach(i => {",
+                  "    pm.expect(i.creado_por.email).to.eql('almacen@kalma.test');",
+                  "    pm.expect(i).to.not.have.property('filas');",
+                  "}));",
+                  "pm.test('El contador de pendientes es solo para quien revisa', () => pm.expect(r).to.not.have.property('pendientes'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "CSV del informe enviado (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/{{is_informe_id}}/csv",
+            "description": "GET /api/gestion/informes-stock/{id}/csv · La foto guardada, no el stock de ahora."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Descarga text/csv con nombre del servidor', () => {",
+                  "    pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');",
+                  "    pm.expect(pm.response.headers.get('Content-Disposition')).to.match(/^attachment; filename=\"kalma-informe-stock-\\d+-stock-bajo\\.csv\"$/);",
+                  "});",
+                  "pm.test('Cabecera con punto y coma (y BOM de UTF-8 delante)', () => {",
+                  "    const texto = pm.response.text();",
+                  "    // newman quita el BOM del texto: se miran los bytes si los hay",
+                  "    const bytes = pm.response.stream;",
+                  "    if (bytes) {",
+                  "        pm.expect([bytes[0], bytes[1], bytes[2]]).to.eql([0xEF, 0xBB, 0xBF]);",
+                  "    } else {",
+                  "        pm.expect(texto.charCodeAt(0)).to.eql(0xFEFF);",
+                  "    }",
+                  "    pm.expect(texto.replace(/^\\uFEFF/, '').split('\\r\\n')[0]).to.eql('codigo_marca;modelo;colorway;talla;stock;stock_minimo;rfid_tienda');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El almacén no puede marcarlo como revisado (403)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/informes-stock/{{is_informe_id}}/revisado",
+            "description": "PATCH /api/gestion/informes-stock/{id}/revisado · Permiso informes_stock.revisar (solo administración). El intento queda en la auditoría (acceso.denegado)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Formato de error', () => pm.expect(pm.response.json().error.codigo).to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión del almacén (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "description": "POST /api/logout · Sesión."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de administración (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@kalma.test\",\n    \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/login · Público."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol admin', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('admin'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bandeja de pendientes (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock?estado=pendiente&por_pagina=50",
+            "description": "GET /api/gestion/informes-stock?estado=pendiente · Administración ve los de todos y el número de pendientes (el contador del panel)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Está el informe del almacén', () => pm.expect(r.datos.map(i => i.id)).to.include(Number(pm.collectionVariables.get('is_informe_id'))));",
+                  "pm.test('Todos pendientes y el contador cuadra', () => {",
+                  "    r.datos.forEach(i => pm.expect(i.estado).to.eql('pendiente'));",
+                  "    pm.expect(r.pendientes).to.eql(r.paginacion.total);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle del informe (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/{{is_informe_id}}",
+            "description": "GET /api/gestion/informes-stock/{id} · Con la foto de las filas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test('Tipo, foto y quién lo envió', () => {",
+                  "    pm.expect(d.tipo).to.eql('stock_bajo');",
+                  "    pm.expect(d.filas).to.be.an('array');",
+                  "    pm.expect(d.creado_por.email).to.eql('almacen@kalma.test');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Marcar como revisado (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/informes-stock/{{is_informe_id}}/revisado",
+            "description": "PATCH /api/gestion/informes-stock/{id}/revisado · Sin cuerpo. Deja un evento informe_stock.revisar en la auditoría."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.collectionVariables.set('is_revisado_en', d.revisado_en);",
+                  "pm.test('Revisado por administración', () => {",
+                  "    pm.expect(d.estado).to.eql('revisado');",
+                  "    pm.expect(d.revisado_por.email).to.eql('admin@kalma.test');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Marcarlo otra vez no cambia nada (200)",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/gestion/informes-stock/{{is_informe_id}}/revisado",
+            "description": "PATCH idempotente: si ya estaba revisado se devuelve igual y no se escribe otra revisión."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Misma fecha de revisión', () => pm.expect(pm.response.json().datos.revisado_en).to.eql(pm.collectionVariables.get('is_revisado_en')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Envío y revisión en la auditoría (200)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/auditoria?entidad=informe_stock&por_pagina=100",
+            "description": "GET /api/gestion/auditoria?entidad=informe_stock · El envío es el evento con el id del informe; la revisión apunta a él (una sola)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('is_informe_id'));",
+                  "const eventos = pm.response.json().datos;",
+                  "pm.test('El envío guarda la foto', () => {",
+                  "    const envio = eventos.find(e => e.id === id);",
+                  "    pm.expect(envio.tipo_evento).to.eql('informe_stock.enviar');",
+                  "    pm.expect(envio.detalle.filas).to.be.an('array');",
+                  "});",
+                  "pm.test('Una sola revisión de ese informe', () => {",
+                  "    pm.expect(eventos.filter(e => e.tipo_evento === 'informe_stock.revisar' && e.entidad_id === id)).to.have.lengthOf(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Informe que no existe (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/999999999",
+            "description": "Un id que no es de un informe responde 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de administración (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "description": "POST /api/logout · Sesión."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login de la clienta (200)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/login",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"cliente@kalma.test\",\n    \"password\": \"Kalma2026!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "POST /api/login · Público."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Rol cliente', () => pm.expect(pm.response.json().datos.usuario.rol).to.eql('cliente'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "La clienta no ve la vista previa (403)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock/vista-previa?tipo=stock_bajo",
+            "description": "Permiso informes_stock.enviar: un cliente recibe 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Formato de error', () => pm.expect(pm.response.json().error.codigo).to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "La clienta no ve los informes (403)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/gestion/informes-stock",
+            "description": "Permiso informes_stock.enviar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('Formato de error', () => pm.expect(pm.response.json().error.codigo).to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cerrar la sesión de la clienta (204)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/logout",
+            "description": "POST /api/logout · Sesión."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -3355,6 +4289,9 @@
     { "key": "seguimiento_gestion", "value": "" },
     { "key": "stock_gestion", "value": "" },
     { "key": "unidades_vendidas", "value": "" },
-    { "key": "variante_gestion", "value": "" }
+    { "key": "variante_gestion", "value": "" },
+    { "key": "alb_referencia", "value": "" },
+    { "key": "is_informe_id", "value": "" },
+    { "key": "is_revisado_en", "value": "" }
   ]
 }

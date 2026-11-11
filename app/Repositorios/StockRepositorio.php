@@ -21,14 +21,17 @@ final class StockRepositorio
      */
     private const COLUMNAS_TALLA = 'v.id AS variante_id, v.talla, v.stock, v.stock_minimo,
         (v.stock <= v.stock_minimo) AS bajo_minimo, v.rfid_tienda, v.activo,
-        p.id AS producto_id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.activo AS producto_activo';
+        p.id AS producto_id, p.nombre, p.colorway, p.codigo_marca, p.slug, p.activo AS producto_activo,
+        p.fecha_lanzamiento, (p.fecha_lanzamiento > CURRENT_DATE) AS lanzamiento,
+        c.id AS categoria_id, c.nombre AS categoria';
 
-    private const DESDE_TALLAS = 'FROM variantes v JOIN productos p ON p.id = v.producto_id';
+    private const DESDE_TALLAS = 'FROM variantes v JOIN productos p ON p.id = v.producto_id
+        JOIN categorias c ON c.id = p.categoria_id';
 
     /**
      * Tallas para el control de stock, ordenadas por modelo, colorway y talla.
      *
-     * @param array{buscar?: string, bajo_minimo?: bool, producto_id?: int} $filtros
+     * @param array{buscar?: string, bajo_minimo?: bool, producto_id?: int, categoria_id?: int} $filtros
      */
     public function listarTallas(array $filtros, int $limite, int $desplazamiento): array
     {
@@ -112,6 +115,10 @@ final class StockRepositorio
         if (isset($filtros['producto_id'])) {
             $sql[] = 'v.producto_id = :producto_id';
             $parametros['producto_id'] = $filtros['producto_id'];
+        }
+        if (isset($filtros['categoria_id'])) {
+            $sql[] = 'p.categoria_id = :categoria_id';
+            $parametros['categoria_id'] = $filtros['categoria_id'];
         }
 
         return [implode(' AND ', $sql), $parametros];

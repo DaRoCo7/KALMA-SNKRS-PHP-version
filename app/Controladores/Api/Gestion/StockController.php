@@ -20,7 +20,7 @@ final class StockController
     {
     }
 
-    /** GET /api/gestion/stock?buscar=&bajo_minimo=1&producto_id=&pagina=1 · tallas con su stock */
+    /** GET /api/gestion/stock?buscar=&bajo_minimo=1&producto_id=&categoria_id=&pagina=1 · tallas con su stock */
     public function index(Peticion $peticion): Respuesta
     {
         $paginacion = Paginacion::desdePeticion($peticion, porDefecto: 20, maximo: 100);

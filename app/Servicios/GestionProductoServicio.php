@@ -453,6 +453,8 @@ final class GestionProductoServicio
             'color'               => ['id' => (int) $p['color_id'], 'nombre' => $p['color'], 'hex' => $p['codigo_hex']],
             'stock_total'         => (int) $p['stock_total'],
             'num_tallas'          => (int) $p['num_tallas'],
+            // AAAA-MM-DD o null; si es futura, la zapatilla está anunciada y no se vende todavía
+            'fecha_lanzamiento'   => $p['fecha_lanzamiento'],
             'fecha_actualizacion' => self::fecha($p['fecha_actualizacion']),
         ];
     }

@@ -1,0 +1,578 @@
+/*
+ * Panel: gráficas (public/js/panel/graficas.js) y las secciones de análisis y
+ * control (informes, informes de stock, consultas y auditoría).
+ *
+ * Va aparte de panel.css para que cada parte del panel crezca en su archivo.
+ * Usa los mismos tonos (--p-*) y el mismo hueco de 16 px.
+ *
+ * Gráficas en negro y grises, sin colores de acento: las marcas en casi negro
+ * y, cuando el título habla de un elemento, el resto en un gris de 3,3:1 sobre
+ * blanco (se distingue de la rejilla y de la base sin competir con el negro).
+ * Cada gráfica es de una sola serie: el color nunca es lo único que identifica.
+ */
+
+.pagina-panel {
+    --g-marca: #2b2b2b;
+    --g-marca-activa: #010101;
+    --g-contexto: #8c8c8c;
+    --g-regla: #efefef;
+    --g-base: #cfcfcf;
+    --g-zona: #f4f4f4;
+}
+
+/* --- Gráfica ------------------------------------------------------------------ */
+
+.grafica {
+    min-width: 0;
+    margin: 0;
+    padding: 14px 16px 12px;
+}
+
+.grafica__cabeza {
+    margin-bottom: 12px;
+}
+
+.grafica__titulo {
+    font-size: 15px;
+}
+
+.grafica__sub {
+    margin-top: 2px !important;
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+.grafica__vacio {
+    padding: 12px 0 4px;
+    color: var(--p-tenue);
+}
+
+/* Relativa: el tooltip se coloca dentro, encima de la marca */
+.grafica__lienzo {
+    position: relative;
+    min-width: 0;
+}
+
+.grafica__svg {
+    display: block;
+    overflow: visible;
+}
+
+.grafica__svg text {
+    fill: var(--p-texto);
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.grafica__svg .grafica__eje {
+    fill: var(--p-tenue);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.grafica__svg .grafica__etiqueta-sub {
+    fill: var(--p-tenue);
+    font-size: 12px;
+}
+
+.grafica__svg .grafica__valor {
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.grafica__regla {
+    stroke: var(--g-regla);
+    stroke-width: 1;
+}
+
+.grafica__base {
+    stroke: var(--g-base);
+    stroke-width: 1;
+}
+
+.grafica__barra,
+.grafica__columna {
+    fill: var(--g-marca);
+    transition: fill 120ms ease;
+}
+
+.grafica__barra--contexto {
+    fill: var(--g-contexto);
+}
+
+.grafica__linea {
+    fill: none;
+    stroke: var(--g-marca);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Anillo del color de la superficie: el punto se lee aunque cruce la línea */
+.grafica__punto {
+    fill: var(--g-marca);
+    stroke: var(--p-superficie);
+    stroke-width: 2;
+}
+
+.grafica__punto--elegido,
+.grafica__reticula {
+    opacity: 0;
+    transition: opacity 100ms ease;
+}
+
+.grafica__reticula {
+    stroke: var(--g-base);
+    stroke-width: 1;
+}
+
+/* La zona de cada marca es toda su fila o columna: más fácil de alcanzar */
+.grafica__zona {
+    fill: transparent;
+    transition: fill 100ms ease;
+}
+
+.grafica__marca {
+    cursor: default;
+    outline: none;
+}
+
+.grafica__marca--activa .grafica__zona:not(.grafica__zona--invisible) {
+    fill: var(--g-zona);
+}
+
+.grafica__marca--activa .grafica__barra,
+.grafica__marca--activa .grafica__columna {
+    fill: var(--g-marca-activa);
+}
+
+.grafica__marca--activa .grafica__punto--elegido,
+.grafica__marca--activa .grafica__reticula {
+    opacity: 1;
+}
+
+/* El foco del teclado se ve en la zona (un <g> no dibuja su propio contorno) */
+.grafica__marca:focus-visible .grafica__zona {
+    stroke: var(--p-texto);
+    stroke-width: 2;
+}
+
+.grafica__tooltip {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    display: grid;
+    gap: 1px;
+    max-width: min(260px, 100%);
+    padding: 7px 10px;
+    border: 1px solid var(--p-borde);
+    border-radius: var(--p-radio-control);
+    background: var(--p-superficie);
+    box-shadow: 0 6px 18px rgb(1 1 1 / 0.10);
+    font-size: 12px;
+    line-height: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 100ms ease;
+}
+
+.grafica__tooltip--visible {
+    opacity: 1;
+}
+
+.grafica__tooltip-valor {
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.grafica__tooltip-detalle {
+    color: var(--p-tenue);
+}
+
+.grafica__datos {
+    margin-top: 10px;
+    border-top: 1px solid var(--p-regla);
+}
+
+.grafica__resumen-tabla {
+    padding-top: 8px;
+    color: var(--p-tenue);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.grafica__datos[open] .grafica__resumen-tabla {
+    margin-bottom: 4px;
+}
+
+.grafica__datos .tabla th:first-child,
+.grafica__datos .tabla td:first-child {
+    padding-left: 0;
+}
+
+.grafica__datos .tabla td {
+    height: 36px;
+}
+
+/* Entrada: las marcas crecen desde su base, una vez y en escalera corta */
+.grafica__svg--entrada .grafica__barra {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: grafica-crece-x 480ms var(--p-salida) var(--retraso, 0ms) both;
+}
+
+.grafica__svg--entrada .grafica__columna {
+    transform-box: fill-box;
+    transform-origin: center bottom;
+    animation: grafica-crece-y 480ms var(--p-salida) var(--retraso, 0ms) both;
+}
+
+.grafica__svg--entrada .grafica__linea {
+    stroke-dasharray: 1;
+    animation: grafica-traza 700ms var(--p-salida) both;
+}
+
+.grafica__svg--entrada .grafica__valor {
+    animation: grafica-aparece 300ms ease 260ms both;
+}
+
+@keyframes grafica-crece-x {
+    from { transform: scaleX(0); }
+}
+
+@keyframes grafica-crece-y {
+    from { transform: scaleY(0); }
+}
+
+@keyframes grafica-traza {
+    from { stroke-dashoffset: 1; }
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes grafica-aparece {
+    from { opacity: 0; }
+}
+
+/* --- Rejillas de las secciones ------------------------------------------------- */
+
+.analisis {
+    display: grid;
+    gap: var(--p-hueco);
+    transition: opacity 150ms ease;
+}
+
+/* Al volver a pedir los datos, lo de antes se queda atenuado: sin esqueleto ni saltos */
+.analisis[aria-busy="true"] {
+    opacity: 0.55;
+}
+
+.analisis__pareja {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--p-hueco);
+    align-items: start;
+}
+
+/* Filtros de una fila encima de todo lo que afectan */
+.barra-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px 16px;
+    margin-bottom: 16px;
+}
+
+.barra-filtros__campo {
+    display: grid;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--p-tenue);
+}
+
+.barra-filtros__campo .campo-texto {
+    min-width: 0;
+}
+
+.barra-filtros__grupo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.barra-filtros__error {
+    flex-basis: 100%;
+    color: var(--p-negativo);
+    font-size: 13px;
+}
+
+.barra-filtros__error:empty {
+    display: none;
+}
+
+/* Botón de periodo rápido elegido */
+.control[aria-pressed="true"] {
+    border-color: var(--p-texto);
+    background: var(--p-texto);
+    color: var(--p-superficie);
+}
+
+select.campo-texto {
+    padding-right: 28px;
+}
+
+.tabla--analisis td:first-child,
+.tabla--analisis th:first-child {
+    padding-left: 16px;
+}
+
+.tabla--analisis tbody tr[data-id] {
+    cursor: pointer;
+    transition: background-color 100ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .tabla--analisis tbody tr[data-id]:hover {
+        background: var(--p-elevado);
+    }
+}
+
+.tabla--analisis tbody tr.tabla__fila--abierta {
+    background: var(--p-activo);
+}
+
+.tabla__corta {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Pestañas dentro de una tarjeta: el borde inferior hace de separador */
+.filtros--tarjeta {
+    margin: 0;
+    padding: 0 16px;
+}
+
+/* --- Exportación de pedidos (en Informes) ------------------------------------- */
+
+.exportar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px 16px;
+    padding: 0 16px 16px;
+}
+
+/* --- Informes de stock --------------------------------------------------------- */
+
+.generador {
+    display: grid;
+    gap: 14px;
+    padding: 0 16px 16px;
+}
+
+.generador__tipos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.generador__tipos legend {
+    margin-bottom: 6px;
+    padding: 0;
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+/* Cada tipo es una opción grande: radio + nombre + qué incluye */
+.opcion-tipo {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    flex: 1 1 240px;
+    padding: 10px 12px;
+    border: 1px solid var(--p-control);
+    border-radius: var(--p-radio);
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.opcion-tipo:has(input:checked) {
+    border-color: var(--p-texto);
+    background: var(--p-elevado);
+}
+
+.opcion-tipo input {
+    grid-row: span 2;
+    margin: 2px 0 0;
+    accent-color: var(--p-texto);
+}
+
+.opcion-tipo__nombre {
+    font-weight: 700;
+}
+
+.opcion-tipo__nota {
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+.generador__fila {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px 16px;
+}
+
+.generador__fila[hidden] {
+    display: none;
+}
+
+.campo-dias {
+    width: 88px;
+}
+
+.envio {
+    display: grid;
+    gap: 8px;
+    padding: 16px;
+    border-top: 1px solid var(--p-regla);
+}
+
+.envio textarea {
+    width: 100%;
+    min-height: 72px;
+    height: auto;
+    padding: 8px 10px;
+    resize: vertical;
+}
+
+.envio__pie {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+}
+
+.envio__cuenta {
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+/* Estado de un informe: pendiente pide una decisión, revisado ya no */
+.estado--revisado {
+    color: var(--p-tenue);
+}
+
+.nota-recorte {
+    padding: 0 16px 12px;
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+.comentario {
+    margin: 0;
+    padding: 10px 12px;
+    border-left: 2px solid var(--p-texto);
+    background: var(--p-elevado);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Contador de la barra lateral: cuántos informes esperan revisión */
+.insignia {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--p-texto);
+    color: var(--p-superficie);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.insignia:empty {
+    display: none;
+}
+
+/* --- Consultas y auditoría ------------------------------------------------------ */
+
+.mensaje-consulta {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.json {
+    margin: 0;
+    padding: 12px;
+    max-height: 420px;
+    overflow: auto;
+    border: 1px solid var(--p-borde);
+    border-radius: var(--p-radio-control);
+    background: var(--p-elevado);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: pre;
+}
+
+.resultado--error,
+.resultado--denegado {
+    color: var(--p-negativo);
+    font-weight: 700;
+}
+
+/* --- Pantallas estrechas ------------------------------------------------------- */
+
+@media (max-width: 72rem) {
+    .analisis__pareja {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 30rem) {
+    .barra-filtros__campo {
+        flex: 1 1 140px;
+    }
+
+    .barra-filtros__campo .campo-texto {
+        width: 100%;
+    }
+
+    .grafica {
+        padding: 12px 12px 10px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .grafica__svg--entrada .grafica__barra,
+    .grafica__svg--entrada .grafica__columna,
+    .grafica__svg--entrada .grafica__linea,
+    .grafica__svg--entrada .grafica__valor {
+        animation: none;
+    }
+
+    .grafica__tooltip,
+    .grafica__zona,
+    .grafica__barra,
+    .grafica__columna {
+        transition: none;
+    }
+}
+
+/* Enlace del evento a su informe de stock, separado del JSON */
+.auditoria__enlace {
+    margin-top: 12px !important;
+}

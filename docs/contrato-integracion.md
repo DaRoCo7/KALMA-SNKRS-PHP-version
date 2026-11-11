@@ -105,6 +105,7 @@ Si Nginx corta una petición por exceso (rate limiting), responde `429` con el m
 | Accesos y errores del proxy | stdout y stderr de `proxy` | `docker compose logs proxy` |
 | Errores y eventos de la aplicación | stderr de `app`, una línea JSON por evento (`fecha` ISO 8601, `nivel`, `mensaje`, `referencia`) | `docker compose logs app` |
 | Eventos de negocio (login, pedidos, estados, stock, accesos denegados) | Tabla `auditoria` | `GET /api/gestion/auditoria` o `psql` |
+| Informes de stock enviados y su revisión | Tabla `auditoria` (`informe_stock.enviar` / `informe_stock.revisar`) | `GET /api/gestion/informes-stock` o `psql` |
 | Movimientos de stock | Tabla `movimientos_stock` | `GET /api/gestion/stock` o `psql` |
 
 - Un error 500 llega al cliente con una `referencia` (8 caracteres hexadecimales). La misma referencia aparece en
@@ -118,7 +119,7 @@ Todos los datos son ficticios. Contraseña de demostración de todas las cuentas
 | Email | Rol | Para la demo |
 |---|---|---|
 | `admin@kalma.test` | admin | Todo: productos, informes, auditoría, exportación |
-| `almacen@kalma.test` | almacen | Stock, ver todos los pedidos y avanzar su estado |
+| `almacen@kalma.test` | almacen | Stock, consultar los albaranes cargados, ver todos los pedidos y avanzar su estado |
 | `cliente@kalma.test` | cliente | Sus pedidos (`SF-2026-000021` cancelable, `SF-2026-000013` no) |
 
 El pedido `SF-2026-000022` es de otro cliente: sirve para demostrar que `cliente@kalma.test` no puede verlo (404).
@@ -254,20 +255,29 @@ Cuerpo de `POST /api/pedidos`:
 | GET | `/api/gestion/pedidos?estado&buscar&personalizado&pagina` | `pedidos.ver_todos` | 200, 400 |
 | GET | `/api/gestion/pedidos/{codigo}` | `pedidos.ver_todos` | 200, 404 |
 | PATCH | `/api/gestion/pedidos/{codigo}/estado` | `pedidos.cambiar_estado` (+ `pedidos.confirmar_cancelar` para confirmar o cancelar) | 200, 400, 403, 404, 409 transición no válida o seguimiento repetido |
-| GET | `/api/gestion/stock?buscar&bajo_minimo&producto_id&pagina` | `stock.gestionar` | 200, 400 (`buscar` admite también la etiqueta RFID) |
+| GET | `/api/gestion/stock?buscar&bajo_minimo&producto_id&categoria_id&pagina` | `stock.gestionar` | 200, 400 (`buscar` admite también la etiqueta RFID; cada talla trae `producto.categoria`, `producto.fecha_lanzamiento` y `producto.lanzamiento`) |
 | PATCH | `/api/gestion/variantes/{id}/stock` | `stock.gestionar` | 200, 400, 404, 409 si quedaría negativo |
 | GET | `/api/gestion/variantes/{id}/movimientos?pagina` | `stock.gestionar` | 200, 404 |
-| GET | `/api/gestion/productos?buscar&activo&pagina` | `productos.gestionar` | 200 (incluye desactivados) |
+| GET | `/api/gestion/productos?buscar&activo&pagina` | `productos.gestionar` | 200 (incluye desactivados; con `fecha_lanzamiento`, que solo se consulta) |
 | GET | `/api/gestion/productos/{id}` | `productos.gestionar` | 200 (con tallas y RFID), 404 |
 | POST | `/api/gestion/productos` | `productos.gestionar` | 201, 400, 409 código repetido |
 | PATCH | `/api/gestion/productos/{id}` | `productos.gestionar` | 200, 400, 404 (el código de Nike no se edita) |
 | DELETE | `/api/gestion/productos/{id}` | `productos.gestionar` | 204 (lo desactiva, no lo borra), 404 |
 | POST | `/api/gestion/albaranes?referencia` | `productos.gestionar` | 200 con el resumen, 400 con los errores de cada fila, 415 (cuerpo `text/csv`) |
+| GET | `/api/gestion/albaranes?pagina` | `albaranes.ver` | 200: albaranes aceptados, del más reciente al más antiguo (`referencia, fecha, usuario, filas, unidades, productos_nuevos, productos_actualizados, tallas_nuevas, desactivados`) |
+| GET | `/api/gestion/albaranes/detalle?referencia` | `albaranes.ver` | 200 con el resumen, `cargas` y `tallas` (zapatilla, talla, `cantidad` y `stock_resultante`), 400 sin referencia, 404 |
 | GET | `/api/gestion/consultas?estado&pagina` | `consultas.gestionar` | 200, 400 |
 | PATCH | `/api/gestion/consultas/{id}` | `consultas.gestionar` | 200, 400, 404 |
 | GET | `/api/gestion/auditoria?tipo&entidad&resultado&usuario_id&pagina` | `auditoria.ver` | 200, 400 |
 | GET | `/api/gestion/exportar/pedidos?formato=csv\|json&estado&desde&hasta` | `datos.exportar` | 200 (descarga), 400 |
 | GET | `/api/usuarios?rol&pagina` | `usuarios.gestionar` | 200 |
+| GET | `/api/gestion/informes-stock/vista-previa?tipo&dias` | `informes_stock.enviar` | 200 `{tipo, parametros, generado_en, total_filas, recortado, filas}` sin guardar, 400 |
+| GET | `/api/gestion/informes-stock/vista-previa/csv?tipo&dias` | `informes_stock.enviar` | 200 (descarga `text/csv`), 400 |
+| POST | `/api/gestion/informes-stock` | `informes_stock.enviar` | 201 con el informe y su foto (`Location`), 400 |
+| GET | `/api/gestion/informes-stock?estado=pendiente\|revisado&tipo&pagina` | `informes_stock.enviar` | 200, pendientes primero; el almacén solo ve los suyos; con `informes_stock.revisar` se ven todos y llega `pendientes` |
+| GET | `/api/gestion/informes-stock/{id}` | `informes_stock.enviar` | 200 con `filas`, 404 (también si es de otro y no se revisa) |
+| GET | `/api/gestion/informes-stock/{id}/csv` | `informes_stock.enviar` | 200 (descarga `text/csv` de la foto), 404 |
+| PATCH | `/api/gestion/informes-stock/{id}/revisado` | `informes_stock.revisar` | 200 (si ya estaba revisado, lo devuelve igual), 403, 404 |
 
 Estados de un pedido: `pendiente → confirmado → preparacion → enviado → entregado`.
 Se puede cancelar desde `pendiente` o `confirmado`; al cancelar se repone el stock una sola vez.
@@ -278,8 +288,28 @@ y cancelar son de administración. Pasar a `enviado` exige `codigo_seguimiento`.
 (separador `,` o `;`). Si la zapatilla existe solo se suma el stock; si la talla o la zapatilla no existen, se crean.
 `nombre, colorway, categoria, color, precio` solo hacen falta para las zapatillas nuevas. Todo o nada: con una fila mal
 se rechaza el archivo entero.
+El archivo no se guarda y no hay tabla de albaranes: la lista sale de la auditoría (`albaran.cargar`, con el usuario, la fecha
+y el resumen) y el detalle, de los movimientos de stock de tipo `entrada` con el motivo `Albarán <referencia>`. La referencia del
+detalle va en `?referencia=` porque puede llevar `/`. Si una referencia se cargó más de una vez, el detalle es la última carga
+y `cargas` dice cuántas hubo.
 
 **Exportación CSV**: una fila por línea de pedido, separador `;`, BOM UTF-8 y coma decimal (para Excel en español).
+
+**Informes de stock** (el almacén los envía a administración). Dos tipos:
+- `stock_bajo`: tallas activas de zapatillas a la venta con `stock <= stock_minimo` (el mismo umbral del resumen). `dias` no se usa.
+- `sin_ventas`: zapatillas a la venta (activas y ya lanzadas) cuya última línea de un pedido no cancelado es anterior a
+  `dias` días (entero de 1 a 365, obligatorio), o que no se han vendido nunca. Cada fila trae `stock_total`, `tallas`,
+  `ultima_venta` (o `null`) y `dias_sin_vender`.
+
+Cuerpo de `POST`: `{"tipo": "sin_ventas", "dias": 60, "comentario": "opcional, hasta 500 caracteres"}`. Las filas las vuelve
+a calcular el servidor y se guarda esa **foto**: el informe no cambia aunque el stock cambie después. Como mucho se guardan
+1000 filas (las más urgentes); si había más, `recortado: true` y `total_filas` dice cuántas eran.
+Los CSV siguen las reglas de la exportación (`;`, BOM y celdas que empiezan por `= + - @` neutralizadas).
+
+No hay tabla de informes: se guardan en `auditoria`, como los albaranes. Enviar = un evento `informe_stock.enviar` (entidad
+`informe_stock`) cuyo `detalle` lleva `tipo`, `parametros`, `comentario`, `generado_en`, `total_filas`, `recortado` y `filas`;
+**su id es el id del informe**. Revisar = un evento `informe_stock.revisar` con `entidad_id` = id del informe. Pendiente =
+un envío sin evento de revisión.
 
 ## 10. Páginas HTML
 

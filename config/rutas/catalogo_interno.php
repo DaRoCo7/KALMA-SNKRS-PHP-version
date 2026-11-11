@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 /*
  * Rutas del catálogo interno (área de administración): alta, edición y
- * desactivación de zapatillas y carga de albaranes del proveedor en CSV.
- * Las carga config/rutas.php. Solo las puede usar administración.
+ * desactivación de zapatillas y carga y consulta de albaranes del proveedor en CSV.
+ * Las carga config/rutas.php. Solo administración, salvo consultar los albaranes.
  */
 
 use App\Controladores\Api\Gestion\AlbaranController;
@@ -25,3 +25,9 @@ $router->patch('/api/gestion/productos/{id}', [GestionProductoController::class,
 $router->delete('/api/gestion/productos/{id}', [GestionProductoController::class, 'desactivar'], $gestionProductos);
 
 $router->post('/api/gestion/albaranes', [AlbaranController::class, 'cargar'], $gestionProductos);
+
+// Consultar los albaranes ya cargados también lo puede hacer el almacén (albaranes.ver).
+// La referencia del detalle va en ?referencia= porque puede llevar «/» (ALB/2026/42)
+$verAlbaranes = [Autenticado::class, new RequierePermiso('albaranes.ver')];
+$router->get('/api/gestion/albaranes', [AlbaranController::class, 'index'], $verAlbaranes);
+$router->get('/api/gestion/albaranes/detalle', [AlbaranController::class, 'ver'], $verAlbaranes);

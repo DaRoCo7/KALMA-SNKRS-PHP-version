@@ -7,7 +7,9 @@ namespace App\Servicios;
 use App\Nucleo\BaseDatos;
 use App\Nucleo\HttpExcepcion;
 use App\Nucleo\Log;
+use App\Nucleo\Paginacion;
 use App\Nucleo\Validador;
+use App\Repositorios\AlbaranRepositorio;
 use App\Repositorios\AuditoriaRepositorio;
 use App\Repositorios\CatalogoInternoRepositorio;
 use App\Repositorios\StockRepositorio;
@@ -42,7 +44,87 @@ final class AlbaranServicio
         private readonly StockRepositorio $stock = new StockRepositorio(),
         private readonly AuditoriaRepositorio $auditoria = new AuditoriaRepositorio(),
         private readonly GestionProductoServicio $productos = new GestionProductoServicio(),
+        private readonly AlbaranRepositorio $albaranes = new AlbaranRepositorio(),
     ) {
+    }
+
+    // =========================================================================
+    // Consulta de los albaranes ya cargados (almacén y administración)
+    // =========================================================================
+
+    /** GET /api/gestion/albaranes · cargas aceptadas, de la más reciente a la más antigua */
+    public function listar(Paginacion $paginacion): array
+    {
+        $total = $this->albaranes->contar();
+        $filas = $this->albaranes->listar($paginacion->porPagina, $paginacion->offset());
+
+        return [
+            'datos'      => array_map(self::resumenGuardado(...), $filas),
+            'paginacion' => $paginacion->meta($total),
+        ];
+    }
+
+    /**
+     * GET /api/gestion/albaranes/detalle?referencia= · resumen de la carga y las
+     * tallas que entraron. La referencia va en la consulta y no en la ruta
+     * porque puede llevar «/» (ALB/2026/42), que la ruta tomaría por otro tramo.
+     *
+     * @throws HttpExcepcion 400 referencia ausente o mal formada · 404 no se ha cargado
+     */
+    public function ver(mixed $referencia): array
+    {
+        if ($referencia === null || $referencia === '') {
+            throw HttpExcepcion::peticionIncorrecta('Falta la referencia', ['referencia' => 'Obligatoria, ej. ?referencia=ALB-2026-0042']);
+        }
+        $referencia = $this->referencia($referencia);
+
+        $carga = $this->albaranes->buscarPorReferencia($referencia)
+            ?? throw HttpExcepcion::noEncontrado("No se ha cargado ningún albarán con la referencia {$referencia}");
+
+        return self::resumenGuardado($carga) + [
+            // Si la misma referencia se cargó más de una vez, esto es la última carga
+            'cargas' => (int) $carga['cargas'],
+            'tallas' => array_map(static fn (array $t): array => [
+                'variante_id'      => (int) $t['variante_id'],
+                'producto'         => [
+                    'id'           => (int) $t['producto_id'],
+                    'codigo_marca' => $t['codigo_marca'],
+                    'nombre'       => $t['nombre'],
+                    'colorway'     => $t['colorway'],
+                ],
+                'talla'            => (float) $t['talla'],
+                'cantidad'         => (int) $t['cantidad'],
+                'stock_resultante' => (int) $t['stock_resultante'],
+            ], $this->albaranes->tallas((int) $carga['id'])),
+        ];
+    }
+
+    /**
+     * Una carga tal como la devuelve la API: las mismas claves que el resumen de
+     * POST /api/gestion/albaranes, más quién y cuándo. El resumen sale del JSON
+     * que se guardó en la auditoría al cargarlo.
+     */
+    private static function resumenGuardado(array $fila): array
+    {
+        $detalle = json_decode((string) $fila['detalle'], true, flags: JSON_THROW_ON_ERROR);
+
+        return [
+            'id'                     => (int) $fila['id'],
+            'referencia'             => (string) ($detalle['referencia'] ?? ''),
+            'fecha'                  => (new \DateTimeImmutable($fila['fecha']))->format(DATE_ATOM),
+            // El usuario puede haberse borrado (la auditoría queda con usuario_id NULL)
+            'usuario'                => $fila['usuario_id'] === null ? null : [
+                'id'     => (int) $fila['usuario_id'],
+                'nombre' => trim("{$fila['usuario_nombre']} {$fila['usuario_apellidos']}"),
+                'email'  => $fila['usuario_email'],
+            ],
+            'filas'                  => (int) ($detalle['filas'] ?? 0),
+            'unidades'               => (int) ($detalle['unidades'] ?? 0),
+            'productos_nuevos'       => $detalle['productos_nuevos'] ?? [],
+            'productos_actualizados' => $detalle['productos_actualizados'] ?? [],
+            'tallas_nuevas'          => (int) ($detalle['tallas_nuevas'] ?? 0),
+            'desactivados'           => $detalle['desactivados'] ?? [],
+        ];
     }
 
     /**

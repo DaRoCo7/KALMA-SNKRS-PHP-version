@@ -1,0 +1,744 @@
+/*
+ * Secciones de inventario del panel: stock, albaranes y productos.
+ *
+ * Se apoya en las piezas de panel.css (tarjetas, tablas, filtros, panel
+ * lateral .detalle, controles) y solo añade lo propio: las tallas con su
+ * stock, las etiquetas de lanzamiento o desactivada, los formularios con su
+ * error por campo y la carga del CSV. Mismo lenguaje: blanco, negro y grises,
+ * cifras tabulares, y color solo donde hay algo que reponer o que corregir.
+ */
+
+/* --- Etiquetas: lanzamiento, desactivada, nueva, activa ----------------------- */
+
+.marca-inv {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 4px;
+    background: var(--p-activo);
+    color: #2a2a2a;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+/* El lanzamiento es lo único que «todavía no ha pasado»: negro, se ve de lejos */
+.marca-inv--lanzamiento {
+    background: var(--p-texto);
+    color: var(--p-superficie);
+    font-variant-numeric: tabular-nums;
+}
+
+.marca-inv--apagada {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--p-control);
+    color: var(--p-tenue);
+}
+
+.marca-inv--nueva {
+    background: var(--p-aviso-fondo);
+    color: var(--p-aviso-tinta);
+}
+
+.marca-inv--activa {
+    background: none;
+    box-shadow: inset 0 0 0 1px var(--p-control);
+    color: var(--p-texto);
+}
+
+.texto-tenue {
+    color: var(--p-tenue);
+}
+
+/* --- Tablas de inventario ------------------------------------------------------ */
+
+.tabla--inv tbody tr[data-id],
+.tabla--inv tbody tr[data-ref] {
+    cursor: pointer;
+    transition: background-color 100ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .tabla--inv tbody tr[data-id]:hover,
+    .tabla--inv tbody tr[data-ref]:hover {
+        background: var(--p-elevado);
+    }
+}
+
+.tabla--inv tbody tr.tabla__fila--abierta {
+    background: var(--p-activo);
+}
+
+/* Una zapatilla desactivada se lee, pero un paso por detrás */
+.fila-inv--apagada td {
+    color: var(--p-tenue);
+}
+
+.fila-inv--apagada .foto-inv {
+    opacity: 0.55;
+}
+
+.foto-inv {
+    display: block;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 4px;
+    background: var(--p-suelo);
+    object-fit: contain;
+}
+
+.celda-foto .foto-inv {
+    width: 36px;
+    height: 36px;
+}
+
+/* Sin foto: queda el hueco gris y la tabla no baila */
+.foto-inv--sin {
+    display: block;
+}
+
+.tabla--productos .celda-foto {
+    width: 36px;
+    padding-right: 0;
+}
+
+.celda-zapatilla {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 220px;
+}
+
+.celda-zapatilla__textos {
+    display: grid;
+    min-width: 0;
+}
+
+.celda-zapatilla__nombre {
+    font-weight: 700;
+}
+
+.celda-zapatilla__marcas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.tabla--stock td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.celda-tallas {
+    min-width: 260px;
+}
+
+.celda-total {
+    font-weight: 700;
+}
+
+/* --- Tallas con su stock -------------------------------------------------------- */
+
+.tallas-inv {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Cada talla es una pastilla de dos pisos: arriba la talla, abajo los pares */
+.talla-inv {
+    display: inline-grid;
+    justify-items: center;
+    min-width: 40px;
+    padding: 3px 6px 4px;
+    border: 1px solid var(--p-borde);
+    border-radius: var(--p-radio-control);
+    background: var(--p-superficie);
+    color: var(--p-texto);
+    line-height: 16px;
+    text-decoration: none;
+    transition: background-color 120ms ease, border-color 120ms ease, transform 140ms var(--p-salida);
+}
+
+.talla-inv__talla {
+    color: var(--p-tenue);
+    font-size: 11px;
+}
+
+.talla-inv__stock {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.talla-inv:active {
+    transform: scale(0.97);
+}
+
+/* En el mínimo o por debajo: lo que hay que reponer, en rojo */
+.talla-inv--baja {
+    border-color: #f0c4c0;
+    background: var(--p-negativo-fondo);
+}
+
+.talla-inv--baja .talla-inv__stock {
+    color: var(--p-negativo-tinta);
+}
+
+.talla-inv--apagada {
+    border-style: dashed;
+    background: none;
+}
+
+.talla-inv--apagada .talla-inv__stock {
+    color: var(--p-tenue);
+    font-weight: 400;
+}
+
+.talla-inv--abierta {
+    border-color: var(--p-texto);
+    box-shadow: inset 0 0 0 1px var(--p-texto);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .talla-inv:hover {
+        border-color: #b5b5b5;
+        background: var(--p-elevado);
+    }
+
+    .talla-inv--baja:hover {
+        border-color: #e9a59f;
+        background: #fbe0dc;
+    }
+}
+
+.leyenda-inv {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin: 0 0 10px !important;
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+.leyenda-inv__muestra {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--p-borde);
+    border-radius: 3px;
+    color: transparent;
+    font-size: 0;
+}
+
+.leyenda-inv__muestra + span + .leyenda-inv__muestra {
+    margin-left: 10px;
+}
+
+/* --- Movimientos y tablas compactas del panel lateral ----------------------------- */
+
+.tabla--compacta th {
+    height: 32px;
+    padding: 0 10px;
+}
+
+.tabla--compacta td {
+    height: 40px;
+    padding: 6px 10px;
+}
+
+.tabla--compacta th:first-child,
+.tabla--compacta td:first-child {
+    padding-left: 0;
+}
+
+.tabla--compacta th:last-child,
+.tabla--compacta td:last-child {
+    padding-right: 0;
+}
+
+.celda-movimiento {
+    min-width: 180px;
+}
+
+.celda-movimiento__tipo {
+    display: block;
+    font-weight: 700;
+}
+
+.celda-movimiento__motivo {
+    display: block;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.cantidad-inv--entra,
+.cantidad-inv--sale {
+    font-weight: 700;
+}
+
+.cantidad-inv--sale {
+    color: var(--p-negativo-tinta);
+}
+
+/* La primera talla de cada zapatilla abre su grupo con una línea más marcada */
+.fila-inv--grupo td {
+    border-top: 1px solid var(--p-borde);
+}
+
+.tabla--compacta tbody tr:first-child td {
+    border-top: 0;
+}
+
+.bloque-inv__cabeza {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.bloque-inv__cabeza .detalle__subtitulo {
+    margin-bottom: 6px !important;
+}
+
+.detalle__bloque > .control--texto {
+    margin-top: 8px;
+    padding-left: 0;
+}
+
+.nota-inv {
+    margin-top: 8px !important;
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+.nota-inv--caja {
+    margin: 0 !important;
+    padding: 10px 12px;
+    border: 1px solid var(--p-borde);
+    border-radius: var(--p-radio);
+    background: var(--p-elevado);
+    color: var(--p-texto);
+    font-size: 13px;
+}
+
+.datos--anchos {
+    grid-template-columns: 112px 1fr;
+}
+
+/* --- Formularios -------------------------------------------------------------- */
+
+.formulario-inv {
+    display: grid;
+    gap: 12px;
+}
+
+.formulario-inv__rejilla {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
+}
+
+.campo-inv {
+    display: grid;
+    gap: 4px;
+    align-content: start;
+    min-width: 0;
+}
+
+.campo-inv--ancho {
+    grid-column: 1 / -1;
+}
+
+.campo-inv__etiqueta {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.campo-inv__ayuda {
+    color: var(--p-tenue);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.campo-inv__error {
+    color: var(--p-negativo);
+    font-size: 13px;
+    line-height: 18px;
+}
+
+.campo-inv__error:empty {
+    display: none;
+}
+
+.campo-inv .campo-texto {
+    width: 100%;
+    min-width: 0;
+}
+
+.campo-select {
+    padding-right: 28px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%23010101' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 8px center;
+    background-repeat: no-repeat;
+    background-size: 14px;
+    cursor: pointer;
+}
+
+.campo-area {
+    height: auto;
+    min-height: 72px;
+    padding: 6px 10px;
+    line-height: 20px;
+    resize: vertical;
+}
+
+.campo-select[aria-invalid="true"],
+.campo-archivo[aria-invalid="true"] {
+    border-color: var(--p-negativo);
+}
+
+.campo-archivo {
+    width: 100%;
+    min-width: 0;
+    padding: 4px;
+    border: 1px dashed var(--p-control);
+    border-radius: var(--p-radio-control);
+    background: var(--p-superficie);
+    font: inherit;
+    font-size: 13px;
+}
+
+.campo-archivo::file-selector-button {
+    height: 24px;
+    margin-right: 10px;
+    padding: 0 10px;
+    border: 1px solid var(--p-control);
+    border-radius: 4px;
+    background: var(--p-elevado);
+    color: var(--p-texto);
+    font: inherit;
+    cursor: pointer;
+}
+
+.formulario-inv__previa {
+    color: var(--p-tenue);
+    font-size: 13px;
+    align-self: center;
+}
+
+/* El ajuste: cantidad corta y motivo ancho en una fila */
+.formulario-inv--ajuste {
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 10px 12px;
+}
+
+.formulario-inv--ajuste > .detalle__subtitulo,
+.formulario-inv--ajuste > .paso__botones {
+    grid-column: 1 / -1;
+}
+
+.formulario-inv--ajuste > .detalle__subtitulo {
+    margin-bottom: 0 !important;
+}
+
+.formulario-inv--ajuste .campo-inv--ancho {
+    grid-column: auto;
+}
+
+.formulario-inv .paso__botones {
+    margin-top: 0;
+}
+
+.resumen-talla {
+    padding-bottom: 16px;
+}
+
+/* El ajuste queda entre la cifra y su historial, en su franja gris como las acciones de un pedido */
+.resumen-talla ~ .detalle__acciones {
+    border-top: 1px solid var(--p-regla);
+}
+
+.estado-inv {
+    display: grid;
+    gap: 10px;
+    justify-items: start;
+}
+
+.estado-inv .detalle__subtitulo {
+    margin-bottom: 0 !important;
+}
+
+.estado-inv__texto {
+    color: var(--p-tenue);
+    font-size: 13px;
+}
+
+.estado-inv .detalle__formulario {
+    justify-self: stretch;
+}
+
+/* --- Carga del albarán ---------------------------------------------------------- */
+
+.carga-inv {
+    margin-bottom: var(--p-hueco);
+}
+
+.formulario-inv--carga {
+    padding: 0 16px 16px;
+}
+
+.formulario-inv__campos {
+    display: grid;
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px 16px;
+}
+
+/* El botón a la altura de los campos, no de sus ayudas */
+.formulario-inv__enviar {
+    padding-top: 24px;
+}
+
+.ayuda-inv {
+    border-top: 1px solid var(--p-regla);
+    padding-top: 10px;
+    font-size: 13px;
+}
+
+.ayuda-inv summary {
+    width: max-content;
+    color: var(--p-texto);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+.ayuda-inv__cuerpo {
+    display: grid;
+    gap: 6px;
+    max-width: 72ch;
+    padding-top: 8px;
+    color: var(--p-tenue);
+}
+
+.ayuda-inv code,
+.ayuda-inv__ejemplo {
+    color: var(--p-texto);
+    font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    font-size: 12px;
+}
+
+.ayuda-inv__ejemplo {
+    margin: 4px 0 0;
+    padding: 8px 10px;
+    overflow-x: auto;
+    border-radius: var(--p-radio-control);
+    background: var(--p-elevado);
+    line-height: 18px;
+}
+
+.carga-inv__resultado:empty {
+    display: none;
+}
+
+.carga-inv__resultado {
+    padding: 0 16px 16px;
+}
+
+.carga-inv__enviando {
+    color: var(--p-tenue);
+}
+
+.errores-inv,
+.exito-inv {
+    display: grid;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: var(--p-radio);
+}
+
+.errores-inv {
+    border: 1px solid #f0c4c0;
+    background: var(--p-superficie);
+}
+
+.errores-inv__titulo {
+    color: var(--p-negativo-tinta);
+    font-weight: 700;
+}
+
+.errores-inv__general {
+    color: var(--p-negativo-tinta);
+}
+
+.errores-inv .tabla td:first-child {
+    width: 56px;
+    font-weight: 700;
+}
+
+.errores-inv__pie {
+    color: var(--p-tenue);
+    font-size: 12px;
+}
+
+.exito-inv {
+    justify-items: start;
+    border: 1px solid var(--p-borde);
+    background: var(--p-elevado);
+}
+
+.exito-inv__titulo {
+    font-weight: 700;
+}
+
+.exito-inv .datos {
+    justify-self: stretch;
+}
+
+.exito-inv__aviso {
+    padding: 8px 10px;
+    border-radius: var(--p-radio-control);
+    background: var(--p-aviso-fondo);
+    color: var(--p-aviso-tinta);
+    font-size: 13px;
+}
+
+.celda-cambios {
+    white-space: nowrap;
+}
+
+/* El panel lateral es una rejilla: sin esto, una tabla ancha (movimientos, tallas)
+   lo ensancharía más que la pantalla en vez de desplazarse dentro de su caja */
+.detalle__caja > * {
+    min-width: 0;
+}
+
+/* --- Tablet y móvil ----------------------------------------------------------- */
+
+@media (max-width: 72rem) {
+    .formulario-inv__campos {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .formulario-inv__enviar {
+        grid-column: 1 / -1;
+        padding-top: 0;
+    }
+}
+
+@media (max-width: 52rem) {
+    .formulario-inv__campos,
+    .formulario-inv__rejilla {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* 16 px: con menos, Safari del iPhone amplía la página al escribir */
+    .campo-inv .campo-texto,
+    .formulario-inv .campo-texto {
+        font-size: 16px;
+    }
+
+    /* En el móvil cada zapatilla es un bloque: nombre y total arriba, código y
+       categoría debajo y las tallas a todo el ancho. Desplazar la tabla de lado
+       escondería justo las tallas, que es lo que se viene a mirar */
+    .tabla--stock thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .tabla--stock,
+    .tabla--stock tbody {
+        display: block;
+    }
+
+    .tabla--stock tbody tr:not(.tabla__vacia, .tabla__esqueleto) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "zapatilla total"
+            "codigo categoria"
+            "tallas tallas";
+        column-gap: 12px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--p-regla);
+    }
+
+    .tabla--stock tbody tr:last-child {
+        border-bottom: 0;
+    }
+
+    .tabla--stock tbody tr:not(.tabla__vacia, .tabla__esqueleto) td {
+        display: block;
+        height: auto;
+        padding: 0;
+        border: 0;
+    }
+
+    .tabla--stock td:nth-child(1) { grid-area: zapatilla; }
+    .tabla--stock td:nth-child(2) { grid-area: codigo; padding: 6px 0 0 52px !important; color: var(--p-tenue); font-size: 12px; }
+    .tabla--stock td:nth-child(3) { grid-area: categoria; padding-top: 6px !important; color: var(--p-tenue); font-size: 12px; text-align: right; }
+    .tabla--stock td:nth-child(4) { grid-area: tallas; padding-top: 10px !important; }
+    .tabla--stock td:nth-child(5) { grid-area: total; align-self: center; }
+
+    .tabla--stock .celda-zapatilla,
+    .celda-tallas {
+        min-width: 0;
+    }
+
+    .tabla--stock .celda-total::after {
+        content: " pares";
+        color: var(--p-tenue);
+        font-weight: 400;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 30rem) {
+    .formulario-inv--ajuste {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .formulario-inv--carga,
+    .carga-inv__resultado {
+        padding-inline: 12px;
+    }
+
+    /* Las tablas del panel lateral caben en el ancho del móvil: la fecha y los
+       textos secundarios bajan de línea en vez de empujar las cifras fuera */
+    .tabla--compacta .celda-movimiento {
+        min-width: 0;
+    }
+
+    .tabla--compacta .tabla__sub,
+    .tabla--compacta .tabla__fecha {
+        white-space: normal;
+    }
+
+    .tabla--compacta .tabla__fecha {
+        width: 84px;
+    }
+
+    .tabla--compacta th,
+    .tabla--compacta td {
+        padding-inline: 6px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .talla-inv:active {
+        transform: none;
+    }
+}

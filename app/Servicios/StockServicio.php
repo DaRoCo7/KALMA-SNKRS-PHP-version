@@ -33,7 +33,7 @@ final class StockServicio
     ) {
     }
 
-    /** Tallas con su stock: ?buscar (nombre, código o RFID), ?bajo_minimo=1 y ?producto_id */
+    /** Tallas con su stock: ?buscar (nombre, código o RFID), ?bajo_minimo=1, ?producto_id y ?categoria_id */
     public function listar(array $query, Paginacion $paginacion): array
     {
         $filtros = $this->filtros($query);
@@ -188,15 +188,19 @@ final class StockServicio
             }
         }
 
-        $productoId = $query['producto_id'] ?? '';
-        if ($productoId !== '') {
-            $valor = is_string($productoId)
-                ? filter_var($productoId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_ID]])
+        // producto_id y categoria_id: identificadores numéricos (la categoría, para el filtro del panel)
+        foreach (['producto_id' => 'del producto', 'categoria_id' => 'de la categoría'] as $campo => $de) {
+            $id = $query[$campo] ?? '';
+            if ($id === '') {
+                continue;
+            }
+            $valor = is_string($id)
+                ? filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => self::MAX_ID]])
                 : false;
             if ($valor === false) {
-                $errores['producto_id'] = 'Identificador numérico del producto';
+                $errores[$campo] = "Identificador numérico {$de}";
             } else {
-                $filtros['producto_id'] = $valor;
+                $filtros[$campo] = $valor;
             }
         }
 
@@ -225,6 +229,10 @@ final class StockServicio
                 'codigo_marca' => $t['codigo_marca'],
                 'slug'         => $t['slug'],
                 'activo'       => $t['producto_activo'],
+                'categoria'    => ['id' => (int) $t['categoria_id'], 'nombre' => $t['categoria']],
+                // Con fecha futura es un lanzamiento: anunciado, todavía sin vender
+                'fecha_lanzamiento' => $t['fecha_lanzamiento'],
+                'lanzamiento'  => $t['lanzamiento'] === true,
             ],
             'talla'        => (float) $t['talla'],
             'stock'        => (int) $t['stock'],

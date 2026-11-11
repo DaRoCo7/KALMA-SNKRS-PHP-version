@@ -18,7 +18,7 @@ final class CatalogoInternoRepositorio
 {
     /** Datos del producto con su categoría, su color y el resumen de sus tallas */
     private const COLUMNAS = 'p.id, p.codigo_marca, p.nombre, p.colorway, p.slug, p.descripcion, p.precio,
-        p.personalizable, p.imagen, p.activo, p.fecha_creacion, p.fecha_actualizacion,
+        p.personalizable, p.imagen, p.activo, p.fecha_lanzamiento, p.fecha_creacion, p.fecha_actualizacion,
         c.id AS categoria_id, c.nombre AS categoria,
         col.id AS color_id, col.nombre AS color, col.codigo_hex,
         s.stock_total, s.num_tallas';
