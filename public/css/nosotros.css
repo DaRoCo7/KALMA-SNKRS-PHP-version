@@ -1,6 +1,6 @@
 /*
  * Sobre nosotros. Página de lectura: un solo rótulo grande (el h1) y el resto a
- * tamaño de texto, con mucho aire entre bloques para que respire.
+ * tamaño de texto, con un ritmo compacto entre bloques y columnas equilibradas.
  * Colores, tamaños y márgenes salen de las variables de estilos.css.
  */
 
@@ -8,7 +8,7 @@
 .calle,
 .par-a-par,
 .valores {
-    padding: clamp(5rem, 12vw, 10rem) var(--margen);
+    padding: clamp(3rem, 6vw, 5.5rem) max(var(--margen), calc((100vw - 80rem) / 2));
 }
 
 /* Texto de lectura: 60-70 caracteres por línea y un interlineado cómodo */
@@ -36,29 +36,33 @@
 
 .escenario {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .escenario__texto {
-    padding: 0 clamp(2rem, 5vw, 5rem) clamp(4rem, 10vw, 8rem) var(--margen);
+    padding: 0 clamp(1.5rem, 4vw, 4rem) clamp(2.5rem, 5vw, 4.5rem) max(var(--margen), calc((100vw - 80rem) / 2));
 }
 
 .capitulo {
     max-width: 38rem;
-    padding-top: clamp(5rem, 14svh, 9rem);
+    padding-block: clamp(2rem, 4vw, 3.5rem);
+    border-top: 1px solid #dedede;
 }
 
-/* El primero ocupa la primera pantalla (menos la cabecera) y centra el título */
+/* Portada compacta: permite descubrir antes el siguiente capítulo. */
 .capitulo--inicio {
     display: grid;
     align-content: center;
-    min-height: calc(100svh - 4.5rem);
-    padding-top: 2rem;
+    min-height: clamp(24rem, 64svh, 40rem);
+    padding-block: clamp(3rem, 6vw, 5rem);
+    border-top: 0;
 }
 
 /* El único momento tipográfico grande de la página */
 .nosotros__titulo {
     margin: 0;
+    max-width: 12ch;
+    text-wrap: balance;
 }
 
 .capitulo .nosotros__entrada {
@@ -68,14 +72,15 @@
     line-height: 1.35;
 }
 
-/* Títulos de capítulo modestos: marcan el tema sin gritar */
+/* Subtítulos con un tamaño intermedio entre la portada y el cuerpo. */
 .capitulo__titulo,
 .calle__titulo,
 .par-a-par__titulo,
 .valores__titulo,
 .cierre__titulo {
-    margin: 0 0 1.5rem;
-    font-size: var(--paso-entrada);
+    margin: 0 0 1.25rem;
+    font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2.25rem);
+    text-wrap: balance;
     font-weight: 900;
     line-height: 1.1;
     letter-spacing: -0.02em;
@@ -83,7 +88,8 @@
 }
 
 .capitulo__figura {
-    margin: 2.5rem 0;
+    margin: 1.75rem 0;
+    max-width: 30rem;
 }
 
 .capitulo__figura img,
@@ -98,7 +104,7 @@
     position: sticky;
     top: 0;
     align-self: start;
-    height: 100svh;
+    height: min(100svh, 56rem);
 }
 
 .escenario__suelo {
@@ -158,9 +164,10 @@
 
 .calle {
     display: grid;
-    grid-template-columns: 7fr 5fr;
-    align-items: end;
-    gap: clamp(2rem, 5vw, 5rem);
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    align-items: center;
+    gap: clamp(1.75rem, 4vw, 4rem);
+    border-top: 1px solid #dedede;
     background: var(--blanco);
 }
 
@@ -180,8 +187,9 @@
 
 .par-a-par {
     display: grid;
-    grid-template-columns: 5fr 7fr;
-    gap: clamp(3rem, 6vw, 6rem);
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    align-items: start;
+    gap: clamp(2rem, 4vw, 4rem);
     background: var(--negro);
     color: var(--blanco);
 }
@@ -196,9 +204,14 @@
 
 .extras-casa {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: clamp(2.5rem, 4vw, 3.5rem) clamp(2rem, 4vw, 3.5rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 2rem clamp(1.25rem, 3vw, 2.5rem);
     margin: 0;
+}
+
+.extras-casa__extra {
+    padding-top: 1rem;
+    border-top: 1px solid #494949;
 }
 
 .extras-casa dt,
@@ -220,19 +233,24 @@
 /* --- Lo que nos mueve: una fila por palabra, la palabra y su porqué ---------- */
 
 .valores {
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    gap: 1.5rem clamp(2rem, 4vw, 4rem);
     background: var(--blanco);
 }
 
 .valores__lista {
     display: grid;
-    gap: clamp(2.5rem, 5vw, 4rem);
-    margin: clamp(1.5rem, 4vw, 3rem) 0 0;
+    gap: 0;
+    margin: 0;
 }
 
 .valores__valor {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-    gap: 1rem clamp(2rem, 5vw, 5rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+    padding-block: 1.5rem;
+    border-top: 1px solid #dedede;
+    gap: 0.75rem 1.5rem;
     align-items: baseline;
 }
 
@@ -245,8 +263,9 @@
 /* --- Cierre: el par sobre el suelo y la invitación al lado ------------------- */
 
 .cierre {
+    border-top: 1px solid #dedede;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     background: var(--blanco);
 }
 
@@ -254,7 +273,7 @@
 .cierre__suelo {
     display: grid;
     place-items: center;
-    padding: clamp(3rem, 7vw, 6rem) var(--margen);
+    padding: clamp(2.5rem, 5vw, 4.5rem) var(--margen);
     background: var(--suelo);
 }
 
@@ -272,7 +291,7 @@
 
 .cierre__texto {
     align-self: center;
-    padding: clamp(3rem, 7vw, 6rem) var(--margen) clamp(3rem, 7vw, 6rem) clamp(2rem, 5vw, 5rem);
+    padding: clamp(2.5rem, 5vw, 4.5rem) var(--margen) clamp(2.5rem, 5vw, 4.5rem) clamp(2rem, 5vw, 5rem);
 }
 
 .cierre__texto p {
@@ -298,12 +317,19 @@
     }
 }
 
+@media (min-width: 56.001rem) and (max-width: 70rem) {
+    .valores__valor {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* --- Pantallas estrechas: todo en una columna -------------------------------- */
 
 @media (max-width: 56rem) {
     .escenario,
     .calle,
     .par-a-par,
+    .valores,
     .cierre {
         grid-template-columns: 1fr;
     }
@@ -312,8 +338,7 @@
     .escenario__fijo {
         position: relative;
         order: -1;
-        height: 42svh;
-        min-height: 16rem;
+        height: clamp(17rem, 38svh, 24rem);
     }
 
     /* Hueco abajo para que el nombre del par no pise la foto */
@@ -331,11 +356,23 @@
 
     .capitulo--inicio {
         min-height: 0;
-        padding-top: 2.5rem;
     }
 
     .capitulo {
-        padding-top: 4.5rem;
+        max-width: none;
+        padding-block: 2rem;
+    }
+
+    .capitulo--inicio {
+        padding-block: 2.5rem;
+    }
+
+    .capitulo__figura {
+        max-width: 34rem;
+    }
+
+    .calle__texto {
+        max-width: none;
     }
 
     .valores__valor {
@@ -350,6 +387,12 @@
 @media (max-width: 36rem) {
     .extras-casa {
         grid-template-columns: 1fr;
+    }
+
+    .cierre__acciones {
+        flex-direction: column;
+        align-items: stretch;
+        text-align: center;
     }
 }
 
