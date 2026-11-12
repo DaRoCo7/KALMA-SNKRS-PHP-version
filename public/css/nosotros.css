@@ -1,95 +1,101 @@
-/*
- * Sobre nosotros. Página de lectura: un solo rótulo grande (el h1) y el resto a
- * tamaño de texto, con un ritmo compacto entre bloques y columnas equilibradas.
- * Colores, tamaños y márgenes salen de las variables de estilos.css.
- */
-
-/* Separación entre secciones: claramente mayor que cualquier hueco interno */
+/* Sobre nosotros: lectura compacta, imagenes proporcionadas y blanco/negro. */
+.escenario,
 .calle,
-.par-a-par,
-.valores {
-    padding: clamp(2.75rem, 5vw, 4.5rem) max(var(--margen), calc((100vw - 80rem) / 2));
+.par-a-par {
+    padding: clamp(2.75rem, 5vw, 4.5rem) max(var(--margen), calc((100% - 80rem) / 2));
 }
 
-/* Texto de lectura: 60-70 caracteres por línea y un interlineado cómodo */
 .capitulo p,
 .calle__texto p,
-.par-a-par__intro p,
-.cierre__texto p {
-    max-width: 62ch;
-    margin: 0 0 1.2em;
-    line-height: 1.6;
+.par-a-par__intro p {
+    max-width: 60ch;
+    margin: 0 0 1.1em;
+    line-height: 1.7;
+    text-wrap: pretty;
 }
 
-/* Pies de foto y créditos: pequeños y en gris, nunca compiten con el texto */
-.capitulo__figura figcaption,
-.calle__figura figcaption {
-    margin-top: 0.75rem;
-    color: var(--tenue);
-    font-size: var(--paso-pequeno);
-    line-height: 1.45;
+/* Permite encoger las columnas sin desbordar con palabras largas. */
+.capitulo > *,
+.calle > *,
+.par-a-par > *,
+.extras-casa > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
-/* --- Escenario: el texto a un lado, el par fijo al otro -----------------------
-   El par se queda quieto mientras se lee: en esta cultura el par permanece y lo
-   que cambia es la historia que lleva encima. */
-
-.escenario {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+.capitulo p:last-child,
+.calle__texto p:last-child {
+    margin-bottom: 0;
 }
 
-.escenario__texto {
-    padding: 0 clamp(1.5rem, 4vw, 4rem) clamp(2.5rem, 5vw, 4.5rem) max(var(--margen), calc((100vw - 80rem) / 2));
-}
-
+/* Titulos y textos comparten los mismos ejes en toda la historia. */
 .capitulo {
-    max-width: 38rem;
+    display: grid;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+    column-gap: clamp(2rem, 4vw, 4rem);
+    align-items: start;
     padding-block: clamp(2rem, 4vw, 3.5rem);
     border-top: 1px solid #dedede;
 }
 
-/* Portada compacta: permite descubrir antes el siguiente capítulo. */
+.capitulo > h2 {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+}
+
+.capitulo > p {
+    grid-column: 2;
+}
+
 .capitulo--inicio {
-    display: grid;
-    align-content: center;
-    min-height: clamp(24rem, 64svh, 40rem);
-    padding-block: clamp(3rem, 6vw, 5rem);
+    align-items: center;
+    padding-top: 0;
     border-top: 0;
 }
 
-/* El único momento tipográfico grande de la página */
+.capitulo:last-child {
+    padding-bottom: 0;
+}
+
 .nosotros__titulo {
-    margin: 0;
     max-width: 12ch;
+    margin: 0;
     text-wrap: balance;
 }
 
 .capitulo .nosotros__entrada {
-    max-width: 34ch;
-    margin: clamp(1.5rem, 3vw, 2.25rem) 0 0;
+    max-width: 44ch;
+    margin: 0;
     font-size: var(--paso-entrada);
-    line-height: 1.35;
+    line-height: 1.55;
 }
 
-/* Subtítulos con un tamaño intermedio entre la portada y el cuerpo. */
 .capitulo__titulo,
 .calle__titulo,
-.par-a-par__titulo,
-.valores__titulo,
-.cierre__titulo {
-    margin: 0 0 1.25rem;
-    font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2.25rem);
-    text-wrap: balance;
+.par-a-par__titulo {
+    margin: 0 0 1rem;
+    max-width: 24ch;
+    font-size: clamp(1.375rem, 1.05rem + 1.1vw, 2rem);
     font-weight: 900;
-    line-height: 1.1;
+    line-height: 1.18;
     letter-spacing: -0.02em;
     text-transform: uppercase;
+    text-wrap: balance;
+}
+
+/* La fotografia de herencia acompana el texto sin crear una columna vacia. */
+.capitulo--herencia > h2 {
+    grid-column: 2;
+    grid-row: 1;
 }
 
 .capitulo__figura {
-    margin: 1.75rem auto;
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    width: 100%;
     max-width: 30rem;
+    margin: 0;
+    align-self: start;
 }
 
 .capitulo__figura img,
@@ -99,71 +105,13 @@
     height: auto;
 }
 
-/* La columna del par: fija en pantalla mientras se lee el texto */
-.escenario__fijo {
-    position: sticky;
-    top: 0;
-    align-self: start;
-    height: min(100svh, 56rem);
-}
-
-.escenario__suelo {
-    position: relative;
-    height: 100%;
-    background: var(--suelo);
-}
-
-/* Todas las escenas apiladas en el mismo sitio: solo una a la vista.
-   Mientras funde, la opacidad aísla la escena y la mezcla de la foto solo ve
-   lo que hay dentro, así que cada escena lleva el mismo fondo que el suelo. */
-.escena {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    grid-template-rows: minmax(0, 1fr);
-    place-items: center;
-    margin: 0;
-    padding: clamp(1.5rem, 3vw, 3rem);
-    padding-bottom: clamp(5.5rem, 10svh, 7rem);
-    background: var(--suelo);
-    opacity: 0;
-    transition: opacity 700ms ease;
-}
-
-.escena.es-actual {
-    z-index: 1;
-    opacity: 1;
-}
-
-.escena__foto {
-    display: block;
-    width: min(100%, 38rem);
-    height: 100%;
-    min-height: 0;
-    object-fit: contain;
-    /* El blanco de la foto desaparece contra el suelo gris */
-    mix-blend-mode: multiply;
-}
-
-.escena__pie {
-    position: absolute;
-    left: clamp(1.5rem, 3vw, 3rem);
-    right: clamp(1.5rem, 3vw, 3rem);
-    bottom: clamp(1.5rem, 3svh, 2rem);
-    display: grid;
-    gap: 0.15rem;
-    font-size: var(--paso-pequeno);
-}
-
-.escena__nombre {
-    font-weight: 700;
-}
-
-.escena__color {
+.capitulo__figura figcaption,
+.calle__figura figcaption {
+    margin-top: 0.75rem;
     color: var(--tenue);
+    font-size: var(--paso-pequeno);
+    line-height: 1.45;
 }
-
-/* --- La calle: la foto grande y el texto al lado ----------------------------- */
 
 .calle {
     display: grid;
@@ -182,21 +130,7 @@
     max-width: 34rem;
 }
 
-.calle__texto p:last-child {
-    margin-bottom: 0;
-}
-
-/* Un mismo ritmo en los bordes del bloque negro y las secciones blancas. */
-.valores__valor:first-child {
-    padding-top: 1rem;
-}
-
-.valores__valor:last-child {
-    padding-bottom: 0;
-}
-
-/* --- Par a par: campo negro, la explicación y los cuatro extras -------------- */
-
+/* El bloque de extras cierra el contenido antes del footer compartido. */
 .par-a-par {
     display: grid;
     grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
@@ -204,6 +138,7 @@
     gap: clamp(2rem, 4vw, 4rem);
     background: var(--negro);
     color: var(--blanco);
+    padding-bottom: clamp(1.5rem, 2.5vw, 2.5rem);
 }
 
 .par-a-par__intro p {
@@ -211,13 +146,15 @@
 }
 
 .par-a-par__intro .boton {
-    margin-top: 0.75rem;
+    max-width: 100%;
+    margin-top: 0.25rem;
+    line-height: 1.4;
 }
 
 .extras-casa {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 2rem clamp(1.25rem, 3vw, 2.5rem);
+    gap: 1.75rem clamp(1.25rem, 3vw, 2.5rem);
     margin: 0;
 }
 
@@ -226,191 +163,68 @@
     border-top: 1px solid #494949;
 }
 
-.extras-casa dt,
-.valores__valor dt {
+.extras-casa dt {
     font-size: var(--paso-entrada);
     font-weight: 900;
-    line-height: 1.1;
+    line-height: 1.2;
     letter-spacing: -0.02em;
     text-transform: uppercase;
 }
 
 .extras-casa dd {
     max-width: 38ch;
-    margin: 0.75rem 0 0;
+    margin: 0.625rem 0 0;
     color: var(--tenue-oscuro);
-    line-height: 1.6;
+    line-height: 1.65;
+    text-wrap: pretty;
 }
-
-/* --- Lo que nos mueve: una fila por palabra, la palabra y su porqué ---------- */
-
-.valores {
-    display: grid;
-    grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
-    gap: 1.5rem clamp(2rem, 4vw, 4rem);
-    background: var(--blanco);
-}
-
-.valores__lista {
-    display: grid;
-    gap: 0;
-    margin: 0;
-}
-
-.valores__valor {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
-    padding-block: 1.5rem;
-    border-top: 1px solid #dedede;
-    gap: 0.75rem 1.5rem;
-    align-items: baseline;
-}
-
-.valores__valor dd {
-    max-width: 52ch;
-    margin: 0;
-    line-height: 1.6;
-}
-
-/* --- Cierre: el par sobre el suelo y la invitación al lado ------------------- */
-
-.cierre {
-    border-top: 1px solid #dedede;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    background: var(--blanco);
-}
-
-/* Lleva el fondo propio porque la entrada animada aísla la mezcla de la foto */
-.cierre__suelo {
-    display: grid;
-    place-items: center;
-    padding: clamp(2.75rem, 5vw, 4.5rem) clamp(1.5rem, 3vw, 3rem);
-    background: var(--suelo);
-}
-
-.cierre__foto {
-    display: block;
-    width: min(100%, 30rem);
-    height: auto;
-    /* La foto original es cuadrada con la zapatilla en la mitad de abajo:
-       se recorta el blanco de arriba para que el par quede centrado */
-    aspect-ratio: 2 / 1;
-    object-fit: cover;
-    object-position: 50% 95%;
-    mix-blend-mode: multiply;
-}
-
-.cierre__texto {
-    align-self: center;
-    padding: clamp(2.75rem, 5vw, 4.5rem) var(--margen) clamp(2.75rem, 5vw, 4.5rem) clamp(2rem, 5vw, 5rem);
-}
-
-.cierre__texto p {
-    max-width: 40ch;
-}
-
-.cierre__acciones {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 0.5rem;
-}
-
-/* El segundo botón, un paso de tono por debajo del primero */
-.cierre__secundario {
-    background: var(--suelo);
-    color: var(--negro);
-}
-
-@media (hover: hover) and (pointer: fine) {
-    .cierre__secundario:hover {
-        background: #e2e2e2;
-    }
-}
-
-@media (min-width: 56.001rem) and (max-width: 70rem) {
-    .valores__valor {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* --- Pantallas estrechas: todo en una columna -------------------------------- */
 
 @media (max-width: 56rem) {
-    .escenario,
+    .capitulo,
     .calle,
-    .par-a-par,
-    .valores,
-    .cierre {
-        grid-template-columns: 1fr;
-    }
-
-    /* El par deja de estar fijo: arriba, como portada, y el texto debajo */
-    .escenario__fijo {
-        position: relative;
-        order: -1;
-        height: clamp(17rem, 38svh, 24rem);
-    }
-
-    /* Hueco abajo para que el nombre del par no pise la foto */
-    .escena {
-        padding: 1.25rem var(--margen) 5rem;
-    }
-
-    .escena__foto {
-        width: min(100%, 28rem);
-    }
-
-    .escena__pie {
-        left: var(--margen);
-        right: var(--margen);
-        bottom: 1.25rem;
-    }
-
-    .escenario__texto {
-        padding-inline: var(--margen);
-    }
-
-    .capitulo--inicio {
-        min-height: 0;
+    .par-a-par {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .capitulo {
-        max-width: none;
         padding-block: 2rem;
     }
 
+    .capitulo:last-child {
+        padding-bottom: 0;
+    }
+
     .capitulo--inicio {
-        padding-block: 2.5rem;
+        gap: 1.5rem;
+        padding-top: 0;
+    }
+
+    .capitulo > h2,
+    .capitulo > p,
+    .capitulo__figura {
+        grid-column: auto;
+        grid-row: auto;
     }
 
     .capitulo__figura {
         max-width: 34rem;
+        margin: 0.5rem auto 1.5rem;
     }
 
     .calle__texto {
         max-width: none;
     }
 
-    .valores__valor {
-        grid-template-columns: 1fr;
-    }
-
-    .cierre__texto {
-        padding-inline: var(--margen);
+    .calle,
+    .par-a-par {
+        gap: 1.75rem;
     }
 }
 
 @media (max-width: 36rem) {
     .extras-casa {
-        grid-template-columns: 1fr;
-    }
-
-    .cierre__acciones {
-        flex-direction: column;
-        align-items: stretch;
-        text-align: center;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 1.5rem;
     }
 }
 
@@ -435,9 +249,5 @@
         transform: none;
         transition-duration: 200ms;
         transition-delay: 0ms;
-    }
-
-    .escena {
-        transition-duration: 200ms;
     }
 }
