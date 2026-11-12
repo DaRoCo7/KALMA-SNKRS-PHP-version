@@ -8,7 +8,7 @@
 .calle,
 .par-a-par,
 .valores {
-    padding: clamp(3rem, 6vw, 5.5rem) max(var(--margen), calc((100vw - 80rem) / 2));
+    padding: clamp(2.75rem, 5vw, 4.5rem) max(var(--margen), calc((100vw - 80rem) / 2));
 }
 
 /* Texto de lectura: 60-70 caracteres por línea y un interlineado cómodo */
@@ -88,7 +88,7 @@
 }
 
 .capitulo__figura {
-    margin: 1.75rem 0;
+    margin: 1.75rem auto;
     max-width: 30rem;
 }
 
@@ -120,9 +120,11 @@
     position: absolute;
     inset: 0;
     display: grid;
+    grid-template-rows: minmax(0, 1fr);
     place-items: center;
     margin: 0;
-    padding: clamp(2rem, 5vw, 4rem);
+    padding: clamp(1.5rem, 3vw, 3rem);
+    padding-bottom: clamp(5.5rem, 10svh, 7rem);
     background: var(--suelo);
     opacity: 0;
     transition: opacity 700ms ease;
@@ -135,9 +137,9 @@
 
 .escena__foto {
     display: block;
-    width: min(92%, 44rem);
-    height: auto;
-    max-height: 66svh;
+    width: min(100%, 38rem);
+    height: 100%;
+    min-height: 0;
     object-fit: contain;
     /* El blanco de la foto desaparece contra el suelo gris */
     mix-blend-mode: multiply;
@@ -145,8 +147,9 @@
 
 .escena__pie {
     position: absolute;
-    left: clamp(2rem, 5vw, 4rem);
-    bottom: clamp(1.5rem, 4svh, 3rem);
+    left: clamp(1.5rem, 3vw, 3rem);
+    right: clamp(1.5rem, 3vw, 3rem);
+    bottom: clamp(1.5rem, 3svh, 2rem);
     display: grid;
     gap: 0.15rem;
     font-size: var(--paso-pequeno);
@@ -181,6 +184,15 @@
 
 .calle__texto p:last-child {
     margin-bottom: 0;
+}
+
+/* Un mismo ritmo en los bordes del bloque negro y las secciones blancas. */
+.valores__valor:first-child {
+    padding-top: 1rem;
+}
+
+.valores__valor:last-child {
+    padding-bottom: 0;
 }
 
 /* --- Par a par: campo negro, la explicación y los cuatro extras -------------- */
@@ -273,13 +285,13 @@
 .cierre__suelo {
     display: grid;
     place-items: center;
-    padding: clamp(2.5rem, 5vw, 4.5rem) var(--margen);
+    padding: clamp(2.75rem, 5vw, 4.5rem) clamp(1.5rem, 3vw, 3rem);
     background: var(--suelo);
 }
 
 .cierre__foto {
     display: block;
-    width: min(100%, 32rem);
+    width: min(100%, 30rem);
     height: auto;
     /* La foto original es cuadrada con la zapatilla en la mitad de abajo:
        se recorta el blanco de arriba para que el par quede centrado */
@@ -291,7 +303,7 @@
 
 .cierre__texto {
     align-self: center;
-    padding: clamp(2.5rem, 5vw, 4.5rem) var(--margen) clamp(2.5rem, 5vw, 4.5rem) clamp(2rem, 5vw, 5rem);
+    padding: clamp(2.75rem, 5vw, 4.5rem) var(--margen) clamp(2.75rem, 5vw, 4.5rem) clamp(2rem, 5vw, 5rem);
 }
 
 .cierre__texto p {
@@ -343,11 +355,17 @@
 
     /* Hueco abajo para que el nombre del par no pise la foto */
     .escena {
-        padding-bottom: 5rem;
+        padding: 1.25rem var(--margen) 5rem;
     }
 
     .escena__foto {
-        max-height: 30svh;
+        width: min(100%, 28rem);
+    }
+
+    .escena__pie {
+        left: var(--margen);
+        right: var(--margen);
+        bottom: 1.25rem;
     }
 
     .escenario__texto {
