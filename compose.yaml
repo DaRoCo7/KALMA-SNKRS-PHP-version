@@ -8,11 +8,14 @@ services:
     build:
       context: .
       dockerfile: docker/nginx/Dockerfile
+    # Si el servidor ya tiene el 80/443 ocupado (por ejemplo, un Apache del sistema),
+    # los puertos y la dirección pública se cambian desde .env sin tocar este archivo.
+    # Sin esas variables, se publica en 80/443 como siempre.
     environment:
-      KALMA_HTTPS_ORIGIN: https://kalma.local
+      KALMA_HTTPS_ORIGIN: ${KALMA_ORIGEN:-https://kalma.local}
     ports:
-      - "80:80"
-      - "443:443"
+      - "${KALMA_PUERTO_HTTP:-80}:80"
+      - "${KALMA_PUERTO_HTTPS:-443}:443"
     volumes:
       - ./docker/nginx/certs:/etc/nginx/certs:ro
     depends_on:

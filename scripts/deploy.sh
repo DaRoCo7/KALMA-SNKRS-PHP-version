@@ -19,7 +19,9 @@ case "$modo" in
         origen=https://localhost:8443
         ;;
     produccion)
-        origen=https://kalma.local
+        # Misma variable que comprobar.sh: con puertos propios se comprueba, por ejemplo,
+        # https://localhost:8443 cuando el servidor no resuelve kalma.local.
+        origen=${KALMA_URL:-https://kalma.local}
         ;;
     *)
         echo "Uso: bash scripts/deploy.sh [desarrollo|produccion]" >&2
