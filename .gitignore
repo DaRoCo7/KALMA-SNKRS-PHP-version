@@ -19,3 +19,7 @@ Thumbs.db
 
 # Dependencias PHP (si utilizamos Composer)
 /vendor/
+# Certificados HTTPS locales (no subir a Git)
+/docker/nginx/certs/
+
+/backups/
