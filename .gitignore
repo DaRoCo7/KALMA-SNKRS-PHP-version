@@ -23,3 +23,6 @@ Thumbs.db
 /docker/nginx/certs/
 
 /backups/
+
+# Dependencias del generador de la memoria (docs/memoria)
+/docs/memoria/node_modules/

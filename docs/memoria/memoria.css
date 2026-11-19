@@ -1,0 +1,125 @@
+/* Estilos de impresión de la memoria técnica (A4). La cabecera y el pie de cada página los añade generar-pdf.mjs. */
+
+@page { size: A4; margin: 22mm 17mm 19mm 17mm; }
+@page portada { margin: 0; }                                    /* la portada ocupa la hoja entera */
+@page horizontal { size: A4 landscape; margin: 20mm 14mm 17mm 14mm; }  /* diagramas E/R */
+
+:root {
+  --azul-noche: #16233A;
+  --azul: #2B5C8A;
+  --texto: #1E293B;
+  --gris: #64748B;
+  --linea: #DCE3EB;
+  --fondo: #F6F8FA;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9.6pt;
+  line-height: 1.45;
+  color: var(--texto);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ------------------------------------------------------------------ Portada */
+.portada {
+  page: portada;
+  position: relative;
+  height: 297mm;
+  background: #000;
+  color: #FFF;
+  break-after: page;
+  text-align: center;
+}
+.portada__logo { width: 112mm; margin-top: 62mm; }
+.portada__titulo { font-size: 27pt; line-height: 1.25; margin: 44mm 0 6mm; letter-spacing: .5pt; }
+.portada__subtitulo { font-size: 11pt; color: #BFC7D2; margin: 0; text-align: center; }
+.portada__pie {
+  position: absolute; left: 22mm; right: 22mm; bottom: 26mm;
+  display: flex; justify-content: space-between;
+  font-size: 9pt; line-height: 1.6; color: #E2E8F0; text-align: left;
+}
+.portada__pie .derecha { text-align: right; }
+
+/* ------------------------------------------------------------------ Índice */
+.indice { break-after: page; }
+.toc { list-style: none; padding: 0; margin: 4mm 0 8mm; }
+.toc li {
+  display: flex; align-items: baseline; gap: 3mm;
+  padding: 2.6mm 3mm; border-bottom: 1px solid var(--linea);
+  font-size: 10.5pt;
+}
+.toc li:nth-child(odd) { background: var(--fondo); }
+.toc a { color: var(--texto); text-decoration: none; flex: 1; }
+.toc a span { display: inline-block; width: 11mm; font-weight: bold; color: var(--azul); }
+.toc .pag { width: 10mm; text-align: right; color: var(--gris); }
+
+/* ------------------------------------------------------------------ Títulos y texto */
+h2 {
+  font-size: 19pt; color: var(--azul-noche); margin: 0 0 4mm; padding-top: 2mm;
+  break-after: avoid;
+}
+h2.sin-numero { font-size: 22pt; }
+section + section h2 { margin-top: 7mm; }
+.nueva-pagina { break-before: page; }
+.nueva-pagina h2 { margin-top: 0; }
+h3 { font-size: 11.5pt; color: var(--azul); margin: 5mm 0 2mm; break-after: avoid; }
+p { margin: 0 0 2.4mm; }
+ul { margin: 0 0 2.6mm; padding-left: 5mm; }
+li { margin-bottom: 1mm; }
+strong { color: var(--azul-noche); }
+code {
+  font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+  font-size: 8.6pt; background: #EEF2F6; border-radius: 2px; padding: 0 1px;
+}
+.pequeno { font-size: 8.4pt; color: #475569; }
+.nota {
+  background: #EEF4FA; border-left: 3px solid var(--azul);
+  padding: 3mm 4mm; color: var(--azul); font-weight: bold; font-size: 9.4pt;
+}
+
+/* ------------------------------------------------------------------ Bloques de código */
+pre {
+  background: #0F172A; color: #E2E8F0;
+  font-family: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+  font-size: 7.9pt; line-height: 1.42;
+  padding: 3mm 4mm; border-radius: 4px; margin: 1.5mm 0 3.5mm;
+  white-space: pre-wrap; word-break: break-word;
+  break-inside: avoid;
+}
+
+/* ------------------------------------------------------------------ Tablas */
+table { width: 100%; border-collapse: collapse; margin: 1.5mm 0 4mm; font-size: 8.5pt; break-inside: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th {
+  background: var(--azul-noche); color: #FFF; text-align: left; font-weight: bold;
+  padding: 1.8mm 2.4mm; border: 1px solid var(--azul-noche);
+}
+td { padding: 1.6mm 2.4mm; border: 1px solid var(--linea); vertical-align: top; }
+tbody tr:nth-child(even) td { background: var(--fondo); }
+td code, th code { font-size: 7.9pt; }
+th code { background: transparent; color: #FFF; }
+table.matriz td:nth-child(n+3), table.matriz th:nth-child(n+3) { text-align: center; width: 13mm; }
+table.matriz td:nth-child(n+3) { font-weight: bold; color: #15803D; }
+table.cifras td { font-size: 9pt; }
+table.cifras td:nth-child(even) { width: 30mm; text-align: right; font-size: 10pt; }
+table.compacta td, table.compacta th { padding: 1.1mm 2.2mm; }
+
+/* ------------------------------------------------------------------ Figuras */
+figure { margin: 2mm 0 4.5mm; break-inside: avoid; text-align: center; }
+figure img { max-width: 100%; border: 1px solid var(--linea); border-radius: 3px; }
+figure img.ancho-85 { width: 85%; }
+figure img.ancho-70 { width: 70%; }
+figcaption { font-size: 8.2pt; color: var(--gris); font-style: italic; margin-top: 1.5mm; text-align: center; }
+.figuras-2 { display: flex; gap: 5mm; align-items: flex-start; break-inside: avoid; }
+.figuras-2 figure { flex: 1; margin-top: 1mm; }
+figure.diagrama svg { width: 100%; height: auto; }
+
+/* Páginas apaisadas con los diagramas E/R: la figura ocupa la hoja */
+.horizontal { page: horizontal; break-before: page; break-after: page; }
+.diagrama-er { margin: 0; }
+.diagrama-er img { width: 100%; max-height: 160mm; object-fit: contain; border: none; }

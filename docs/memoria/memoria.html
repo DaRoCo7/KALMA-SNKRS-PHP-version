@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Memoria técnica · KALMA SNKRS</title>
+<!--
+  Fuente de la memoria técnica. El PDF se genera con generar-pdf.mjs (ver README de esta carpeta):
+  Chrome imprime este HTML, añade la cabecera y el pie de página y rellena los números del índice.
+-->
+<link rel="stylesheet" href="memoria.css">
+</head>
+<body>
+
+<!-- ======================================================================= PORTADA -->
+<section class="portada">
+  <img class="portada__logo" src="../../public/img/logo-kalma.png" alt="KALMA SNKRS">
+  <h1 class="portada__titulo">MEMORIA TÉCNICA<br>KALMA SNKRS</h1>
+  <p class="portada__subtitulo">Tienda online de zapatillas exclusivas · Sneaker Factory</p>
+  <div class="portada__pie">
+    <div>Proyecto intermodular<br>2.º DAW · XTART<br>Noviembre de 2026</div>
+    <div class="derecha">David Rojas · David Moreno<br>Estefanía Correa</div>
+  </div>
+</section>
+
+<!-- ======================================================================= ÍNDICE -->
+<section class="indice">
+  <h2 class="sin-numero">Índice</h2>
+  <ol class="toc">
+    <li><a href="#s01"><span>01</span>Presentación, objetivos y contenido de la entrega</a><span class="pag" data-ref="s01"></span></li>
+    <li><a href="#s02"><span>02</span>Funcionalidades de la tienda</a><span class="pag" data-ref="s02"></span></li>
+    <li><a href="#s03"><span>03</span>Arquitectura y tecnologías</a><span class="pag" data-ref="s03"></span></li>
+    <li><a href="#s04"><span>04</span>Estructura de la aplicación</a><span class="pag" data-ref="s04"></span></li>
+    <li><a href="#s05"><span>05</span>Base de datos y modelo entidad/relación</a><span class="pag" data-ref="s05"></span></li>
+    <li><a href="#s06"><span>06</span>API REST e integración</a><span class="pag" data-ref="s06"></span></li>
+    <li><a href="#s07"><span>07</span>Seguridad, roles y permisos</a><span class="pag" data-ref="s07"></span></li>
+    <li><a href="#s08"><span>08</span>Decisiones de diseño</a><span class="pag" data-ref="s08"></span></li>
+    <li><a href="#s09"><span>09</span>Interfaz y experiencia de uso</a><span class="pag" data-ref="s09"></span></li>
+    <li><a href="#s10"><span>10</span>Pruebas: resultados esperados y obtenidos</a><span class="pag" data-ref="s10"></span></li>
+    <li><a href="#s11"><span>11</span>Infraestructura Docker</a><span class="pag" data-ref="s11"></span></li>
+    <li><a href="#s12"><span>12</span>Despliegue en el servidor común</a><span class="pag" data-ref="s12"></span></li>
+    <li><a href="#s13"><span>13</span>HTTPS y acceso desde otros equipos</a><span class="pag" data-ref="s13"></span></li>
+    <li><a href="#s14"><span>14</span>Copias de seguridad y restauración</a><span class="pag" data-ref="s14"></span></li>
+    <li><a href="#s15"><span>15</span>Incidencias, comprobaciones y mantenimiento</a><span class="pag" data-ref="s15"></span></li>
+    <li><a href="#s16"><span>16</span>Conclusiones y mejoras futuras</a><span class="pag" data-ref="s16"></span></li>
+    <li><a href="#sA"><span>A</span>Anexo: puesta en marcha local</a><span class="pag" data-ref="sA"></span></li>
+  </ol>
+  <p class="nota">El proyecto se presenta desde el trabajo realizado por el equipo: funciones, decisiones técnicas,
+  configuración, pruebas y comprobaciones. Todos los datos de personas, clientes y pedidos son ficticios.</p>
+</section>
+
+<!-- ======================================================================= 01 -->
+<section id="s01">
+<h2 data-titulo="01. Presentación">01. Presentación, objetivos y contenido de la entrega</h2>
+<p>KALMA SNKRS, también denominada Sneaker Factory, es una tienda online de zapatillas Nike exclusivas para
+particulares. La aplicación permite consultar un catálogo organizado por modelos, colores, tallas y existencias,
+realizar pedidos con opciones de personalización y seguir su estado. Además, incorpora un área interna para
+administrar productos, controlar el almacén, gestionar pedidos y consultar informes y auditoría.</p>
+<p>El proyecto se ha desarrollado como trabajo intermodular de 2.º DAW y une dos módulos:
+<strong>Desarrollo Web en Entorno Servidor</strong> (la aplicación PHP, su API y su base de datos) y
+<strong>Despliegue de Aplicaciones Web</strong> (contenedores, proxy HTTPS, despliegue, copias y restauración).</p>
+
+<h3>Objetivos principales</h3>
+<ul>
+  <li>Desarrollar una tienda web con catálogo, cuentas de usuario, cesta y pedidos.</li>
+  <li>Separar las funciones de cliente, administración y almacén mediante autenticación y permisos comprobados en el servidor.</li>
+  <li>Mantener los datos en una base de datos relacional y proteger las operaciones de inventario y pedidos con transacciones.</li>
+  <li>Publicar la aplicación mediante contenedores Docker, con Nginx como proxy inverso y PHP como servidor de aplicación.</li>
+  <li>Configurar el acceso HTTPS, la persistencia de PostgreSQL, las copias de seguridad y la restauración.</li>
+  <li>Comprobar el funcionamiento con una colección de pruebas de la API, verificaciones de salud y restauraciones aisladas.</li>
+</ul>
+
+<h3>Contenido de la entrega</h3>
+<table>
+  <thead><tr><th style="width:38%">Entregable</th><th>Dónde está</th></tr></thead>
+  <tbody>
+    <tr><td>Repositorio con el código del backend, recursos, scripts de base de datos y datos ficticios</td>
+        <td><code>app/</code>, <code>config/</code>, <code>public/</code>, <code>database/schema.sql</code>, <code>database/seeds/</code>,
+        <code>database/migraciones/</code>, <code>docker/</code> y <code>scripts/</code></td></tr>
+    <tr><td>Documento técnico: arquitectura, esquema E/R, permisos, decisiones, seguridad, incidencias y capturas</td>
+        <td>Este documento (<code>docs/KALMA_SNKRS_Memoria_Tecnica.pdf</code>) y <code>docs/diagrama-er.md</code></td></tr>
+    <tr><td>Especificación de la API con al menos 12 rutas y ejemplos de petición y respuesta</td>
+        <td>Apartado 6; <code>docs/contrato-integracion.md</code> (punto 9, las 45 rutas de la API) y
+        <code>docs/pruebas/ejemplos-api.md</code> (27 ejemplos reales sobre 19 rutas)</td></tr>
+    <tr><td>Colección de pruebas con resultados esperados y obtenidos, con errores y usuarios sin permiso</td>
+        <td><code>postman/</code> (176 pruebas, 375 comprobaciones) y <code>docs/pruebas/resultados-coleccion.md</code> (apartado 10)</td></tr>
+    <tr><td>README de instalación e integración, <code>.env.example</code> sin secretos y evidencia del despliegue común</td>
+        <td><code>README.md</code>, <code>README-DESPLIEGUE.md</code>, <code>docs/KALMA_Despliegue_Aula.md</code>, <code>.env.example</code> y apartado 12</td></tr>
+  </tbody>
+</table>
+
+<h3>Equipo técnico</h3>
+<p>David Rojas · David Moreno · Estefanía Correa</p>
+</section>
+
+<!-- ======================================================================= 02 -->
+<section id="s02">
+<h2>02. Funcionalidades de la tienda</h2>
+<h3>2.1. Zona pública y catálogo</h3>
+<ul>
+  <li>Portada con los próximos lanzamientos, página de lanzamientos y página «Sobre nosotros».</li>
+  <li>Catálogo de zapatillas con búsqueda, filtro por categoría, ordenación y carga por páginas; la API admite además filtros por color, talla, precio y disponibilidad.</li>
+  <li>Ficha de producto con el modelo, el colorway, otros colores del mismo modelo, tallas disponibles, precio y opciones de personalización.</li>
+  <li>Registro de usuarios, inicio y cierre de sesión y formulario de contacto.</li>
+  <li>Cesta lateral para revisar los productos, las tallas, las cantidades y la personalización elegida.</li>
+</ul>
+<div class="figuras-2">
+  <figure><img src="capturas/app-catalogo.jpg" alt=""><figcaption>Figura 1. Catálogo con la búsqueda «dunk».</figcaption></figure>
+  <figure><img src="capturas/app-ficha.jpg" alt=""><figcaption>Figura 2. Ficha de producto: tallas y personalización.</figcaption></figure>
+</div>
+
+<h3>2.2. Área de cliente</h3>
+<ul>
+  <li>Consulta y actualización de los datos del perfil (nombre, apellidos, teléfono y dirección; el email y la contraseña no se editan).</li>
+  <li>Creación de pedidos con una o varias líneas, selección de talla y personalización por línea.</li>
+  <li>Historial y detalle de los pedidos propios, con su línea de tiempo de estados.</li>
+  <li>Cancelación de pedidos solo en los estados permitidos, con reposición del stock una única vez.</li>
+</ul>
+
+<h3>2.3. Administración y almacén</h3>
+<ul>
+  <li>Alta, consulta, modificación y desactivación lógica de productos con sus tallas y su etiqueta RFID.</li>
+  <li>Control de existencias por talla, stock mínimo, ajustes con motivo e historial de movimientos.</li>
+  <li>Carga de albaranes en CSV (suma stock y da de alta tallas o zapatillas nuevas) y consulta de los albaranes cargados.</li>
+  <li>Gestión de los estados de los pedidos y registro del código de seguimiento al enviar.</li>
+  <li>Panel resumen, informes de ventas por modelo, por mes y de personalizaciones, e informes de stock bajo y sin ventas.</li>
+  <li>Consulta de la auditoría, gestión de las consultas de contacto y exportación de pedidos en CSV o JSON.</li>
+</ul>
+
+<h3>2.4. Flujo de los pedidos</h3>
+<table>
+  <thead><tr><th style="width:17%">Estado o acción</th><th>Comportamiento</th><th style="width:26%">Quién lo hace</th></tr></thead>
+  <tbody>
+    <tr><td>Pendiente</td><td>Pedido creado; el stock ya está descontado y espera la confirmación del pago.</td><td>Cliente (al crear el pedido)</td></tr>
+    <tr><td>Confirmado</td><td>Pago confirmado; el pedido pasa a la cola del almacén.</td><td>Administración</td></tr>
+    <tr><td>Preparación</td><td>El almacén prepara los artículos.</td><td>Almacén o administración</td></tr>
+    <tr><td>Enviado</td><td>Se exige un código de seguimiento único.</td><td>Almacén o administración</td></tr>
+    <tr><td>Entregado</td><td>Fin del flujo; el pedido ya no cambia.</td><td>Almacén o administración</td></tr>
+    <tr><td>Cancelado</td><td>Solo desde pendiente o confirmado; el stock se repone una sola vez.</td><td>Cliente (sus pedidos) o administración</td></tr>
+  </tbody>
+</table>
+<p>Cada transición queda en <code>historial_estados_pedido</code> con el estado anterior, el nuevo, quién lo hizo y cuándo.
+Una transición no permitida (por ejemplo, de pendiente a preparación sin confirmar el pago) responde <code>409</code>.</p>
+
+<h3>2.5. Personalización de producto exclusivo</h3>
+<table>
+  <thead><tr><th style="width:15%">Tipo</th><th>Opciones</th><th>Regla</th></tr></thead>
+  <tbody>
+    <tr><td>Packaging</td><td>Caja edición KALMA, caja de coleccionista (la caja de madera grabada está desactivada)</td><td>Una por línea</td></tr>
+    <tr><td>Bordado</td><td>Nombre bordado en el talón, hasta 12 letras</td><td>Solo en modelos personalizables (no Air Max ni Jordan)</td></tr>
+    <tr><td>Cordones</td><td>Cordones de repuesto negros, blancos o rojos</td><td>Una por línea</td></tr>
+    <tr><td>Certificado</td><td>Certificado de autenticidad</td><td>Una por línea</td></tr>
+  </tbody>
+</table>
+<p>El recargo es por par. El servidor comprueba que la opción esté activa, que el modelo admita el bordado y que el
+texto respete el límite, y calcula el recargo con los datos del catálogo, nunca con los que envía el navegador.</p>
+</section>
+
+<!-- ======================================================================= 03 -->
+<section id="s03">
+<h2>03. Arquitectura y tecnologías</h2>
+<p>La aplicación se ejecuta en tres contenedores. El navegador solo habla con el proxy Nginx, que termina la conexión
+HTTPS, sirve los recursos estáticos y reenvía las peticiones dinámicas a Apache con PHP. La aplicación se comunica con
+PostgreSQL mediante PDO a través de una red interna de Docker a la que el proxy no tiene acceso.</p>
+
+<figure class="diagrama">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <defs><marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16233A"/></marker></defs>
+  <rect x="200" y="14" width="300" height="122" rx="8" fill="#F1F5F9" stroke="#CBD5E1" stroke-dasharray="4 3"/>
+  <text x="350" y="30" font-size="10" text-anchor="middle" fill="#475569">red front</text>
+  <rect x="352" y="60" width="358" height="132" rx="8" fill="#EEF4FA" stroke="#9DB7D3" stroke-dasharray="4 3"/>
+  <text x="640" y="184" font-size="10" text-anchor="middle" fill="#2B5C8A">red back (internal)</text>
+  <rect x="10" y="62" width="110" height="52" rx="6" fill="#FFFFFF" stroke="#16233A" stroke-width="1.4"/>
+  <text x="65" y="85" font-size="12" font-weight="bold" text-anchor="middle" fill="#16233A">Navegador</text>
+  <text x="65" y="101" font-size="9.5" text-anchor="middle" fill="#475569">cliente o empleado</text>
+  <rect x="215" y="56" width="120" height="64" rx="6" fill="#16233A"/>
+  <text x="275" y="80" font-size="12" font-weight="bold" text-anchor="middle" fill="#FFFFFF">proxy</text>
+  <text x="275" y="95" font-size="9.5" text-anchor="middle" fill="#CBD5E1">Nginx 1.27 Alpine</text>
+  <text x="275" y="109" font-size="9.5" text-anchor="middle" fill="#CBD5E1">TLS · estáticos · límites</text>
+  <rect x="380" y="74" width="120" height="64" rx="6" fill="#16233A"/>
+  <text x="440" y="98" font-size="12" font-weight="bold" text-anchor="middle" fill="#FFFFFF">app</text>
+  <text x="440" y="113" font-size="9.5" text-anchor="middle" fill="#CBD5E1">PHP 8.3 + Apache</text>
+  <text x="440" y="127" font-size="9.5" text-anchor="middle" fill="#CBD5E1">sin puerto publicado</text>
+  <rect x="560" y="74" width="130" height="64" rx="6" fill="#16233A"/>
+  <text x="625" y="98" font-size="12" font-weight="bold" text-anchor="middle" fill="#FFFFFF">db</text>
+  <text x="625" y="113" font-size="9.5" text-anchor="middle" fill="#CBD5E1">PostgreSQL 17</text>
+  <text x="625" y="127" font-size="9.5" text-anchor="middle" fill="#CBD5E1">sin puerto publicado</text>
+  <line x1="120" y1="88" x2="213" y2="88" stroke="#16233A" stroke-width="1.6" marker-end="url(#f)"/>
+  <text x="166" y="80" font-size="9.5" text-anchor="middle" fill="#16233A">HTTPS</text>
+  <text x="166" y="104" font-size="8.5" text-anchor="middle" fill="#475569">443 / 8443</text>
+  <line x1="335" y1="96" x2="378" y2="104" stroke="#16233A" stroke-width="1.6" marker-end="url(#f)"/>
+  <text x="356" y="90" font-size="8.5" text-anchor="middle" fill="#475569">:80</text>
+  <line x1="500" y1="106" x2="558" y2="106" stroke="#16233A" stroke-width="1.6" marker-end="url(#f)"/>
+  <text x="529" y="99" font-size="8.5" text-anchor="middle" fill="#475569">:5432</text>
+  <rect x="215" y="150" width="120" height="30" rx="5" fill="#FFFFFF" stroke="#94A3B8"/>
+  <text x="275" y="169" font-size="9.5" text-anchor="middle" fill="#334155">certs (solo lectura)</text>
+  <line x1="275" y1="150" x2="275" y2="122" stroke="#94A3B8" stroke-dasharray="3 2"/>
+  <rect x="560" y="146" width="130" height="28" rx="5" fill="#FFFFFF" stroke="#94A3B8"/>
+  <text x="625" y="164" font-size="9.5" text-anchor="middle" fill="#334155">volumen datos_postgres</text>
+  <line x1="625" y1="146" x2="625" y2="140" stroke="#94A3B8"/>
+</svg>
+<figcaption>Figura 3. Servicios, redes y puertos. Solo el proxy publica puertos en el equipo anfitrión.</figcaption>
+</figure>
+
+<table>
+  <thead><tr><th style="width:18%">Capa</th><th style="width:26%">Tecnología</th><th>Responsabilidad</th></tr></thead>
+  <tbody>
+    <tr><td>Interfaz</td><td>HTML, CSS y JavaScript</td><td>Presentación, interacción y peticiones a la API con <code>fetch</code>.</td></tr>
+    <tr><td>Proxy inverso</td><td>Nginx 1.27 Alpine</td><td>HTTPS, redirección de HTTP, recursos estáticos, límites de peticiones y reenvío a la aplicación.</td></tr>
+    <tr><td>Aplicación</td><td>PHP 8.3 + Apache, sin framework</td><td>Router, middlewares, controladores, servicios con las reglas de negocio y repositorios.</td></tr>
+    <tr><td>Persistencia</td><td>PostgreSQL 17</td><td>Almacenamiento relacional, restricciones, índices, triggers y transacciones.</td></tr>
+    <tr><td>Ejecución</td><td>Docker Compose</td><td>Construcción de las imágenes y coordinación de los servicios, redes y volumen.</td></tr>
+  </tbody>
+</table>
+
+<h3>Recorrido de una petición</h3>
+<pre>Navegador ──► Nginx (TLS, límites) ──► public/index.php (front controller)
+  └─► Router (config/rutas.php y config/rutas/*.php)
+        └─► Middlewares: sesión → CSRF → [límite de peticiones] → [Autenticado] → [RequierePermiso]
+              └─► Controlador (lee la petición, construye la respuesta)
+                    └─► Servicio (reglas de negocio, transacciones, auditoría)
+                          └─► Repositorio (SQL con PDO y consultas preparadas) ──► PostgreSQL</pre>
+<p>Por ejemplo, cuando una clienta crea un pedido (<code>POST /api/pedidos</code>), los middlewares comprueban la sesión,
+el token CSRF y el permiso <code>pedidos.propios</code>. Después, el servicio abre una transacción, bloquea las tallas con
+<code>SELECT … FOR UPDATE</code>, comprueba el stock y la personalización con los datos del catálogo, inserta el pedido y sus
+líneas, descuenta el stock dejando su movimiento, guarda el primer estado del historial y registra la auditoría. Si
+cualquier paso falla, se hace <code>ROLLBACK</code> y no queda nada a medias. La respuesta es <code>201 Created</code> con
+<code>Location: /api/pedidos/SF-2026-000025</code>.</p>
+</section>
+
+<!-- ======================================================================= 04 -->
+<section id="s04">
+<h2>04. Estructura de la aplicación</h2>
+<table>
+  <thead><tr><th style="width:24%">Directorio</th><th>Contenido</th></tr></thead>
+  <tbody>
+    <tr><td><code>public/</code></td><td>Punto de entrada único (<code>index.php</code>), hojas de estilo, JavaScript e imágenes.</td></tr>
+    <tr><td><code>app/Nucleo/</code></td><td>Router, petición, respuesta, conexión, validación, paginación, formato de fechas, CSV y gestión de errores y logs.</td></tr>
+    <tr><td><code>app/Middlewares/</code></td><td>Sesión, CSRF, autenticación, permisos y límites de peticiones.</td></tr>
+    <tr><td><code>app/Seguridad/</code></td><td>Matriz de permisos por rol, gestión de la sesión y limitador de peticiones.</td></tr>
+    <tr><td><code>app/Controladores/</code></td><td>Controladores de las páginas (<code>Web/</code>) y de la API (<code>Api/</code>; <code>Api/Gestion/</code> para el área interna).</td></tr>
+    <tr><td><code>app/Servicios/</code></td><td>Reglas de negocio: pedidos y su máquina de estados, catálogo, stock, albaranes, informes, perfil y exportación.</td></tr>
+    <tr><td><code>app/Repositorios/</code></td><td>Acceso a PostgreSQL, solo con consultas preparadas.</td></tr>
+    <tr><td><code>app/vistas/</code></td><td>Plantillas HTML de las páginas y sus partes comunes.</td></tr>
+    <tr><td><code>config/</code></td><td>Tabla de rutas, con un archivo por módulo en <code>config/rutas/</code>.</td></tr>
+    <tr><td><code>database/</code></td><td>Esquema, datos de demostración y migraciones.</td></tr>
+    <tr><td><code>docker/</code> y <code>scripts/</code></td><td>Imagen y plantilla de Nginx; scripts de despliegue, comprobación, copia, restauración y cron.</td></tr>
+    <tr><td><code>postman/</code> y <code>docs/</code></td><td>Colección de pruebas y su entorno; documentación técnica, diagramas y resultados de las pruebas.</td></tr>
+  </tbody>
+</table>
+<p>La aplicación usa Composer solo para la carga automática de clases (PSR-4, <code>App\</code> → <code>app/</code>). No depende de
+un framework: el MVC y los componentes principales son propios. La imagen de la aplicación se construye en dos etapas: la
+primera genera el autoload con Composer y la final solo contiene PHP con Apache, la extensión <code>pdo_pgsql</code>, la
+configuración de producción de PHP (sin mostrar errores ni la versión) y el código.</p>
+</section>
+
+<!-- ======================================================================= 05 -->
+<section id="s05" class="nueva-pagina">
+<h2>05. Base de datos y modelo entidad/relación</h2>
+<p>La persistencia se hace en PostgreSQL 17 con 17 tablas, agrupadas según las funciones de la tienda. El modelo se
+presenta en dos niveles: el <strong>modelo conceptual</strong> (figura 4), con las entidades y sus relaciones, y el
+<strong>esquema relacional</strong> (figura 5), con las tablas, sus claves y sus restricciones.</p>
+<table>
+  <thead><tr><th style="width:14%">Área</th><th style="width:46%">Tablas</th><th>Uso</th></tr></thead>
+  <tbody>
+    <tr><td>Usuarios</td><td>roles, usuarios, clientes</td><td>Cuentas, perfiles de cliente y roles.</td></tr>
+    <tr><td>Catálogo</td><td>categorias, marcas, colores, productos, variantes, opciones_personalizacion</td><td>Modelos, colores, tallas, stock y opciones.</td></tr>
+    <tr><td>Pedidos</td><td>pedidos, lineas_pedido, linea_personalizacion, historial_estados_pedido</td><td>Cabeceras, líneas, personalización y estados.</td></tr>
+    <tr><td>Inventario</td><td>movimientos_stock</td><td>Cada cambio de existencias con su stock resultante.</td></tr>
+    <tr><td>Control</td><td>auditoria, consultas, limites_peticiones</td><td>Trazabilidad, formulario de contacto y límites de uso.</td></tr>
+  </tbody>
+</table>
+<h3>Lectura del modelo conceptual</h3>
+<p>Se usa la notación de Chen con cardinalidades mínimas y máximas. La pareja que hay junto a cada entidad indica
+cuántas ocurrencias de esa entidad se relacionan con una ocurrencia de la entidad del otro extremo. En
+CLIENTE —realiza— PEDIDO, el (1,1) junto a CLIENTE dice que cada pedido es de un solo cliente, y el (0,N) junto a
+PEDIDO, que un cliente puede tener ninguno o muchos pedidos.</p>
+<ul>
+  <li><strong>Entidades débiles</strong> (doble borde): LÍNEA DE PEDIDO e HISTORIAL DE ESTADOS no existen sin su pedido y se borran con él.</li>
+  <li><strong>Relación N:M con atributos</strong>: una línea puede llevar varias opciones de personalización y una opción se elige en muchas líneas. La relación guarda el texto bordado y el recargo aplicado, y se convierte en la tabla <code>linea_personalizacion</code>.</li>
+  <li><strong>CONSULTA</strong> y <strong>LÍMITE DE PETICIONES</strong> no se relacionan con nada: la consulta la puede enviar un visitante sin cuenta y los límites guardan hashes, no referencias.</li>
+</ul>
+</section>
+
+<section class="horizontal">
+<figure class="diagrama-er">
+  <img src="../diagrama-er-conceptual.svg" alt="Modelo entidad/relación conceptual">
+  <figcaption>Figura 4. Modelo entidad/relación conceptual (notación de Chen, cardinalidades mínimas y máximas).</figcaption>
+</figure>
+</section>
+
+<section class="horizontal">
+<figure class="diagrama-er">
+  <img src="../diagrama-er-relacional.svg" alt="Esquema relacional">
+  <figcaption>Figura 5. Esquema relacional (pata de gallo). Se muestran las claves y las columnas que explican cada tabla; el resto está en <code>database/schema.sql</code>.</figcaption>
+</figure>
+</section>
+
+<section>
+<h3>5.1. Del modelo conceptual a las tablas</h3>
+<table>
+  <thead><tr><th style="width:45%">En el modelo conceptual</th><th>En el esquema relacional</th></tr></thead>
+  <tbody>
+    <tr><td>Relación 1:N (por ejemplo, CLIENTE realiza PEDIDO)</td><td>Clave foránea en la tabla del lado N (<code>pedidos.cliente_id</code>).</td></tr>
+    <tr><td>Relación 1:1 USUARIO tiene perfil CLIENTE</td><td>Clave foránea con <code>UNIQUE</code> en <code>clientes.usuario_id</code>.</td></tr>
+    <tr><td>Cardinalidad mínima 0 en el lado 1 (registra, origina, cambia, genera)</td><td>Clave foránea que admite <code>NULL</code> con <code>ON DELETE SET NULL</code>.</td></tr>
+    <tr><td>Entidad débil (LÍNEA DE PEDIDO, HISTORIAL DE ESTADOS)</td><td>Clave foránea <code>NOT NULL</code> con <code>ON DELETE CASCADE</code> hacia <code>pedidos</code>.</td></tr>
+    <tr><td>Relación N:M personaliza, con atributos</td><td>Tabla <code>linea_personalizacion</code> con dos claves foráneas, <code>UNIQUE (linea_id, opcion_id)</code>, <code>texto</code> y <code>recargo_aplicado</code>.</td></tr>
+    <tr><td>Cardinalidad mínima 1 en PEDIDO contiene LÍNEA</td><td>No se puede expresar con una restricción de tabla: la exige el servicio al crear el pedido.</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2. Integridad y concurrencia</h3>
+<ul>
+  <li>Claves primarias <code>GENERATED ALWAYS AS IDENTITY</code>, claves foráneas, restricciones <code>UNIQUE</code> (también compuestas: talla por producto, código de estilo por marca, variante por pedido) y <code>CHECK</code> (estados, tipos, formatos, rangos).</li>
+  <li><code>CHECK (stock &gt;= 0)</code> en las variantes: es la última defensa contra la sobreventa.</li>
+  <li><code>importe</code> de cada línea es una columna generada (<code>cantidad × (precio_unitario + recargo_personalizacion)</code>), así que nunca se desincroniza.</li>
+  <li>Un trigger actualiza <code>fecha_actualizacion</code> en cada <code>UPDATE</code>; las fechas son <code>TIMESTAMPTZ</code>.</li>
+  <li>Las operaciones importantes van en transacciones. Al crear un pedido, las variantes se bloquean con <code>SELECT … FOR UPDATE</code>, así que dos compras simultáneas no pueden vender la misma unidad.</li>
+  <li>Las líneas copian el nombre, la talla, el color y el precio del momento de la compra: el pedido no cambia si después cambia el catálogo.</li>
+</ul>
+
+<h3>5.3. Datos iniciales y migraciones</h3>
+<p>Con el volumen vacío, PostgreSQL ejecuta en orden <code>01_schema.sql</code>, <code>02_usuarios.sql</code>,
+<code>03_catalogo.sql</code> y <code>04_pedidos.sql</code>. Las semillas calculan el stock, los totales y el historial a partir de
+pocas filas y, al final, comprueban que todo cuadra; si no cuadra, la carga se aborta. Los cambios posteriores se
+aplican con migraciones (<code>database/migraciones/</code>) que <code>scripts/deploy.sh</code> ejecuta una sola vez cada una,
+dentro de una transacción y con un bloqueo, registrándolas en <code>migraciones_aplicadas</code> sin perder los datos del volumen.</p>
+
+<h3>5.4. Códigos de producto: <code>codigo_marca</code> no es <code>rfid_tienda</code></h3>
+<table>
+  <thead><tr><th style="width:16%"></th><th><code>productos.codigo_marca</code></th><th><code>variantes.rfid_tienda</code></th></tr></thead>
+  <tbody>
+    <tr><td>Qué es</td><td>Código de estilo (<em>style code</em>) real de Nike</td><td>Etiqueta RFID (EPC-96) que pone KALMA</td></tr>
+    <tr><td>Ejemplo</td><td><code>CW2288-111</code> = modelo <code>CW2288</code> + color <code>111</code></td><td><code>4B4C4D…</code> (24 caracteres hexadecimales)</td></tr>
+    <tr><td>Nivel</td><td>Modelo + color (igual en todas las tallas)</td><td>Cada talla</td></tr>
+    <tr><td>Unicidad</td><td><code>UNIQUE (marca_id, codigo_marca)</code></td><td><code>UNIQUE</code> en toda la tabla</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ======================================================================= 06 -->
+<section id="s06">
+<h2>06. API REST e integración</h2>
+<p>La aplicación ofrece una API REST con respuestas JSON bajo <code>/api/*</code> (45 rutas) y un endpoint
+<code>/health</code> para comprobar la aplicación y la base de datos. Las páginas HTML (11 rutas) se sirven desde las rutas
+web y consultan la API con <code>fetch</code>. La especificación completa de cada ruta (parámetros, cuerpo, permisos y
+códigos de respuesta) está en el punto 9 de <code>docs/contrato-integracion.md</code>, y
+<code>docs/pruebas/ejemplos-api.md</code> recoge 27 ejemplos reales de petición y respuesta.</p>
+<pre>Éxito:    {"datos": ...}
+Listado:  {"datos": [...], "paginacion": {"pagina": 1, "por_pagina": 12, "total": 30, "paginas": 3}}
+Error:    {"error": {"codigo": 409, "mensaje": "...", "detalles": {...}}}</pre>
+
+<table>
+  <thead><tr><th style="width:19%">Área</th><th>Rutas</th><th style="width:17%">Permiso</th></tr></thead>
+  <tbody>
+    <tr><td>Sistema y sesión</td><td><code>GET /health</code> · <code>GET /api</code> · <code>GET /api/sesion</code> · <code>POST /api/registro</code> · <code>POST /api/login</code> · <code>POST /api/logout</code></td><td>Público / sesión</td></tr>
+    <tr><td>Catálogo y contacto</td><td><code>GET /api/productos</code> · <code>GET /api/productos/{slug}</code> · <code>GET /api/catalogo/filtros</code> · <code>GET /api/lanzamientos</code> · <code>POST /api/consultas</code></td><td>Público</td></tr>
+    <tr><td>Cliente</td><td><code>GET</code>, <code>PATCH /api/perfil</code> · <code>GET</code>, <code>POST /api/pedidos</code> · <code>GET /api/pedidos/{codigo}</code> · <code>POST /api/pedidos/{codigo}/cancelar</code></td><td>Cliente</td></tr>
+    <tr><td>Pedidos (interno)</td><td><code>GET /api/gestion/pedidos</code> · <code>GET /api/gestion/pedidos/{codigo}</code> · <code>PATCH /api/gestion/pedidos/{codigo}/estado</code></td><td>Almacén y admin</td></tr>
+    <tr><td>Stock</td><td><code>GET /api/gestion/stock</code> · <code>PATCH /api/gestion/variantes/{id}/stock</code> · <code>GET /api/gestion/variantes/{id}/movimientos</code></td><td>Almacén y admin</td></tr>
+    <tr><td>Albaranes</td><td><code>GET /api/gestion/albaranes</code> · <code>GET …/albaranes/detalle</code> · <code>POST /api/gestion/albaranes</code> (solo admin) · <code>GET …/albaranes/avisos</code> (solo admin)</td><td>Almacén y admin</td></tr>
+    <tr><td>Catálogo interno</td><td><code>GET</code>, <code>POST /api/gestion/productos</code> · <code>GET</code>, <code>PATCH</code>, <code>DELETE /api/gestion/productos/{id}</code></td><td>Admin</td></tr>
+    <tr><td>Informes y control</td><td><code>GET /api/gestion/resumen</code> · <code>GET /api/gestion/informes/{nombre}</code> · <code>GET /api/gestion/auditoria</code> · <code>GET /api/gestion/exportar/pedidos</code> · <code>GET</code>, <code>PATCH /api/gestion/consultas</code> · <code>GET /api/usuarios</code></td><td>Admin</td></tr>
+    <tr><td>Informes de stock</td><td><code>GET …/informes-stock/vista-previa</code> (y <code>/csv</code>) · <code>GET</code>, <code>POST /api/gestion/informes-stock</code> · <code>GET …/{id}</code> (y <code>/csv</code>) · <code>PATCH …/{id}/revisado</code></td><td>Almacén envía; admin revisa</td></tr>
+  </tbody>
+</table>
+
+<h3>Convenciones</h3>
+<ul>
+  <li>Toda petición <code>POST</code>, <code>PATCH</code> o <code>DELETE</code> lleva la cabecera <code>X-CSRF-Token</code>, que se obtiene en <code>GET /api/sesion</code> y cambia al iniciar sesión.</li>
+  <li>Los listados admiten <code>?pagina</code> y <code>?por_pagina</code> (máximo 50). Las fechas van en ISO 8601 con zona horaria.</li>
+  <li>Precios, recargos, totales y disponibilidad se calculan siempre en el servidor; si el navegador envía precios, se ignoran.</li>
+  <li>Códigos: <code>400</code> datos no válidos (con el motivo de cada campo), <code>401</code> sin sesión, <code>403</code> sin permiso o CSRF falso, <code>404</code> inexistente o ajeno, <code>405</code> método no permitido, <code>409</code> conflicto con el estado, <code>413</code>/<code>415</code> cuerpo demasiado grande o de otro tipo, <code>429</code> demasiadas peticiones y <code>500</code> error interno con una referencia.</li>
+</ul>
+
+<h3>Ejemplo real: crear un pedido con dos líneas</h3>
+<p>Petición de la colección de pruebas (prueba 36). El cuerpo incluye a propósito un <code>precio_unitario: 1</code>, que el servidor ignora.</p>
+<pre>POST /api/pedidos
+Content-Type: application/json
+X-CSRF-Token: &lt;token de la sesión&gt;
+
+{"notas": "Pedido de prueba desde Postman",
+ "lineas": [{"variante_id": 1, "cantidad": 2, "precio_unitario": 1, "personalizacion": [{"opcion_id": 1}]},
+            {"variante_id": 2, "cantidad": 1, "personalizacion": [{"opcion_id": 4, "texto": "LUCIA"}]}]}</pre>
+<p>Respuesta <code>201 Created</code> con <code>Location: /api/pedidos/SF-2026-000025</code> (recortada):</p>
+<pre>{"datos": {"codigo": "SF-2026-000025", "estado": "pendiente", "personalizado": true, "total": 398.97,
+  "lineas": [{"producto": "Nike Air Force 1 '07", "talla": 39.0, "cantidad": 2, "precio_unitario": 119.99,
+              "recargo_personalizacion": 12.0, "importe": 263.98, "personalizacion": [{"nombre": "Caja edición KALMA"}]},
+             {"producto": "Nike Air Force 1 '07", "talla": 40.0, "cantidad": 1, "precio_unitario": 119.99,
+              "recargo_personalizacion": 15.0, "importe": 134.99, "personalizacion": [{"texto": "LUCIA"}]}],
+  "historial": [{"estado_anterior": null, "estado_nuevo": "pendiente", "rol": "cliente"}]}}</pre>
+<p>Si se piden más unidades de las que hay, la respuesta es <code>409</code> e indica la talla y lo disponible:</p>
+<pre>{"error": {"codigo": 409, "mensaje": "No hay stock suficiente para alguna de las tallas",
+  "detalles": {"sin_stock": [{"linea": 0, "variante_id": 1, "producto": "Nike Air Force 1 '07 White/White",
+                              "talla": 39.0, "solicitado": 10, "disponible": 9}]}}}</pre>
+</section>
+
+<!-- ======================================================================= 07 -->
+<section id="s07">
+<h2>07. Seguridad, roles y permisos</h2>
+<h3>7.1. Roles y matriz de permisos</h3>
+<p>Los roles están en la tabla <code>roles</code> (con clave foránea desde <code>usuarios</code>) y lo que puede hacer cada uno
+se define en la matriz de <code>app/Seguridad/Permisos.php</code>. Cada ruta protegida exige un permiso con el middleware
+<code>RequierePermiso</code>; sin sesión responde <code>401</code> y sin permiso, <code>403</code>, y el acceso denegado queda en la auditoría.</p>
+<table class="matriz">
+  <thead><tr><th>Permiso</th><th>Qué permite</th><th>Admin</th><th>Almacén</th><th>Cliente</th></tr></thead>
+  <tbody>
+    <tr><td><code>panel.acceder</code></td><td>Entrar en el área interna (<code>/panel</code>)</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td><code>pedidos.ver_todos</code></td><td>Ver los pedidos de todos los clientes</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td><code>pedidos.cambiar_estado</code></td><td>Logística: preparación, enviado y entregado</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td><code>pedidos.confirmar_cancelar</code></td><td>Confirmar el pago o cancelar desde el área interna</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>stock.gestionar</code></td><td>Consultar y ajustar el stock de las tallas</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td><code>albaranes.ver</code></td><td>Ver los albaranes cargados y su detalle</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td><code>productos.gestionar</code></td><td>Alta, edición y desactivación de productos; cargar albaranes</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>informes_stock.enviar</code></td><td>Generar informes de stock y enviarlos a administración</td><td>✓</td><td>✓</td><td></td></tr>
+    <tr><td><code>informes_stock.revisar</code></td><td>Ver todos los informes de stock y marcarlos como revisados</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>informes.ver</code></td><td>Panel resumen e informes de ventas</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>auditoria.ver</code></td><td>Consultar la auditoría</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>datos.exportar</code></td><td>Exportar pedidos en CSV o JSON</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>consultas.gestionar</code></td><td>Ver y responder las consultas de contacto</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>usuarios.gestionar</code></td><td>Listar usuarios y gestionar cuentas</td><td>✓</td><td></td><td></td></tr>
+    <tr><td><code>pedidos.propios</code></td><td>Crear, ver y cancelar sus propios pedidos</td><td>✓*</td><td></td><td>✓</td></tr>
+    <tr><td><code>perfil.propio</code></td><td>Ver y editar sus propios datos</td><td>✓*</td><td></td><td>✓</td></tr>
+  </tbody>
+</table>
+<p class="pequeno">Administración tiene todos los permisos (<code>'*'</code>). * Los pedidos y el perfil propios exigen
+además, en el servicio, que la cuenta sea de cliente. Que un pedido sea del cliente que lo pide no lo decide la matriz,
+sino el servicio de pedidos: un pedido ajeno responde <code>404</code>, igual que uno inexistente, y queda en la auditoría.</p>
+
+<h3>7.2. Controles de seguridad</h3>
+<table>
+  <thead><tr><th style="width:17%">Riesgo</th><th>Medida</th><th style="width:19%">Comprobado en</th></tr></thead>
+  <tbody>
+    <tr><td>Inyección SQL</td><td>Consultas preparadas reales (<code>PDO::ATTR_EMULATE_PREPARES = false</code>); filtros y ordenación eligen entre fragmentos fijos.</td><td>Prueba 24 (400)</td></tr>
+    <tr><td>XSS</td><td>Las vistas escapan toda salida con <code>htmlspecialchars</code>; la API responde JSON con <code>X-Content-Type-Options: nosniff</code>.</td><td>Revisión del código</td></tr>
+    <tr><td>CSRF</td><td>Token por sesión obligatorio en toda petición que modifica datos; cookie <code>SameSite=Lax</code>.</td><td>Prueba 25 (403 CSRF)</td></tr>
+    <tr><td>Robo de sesión</td><td>Cookie <code>HttpOnly</code> y <code>Secure</code> con HTTPS; identificador regenerado al autenticar; caducidad a los 30 minutos sin actividad.</td><td>Configuración de <code>Sesion.php</code></td></tr>
+    <tr><td>Contraseñas</td><td><code>password_hash</code> (bcrypt); el tiempo de respuesta es el mismo exista o no el email.</td><td>Prueba 12 (401)</td></tr>
+    <tr><td>Fuerza bruta</td><td>Límites en Nginx (30 peticiones por minuto en el acceso) y en PHP: por IP y por cuenta e IP (5 intentos cada 15 minutos), en <code>limites_peticiones</code> con hashes.</td><td>Prueba 26 (429 con <code>Retry-After</code>)</td></tr>
+    <tr><td>Acceso indebido</td><td>Matriz de permisos comprobada en el servidor con middlewares; los accesos denegados se auditan.</td><td>21 pruebas 401/403</td></tr>
+    <tr><td>IDOR</td><td>El servicio comprueba que el pedido es del cliente; si no, <code>404</code>.</td><td>Prueba 31 (404)</td></tr>
+    <tr><td>Manipulación de precios</td><td>El servidor recalcula precios, recargos y total; <code>importe</code> es una columna generada.</td><td>Prueba 36 (201)</td></tr>
+    <tr><td>Sobreventa concurrente</td><td>Transacción con <code>SELECT … FOR UPDATE</code> y <code>CHECK (stock &gt;= 0)</code>.</td><td>Prueba 33 (409)</td></tr>
+    <tr><td>Fuga de información</td><td>Mensajes genéricos sin trazas; el error 500 da una referencia que se busca en el log.</td><td>Formato de error común</td></tr>
+    <tr><td>Fórmulas en CSV</td><td>Las celdas que empiezan por <code>=</code>, <code>+</code>, <code>-</code> o <code>@</code> se neutralizan al exportar.</td><td>Prueba 122</td></tr>
+    <tr><td>Incrustación y rastreo</td><td>Cabeceras <code>X-Frame-Options: DENY</code>, <code>X-Content-Type-Options: nosniff</code> y <code>Referrer-Policy: same-origin</code>.</td><td>Todas las respuestas</td></tr>
+    <tr><td>Exposición de la BD</td><td>PostgreSQL solo está en la red interna <code>back</code> y no publica el puerto 5432.</td><td>Apartado 11</td></tr>
+    <tr><td>Datos personales</td><td>No se guarda el DNI; la auditoría y los logs no guardan contraseñas, tokens ni cookies.</td><td>Prueba 120</td></tr>
+    <tr><td>Transporte</td><td>HTTPS obligatorio con TLS 1.2 y 1.3; HTTP redirige a HTTPS conservando la ruta.</td><td>Apartado 13</td></tr>
+  </tbody>
+</table>
+
+<h3>7.3. Evidencias de los permisos</h3>
+<figure><img src="capturas/terminal-permisos.png" alt="" class="ancho-85">
+  <figcaption>Figura 6. El almacén no puede confirmar el pago ni cancelar (403) y no se puede saltar el flujo de estados (409).</figcaption></figure>
+<div class="figuras-2">
+  <figure><img src="capturas/panel-almacen-pedidos.jpg" alt=""><figcaption>Figura 7. El menú del almacén solo muestra sus secciones: no tiene Resumen, Productos, Informes ni Consultas.</figcaption></figure>
+  <figure><img src="capturas/permiso-cliente-panel.jpg" alt=""><figcaption>Figura 8. La clienta abre <code>/panel</code>: el servidor responde 403 con una página de error sin detalles internos.</figcaption></figure>
+</div>
+</section>
+
+<!-- ======================================================================= 08 -->
+<section id="s08">
+<h2>08. Decisiones de diseño</h2>
+<table>
+  <thead><tr><th style="width:30%">Decisión</th><th>Motivo</th><th style="width:22%">Alternativa descartada</th></tr></thead>
+  <tbody>
+    <tr><td>PHP sin framework con MVC propio: controlador → servicio → repositorio</td><td>Cada capa tiene una responsabilidad y las reglas de negocio quedan en los servicios, fáciles de revisar y probar.</td><td>Laravel o Symfony</td></tr>
+    <tr><td>Sesiones nativas de PHP con cookie y token CSRF</td><td>La web y la API comparten origen; cerrar sesión invalida el acceso al momento.</td><td>Tokens JWT</td></tr>
+    <tr><td>Producto = modelo + colorway; variante = producto + talla</td><td>Como en Nike.com, cada colorway tiene su código, su precio y su foto; el stock se lleva por talla.</td><td>Un producto por modelo con los colores como atributo</td></tr>
+    <tr><td><code>codigo_marca</code> (style code real) distinto de <code>rfid_tienda</code> (EPC-96 por talla)</td><td>Identifican niveles distintos: el modelo y color, frente a cada talla del almacén.</td><td>Un único código</td></tr>
+    <tr><td><code>usuarios</code> separado de <code>clientes</code> (1:1) y sin DNI</td><td>El personal no deja columnas vacías; el DNI no hace falta para vender ni enviar (minimización de datos).</td><td>Una sola tabla de personas</td></tr>
+    <tr><td>Roles en tabla; matriz de permisos en PHP</td><td>Añadir un rol no cambia el esquema y la matriz se revisa junto al código que la usa.</td><td>Tabla de permisos en la BD</td></tr>
+    <tr><td>Stock numérico en <code>variantes</code> y cada cambio en <code>movimientos_stock</code></td><td>Consultar el stock es inmediato y cada unidad que entra o sale queda trazada con su motivo.</td><td>Calcular el stock sumando movimientos</td></tr>
+    <tr><td>Las líneas copian nombre, talla, color y precio</td><td>El pedido refleja lo que se compró aunque el catálogo cambie después.</td><td>Leer siempre del producto</td></tr>
+    <tr><td>El almacén solo lleva la logística; administración confirma el pago y cancela</td><td>Separación de funciones: quien prepara los pedidos no decide sobre los cobros.</td><td>Todos los empleados con los mismos permisos</td></tr>
+    <tr><td>Albarán en CSV solo para administración; se rechaza entero si una fila está mal y uno repetido exige aceptación expresa</td><td>El inventario nunca queda a medias ni se suma dos veces la misma entrega por error.</td><td>Carga parcial con un archivo de errores</td></tr>
+    <tr><td>Informes de stock y albaranes guardados en <code>auditoria</code></td><td>Mantener el modelo en 17 tablas; cada envío y revisión ya es un evento auditable.</td><td>Tablas propias</td></tr>
+    <tr><td>Imágenes por convención: <code>public/img/productos/&lt;código&gt;.webp</code></td><td>Sin subidas de archivos ni un volumen extra que respaldar.</td><td>Subida desde el panel</td></tr>
+    <tr><td>Lanzamientos con <code>productos.fecha_lanzamiento</code></td><td>Se anuncian en la portada, pero no salen en el catálogo ni se pueden pedir hasta su fecha.</td><td>Tabla aparte</td></tr>
+    <tr><td>Bloqueo de login por cuenta e IP</td><td>Quien conozca un email no puede dejar fuera a su dueño, que entra desde otra IP.</td><td>Bloqueo solo por cuenta</td></tr>
+    <tr><td>Cesta en <code>localStorage</code>; el servidor recalcula todo al pedir</td><td>La cesta no necesita estado en el servidor y no se confía en los importes del navegador.</td><td>Cesta guardada en la BD</td></tr>
+    <tr><td>Nginx delante de Apache y PostgreSQL en una red interna</td><td>TLS, estáticos y límites fuera de PHP; la base de datos no es accesible desde fuera.</td><td>Publicar Apache directamente</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ======================================================================= 09 -->
+<section id="s09">
+<h2>09. Interfaz y experiencia de uso</h2>
+<p>La parte pública es una tienda en blanco y negro centrada en el producto. El catálogo permite localizar modelos
+con búsqueda y filtros, y la ficha muestra lo necesario antes de añadir una talla a la cesta. La cesta se mantiene en
+el navegador con <code>localStorage</code> (con una alternativa en memoria si no está disponible); lo que se envía al servidor
+son identificadores de variantes, cantidades y opciones, y el servidor vuelve a comprobar precios, recargos, permisos y existencias.</p>
+<p>Las páginas privadas exigen sesión. El área interna (<code>/panel</code>) construye su menú con los permisos del usuario, de
+modo que cada rol solo ve sus secciones; aunque alguien llame a una ruta a mano, el servidor vuelve a comprobar el permiso.</p>
+<div class="figuras-2">
+  <figure><img src="capturas/app-cuenta.jpg" alt=""><figcaption>Figura 9. Área de la clienta: sus pedidos con su estado y sus datos editables.</figcaption></figure>
+  <figure><img src="capturas/panel-admin-resumen.jpg" alt=""><figcaption>Figura 10. Panel resumen de administración: ingresos, pedidos por estado e informes.</figcaption></figure>
+</div>
+<figure><img src="capturas/panel-admin-stock.jpg" alt="" class="ancho-70"><figcaption>Figura 11. Stock por talla con el mínimo, los avisos y el ajuste con motivo.</figcaption></figure>
+</section>
+
+<!-- ======================================================================= 10 -->
+<section id="s10">
+<h2>10. Pruebas: resultados esperados y obtenidos</h2>
+<h3>10.1. Datos de demostración y perfiles</h3>
+<table>
+  <thead><tr><th style="width:24%">Elemento</th><th>Datos de demostración (ficticios)</th></tr></thead>
+  <tbody>
+    <tr><td>Usuarios</td><td>16 cuentas: 1 de administración, 2 de almacén y 13 de clientes (una desactivada).</td></tr>
+    <tr><td>Catálogo</td><td>21 zapatillas Nike con códigos reales: 14 a la venta de 12 modelos y 7 lanzamientos anunciados.</td></tr>
+    <tr><td>Tallas</td><td>189 variantes (9 tallas por zapatilla), cada una con su stock, su mínimo y su etiqueta RFID.</td></tr>
+    <tr><td>Personalización</td><td>8 opciones, una desactivada (la caja de madera grabada).</td></tr>
+    <tr><td>Pedidos</td><td>24 pedidos en los seis estados (3 pendientes, 2 confirmados, 3 en preparación, 4 enviados, 8 entregados y 4 cancelados); 7 personalizados.</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th style="width:24%">Perfil</th><th style="width:28%">Cuenta (contraseña <code>Kalma2026!</code>)</th><th>Operaciones</th></tr></thead>
+  <tbody>
+    <tr><td>Administración</td><td><code>admin@kalma.test</code></td><td>Todo: productos, albaranes, confirmar y cancelar pedidos, informes, auditoría, exportación y consultas.</td></tr>
+    <tr><td>Almacén</td><td><code>almacen@kalma.test</code></td><td>Stock, consulta de albaranes, logística de pedidos e informes de stock.</td></tr>
+    <tr><td>Cliente</td><td><code>cliente@kalma.test</code></td><td>Su perfil y sus pedidos.</td></tr>
+  </tbody>
+</table>
+
+<h3>10.2. Colección de pruebas</h3>
+<p>La colección <code>postman/KALMA-SNKRS.postman_collection.json</code> prueba toda la API, con respuestas correctas,
+errores y usuarios sin permiso. Cada carpeta abre y cierra su propia sesión y un script de la colección añade el token
+CSRF. Cada petición lleva sus comprobaciones (los <strong>resultados esperados</strong>). La colección se ejecutó con
+newman 6.2.3 contra una pila Docker aislada, con la base de datos recién creada desde el esquema y las semillas, por HTTPS
+y con el código del commit <code>d296743</code>. Los <strong>resultados obtenidos</strong>, prueba a prueba, están en
+<code>docs/pruebas/resultados-coleccion.md</code>.</p>
+<table class="cifras">
+  <tbody>
+    <tr><td>Pruebas (peticiones de la colección)</td><td><strong>176</strong></td><td>Peticiones HTTP (con las de los scripts)</td><td>294</td></tr>
+    <tr><td>Comprobaciones</td><td><strong>375</strong></td><td>Comprobaciones fallidas</td><td><strong>0</strong></td></tr>
+    <tr><td>Pruebas que esperan un error</td><td>70</td><td>Duración · respuesta media</td><td>20,7 s · 17 ms</td></tr>
+  </tbody>
+</table>
+<figure><img src="capturas/terminal-resumen.png" alt="" class="ancho-70"><figcaption>Figura 12. Resumen de la ejecución de la colección: 0 fallos.</figcaption></figure>
+
+<h3>10.3. Errores y usuarios sin permiso</h3>
+<table>
+  <thead><tr><th style="width:9%">Código</th><th>Qué se comprueba</th><th style="width:10%">Pruebas</th></tr></thead>
+  <tbody>
+    <tr><td><code>400</code></td><td>Datos no válidos: registro, filtros, pedido con cantidad incorrecta, bordado en un modelo que no lo admite, opción desactivada, alta y edición de productos, albarán con errores, ajustes de stock, fechas de informes, auditoría y exportación.</td><td>26</td></tr>
+    <tr><td><code>401</code></td><td>Rutas privadas sin sesión y login con contraseña incorrecta.</td><td>7</td></tr>
+    <tr><td><code>403</code></td><td>Token CSRF falso; la clienta en rutas de gestión; el almacén al confirmar pagos, cancelar, exportar, ver el resumen, cargar o aceptar albaranes y revisar informes.</td><td>14</td></tr>
+    <tr><td><code>404</code></td><td>Rutas, productos, pedidos, tallas, informes y consultas inexistentes; pedido de otro cliente (IDOR).</td><td>11</td></tr>
+    <tr><td><code>405</code></td><td>Método no permitido en una ruta existente.</td><td>1</td></tr>
+    <tr><td><code>409</code></td><td>Email o código repetido, pedido sin stock, cancelar un pedido enviado o ya cancelado, saltarse estados, código de seguimiento de otro pedido, stock negativo y albarán repetido sin aceptar.</td><td>10</td></tr>
+    <tr><td><code>429</code></td><td>Sexto intento de login con la misma cuenta desde la misma IP.</td><td>1</td></tr>
+  </tbody>
+</table>
+
+<h3>10.4. Pruebas obligatorias de la defensa</h3>
+<table>
+  <thead><tr><th>Prueba</th><th style="width:22%">Nº en la colección</th></tr></thead>
+  <tbody>
+    <tr><td>Registro, login, acceso denegado y operación autorizada de un empleado</td><td>7, 13, 9, 83</td></tr>
+    <tr><td>Pedido con varias líneas: importe, descuento de stock y persistencia</td><td>36, 37</td></tr>
+    <tr><td>Cantidad no válida, pedido sin stock y pedido de otro cliente</td><td>32, 33, 31</td></tr>
+    <tr><td>Búsqueda filtrada, informe y exportación</td><td>19, 109, 122</td></tr>
+    <tr><td>Cancelación con reposición de stock y cancelación no permitida</td><td>39, 38, 40</td></tr>
+    <tr><td>Seguridad: CSRF, fuerza bruta y auditoría sin datos sensibles</td><td>25, 26, 120</td></tr>
+  </tbody>
+</table>
+<p>Casos preparados en los datos de demostración: <code>SF-2026-000021</code> es un pedido pendiente y personalizado
+que la clienta puede cancelar (el stock se repone); <code>SF-2026-000013</code> está enviado y cancelarlo da
+<code>409</code>; <code>SF-2026-000022</code> es de otro cliente y la clienta no lo puede ver (<code>404</code>).</p>
+
+<h3>10.5. Capturas de las pruebas</h3>
+<figure><img src="capturas/terminal-seguridad.png" alt="" class="ancho-85">
+  <figcaption>Figura 13. Seguridad y pedidos: CSRF falso (403), fuerza bruta (cinco 401 y el sexto 429), sin sesión (401), pedido ajeno (404), cantidad no válida (400) y sin stock (409).</figcaption></figure>
+<figure><img src="capturas/terminal-pedido.png" alt="" class="ancho-85">
+  <figcaption>Figura 14. Pedido personalizado con dos líneas: 201, total calculado en el servidor, stock descontado y cancelación de un pedido enviado rechazada (409).</figcaption></figure>
+</section>
+
+<!-- ======================================================================= 11 -->
+<section id="s11">
+<h2>11. Infraestructura Docker</h2>
+<table>
+  <thead><tr><th style="width:12%">Servicio</th><th>Configuración y función</th></tr></thead>
+  <tbody>
+    <tr><td>proxy</td><td>Imagen propia basada en <code>nginx:1.27-alpine</code> con los estáticos copiados. Publica HTTP y HTTPS (80 y 443, o los puertos de <code>KALMA_PUERTO_HTTP</code> y <code>KALMA_PUERTO_HTTPS</code>), termina TLS, sirve CSS, JavaScript e imágenes y reenvía el resto a <code>app:80</code>. Monta los certificados en solo lectura.</td></tr>
+    <tr><td>app</td><td>Imagen propia en dos etapas sobre <code>php:8.3-apache</code>. Ejecuta la aplicación y no publica ningún puerto. Su healthcheck consulta <code>/health</code>.</td></tr>
+    <tr><td>db</td><td><code>postgres:17</code>. Guarda los datos en el volumen <code>datos_postgres</code> y solo es accesible desde la red interna. Su healthcheck usa <code>pg_isready</code> por TCP.</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th style="width:12%">Red</th><th style="width:22%">Servicios</th><th>Finalidad</th></tr></thead>
+  <tbody>
+    <tr><td>front</td><td>proxy y app</td><td>Comunicación entre el proxy y la aplicación.</td></tr>
+    <tr><td>back</td><td>app y db</td><td>Red <code>internal: true</code>: PostgreSQL no sale a Internet y el proxy no llega a la base de datos.</td></tr>
+  </tbody>
+</table>
+<p>Los servicios arrancan en orden gracias a <code>depends_on</code> con <code>condition: service_healthy</code>: primero la base de
+datos, después la aplicación y por último el proxy. Los datos se conservan al recrear los contenedores o ejecutar
+<code>docker compose down</code>; en cambio, <code>docker compose down -v</code> borra el volumen y la base de datos se vuelve a crear
+desde los scripts iniciales, por lo que no se usa como procedimiento normal de actualización.</p>
+<p>Las imágenes llevan la etiqueta <code>APP_VERSION</code> (por defecto <code>local</code>), lo que permite saber qué versión está
+desplegada y volver a la anterior. Nginx recibe la dirección pública (<code>KALMA_ORIGEN</code>) mediante una plantilla con
+variables de entorno.</p>
+<h3>Desarrollo frente a despliegue</h3>
+<table>
+  <thead><tr><th style="width:24%"></th><th><code>compose.yaml</code> (despliegue)</th><th><code>compose.dev.yaml</code> (desarrollo)</th></tr></thead>
+  <tbody>
+    <tr><td>Puertos</td><td>80 y 443, o los de <code>.env</code></td><td>Solo en el propio equipo: 8081 (redirige) y 8443</td></tr>
+    <tr><td>Código</td><td>Copiado en la imagen</td><td><code>app/</code>, <code>config/</code> y <code>public/</code> montados: los cambios se ven al recargar</td></tr>
+    <tr><td>Errores y límites</td><td>Sin detalles; límites de producción</td><td>Motivo de los errores 500 y límites por IP más altos para repetir las pruebas</td></tr>
+    <tr><td>Volumen</td><td><code>datos_postgres</code> del proyecto</td><td>Volumen externo con nombre fijo, para no arrancar por error con una base vacía</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ======================================================================= 12 -->
+<section id="s12">
+<h2>12. Despliegue en el servidor común</h2>
+<p>La aplicación se desplegó en el servidor común del aula para abrirla desde otro equipo por HTTPS, con Nginx como
+punto de entrada, PHP con Apache para la aplicación y PostgreSQL para los datos.</p>
+<table>
+  <thead><tr><th style="width:26%">Dato</th><th>Valor</th></tr></thead>
+  <tbody>
+    <tr><td>Sistema operativo</td><td>Ubuntu 26.04.1 LTS (kernel 7.0.0-43-generic, x86_64)</td></tr>
+    <tr><td>Equipo y usuario</td><td><code>2dodaw</code>, cuenta de despliegue <code>kalmasnkrs</code> (sin permisos de administrador)</td></tr>
+    <tr><td>Red</td><td>Cable (<code>enp2s0</code>), IPv4 <code>192.168.137.210</code> por DHCP</td></tr>
+    <tr><td>Versión desplegada</td><td>Commit <code>6a6a53f</code>, con la carpeta en HEAD separado y las imágenes etiquetadas con esa versión</td></tr>
+    <tr><td>Acceso</td><td><code>https://192.168.137.210:8443</code> (HTTP en 8080, que redirige a HTTPS)</td></tr>
+  </tbody>
+</table>
+
+<h3>12.1. Procedimiento</h3>
+<pre># 1. Comprobaciones previas: usuario, IP, puertos ocupados y versión de Docker
+whoami && ip -br -4 addr && ss -ltn && docker compose version
+
+# 2. Obtener y fijar la versión
+git clone --branch davidRojas https://github.com/DaRoCo7/KALMA-SNKRS-PHP-version.git
+cd KALMA-SNKRS-PHP-version && git switch --detach 6a6a53f && git log -1 --oneline
+
+# 3. Variables privadas: .env con permisos 600 (la contraseña no sale del servidor)
+umask 077 && cp .env.example .env && chmod 600 .env
+#    DB_NAME, DB_USER, DB_PASSWORD y, por el Apache que ocupa el 80/443:
+#    KALMA_PUERTO_HTTP=8080  KALMA_PUERTO_HTTPS=8443  KALMA_ORIGEN=https://192.168.137.210:8443
+
+# 4. Certificado en docker/nginx/certs/ con la IP del servidor en el SAN
+
+# 5. Construir, aplicar migraciones, arrancar y comprobar
+export APP_VERSION=6a6a53f
+bash scripts/deploy.sh produccion
+docker compose ps
+KALMA_URL=https://localhost:8443 bash scripts/comprobar.sh</pre>
+<p><code>deploy.sh</code> construye las imágenes, espera a que PostgreSQL acepte conexiones, aplica las migraciones pendientes,
+arranca la aplicación y el proxy y consulta <code>/health</code> por HTTPS. Con un volumen nuevo se cargan el esquema y las
+semillas; en los despliegues posteriores el volumen se conserva.</p>
+
+<h3>12.2. Adaptaciones al servidor real</h3>
+<p>La guía preparada para el aula (<code>docs/KALMA_Despliegue_Aula.md</code>) asumía los puertos 80 y 443, el nombre
+<code>kalma.local</code> y permisos de administrador. El servidor común no cumplía esas condiciones y el despliegue se adaptó así:</p>
+<ul>
+  <li><strong>Puertos ocupados</strong>: un Apache del sistema atendía el 80 y el 443. KALMA se publica en 8080 y 8443 con
+  <code>KALMA_PUERTO_HTTP</code>, <code>KALMA_PUERTO_HTTPS</code> y <code>KALMA_ORIGEN</code>, sin tocar <code>compose.yaml</code> (commit <code>6a6a53f</code>).</li>
+  <li><strong>Sin sudo</strong>: la cuenta no puede editar <code>/etc/hosts</code> ni instalar mkcert, así que el acceso es por la IP
+  con un certificado propio que incluye esa IP. Como los equipos cliente no confían en esa autoridad, el navegador muestra
+  el aviso «No es seguro»: el cifrado funciona, pero la identidad del servidor no está avalada por una CA de confianza.</li>
+  <li><strong>IP por DHCP</strong>: el servidor solo tiene red por cable. Si cambia de red y de IP, hay que rehacer el certificado y
+  <code>KALMA_ORIGEN</code>.</li>
+  <li><strong>Servidor compartido</strong>: otros equipos tienen sus contenedores en la misma máquina; KALMA usa su propio proyecto
+  de Compose, sus redes y su volumen, y no toca los demás.</li>
+</ul>
+<p>Después del despliegue, los modos de producción de <code>deploy.sh</code>, <code>backup.sh</code> y <code>restaurar.sh</code> quedaron
+bloqueados en el repositorio hasta definir el entorno definitivo, para que nadie los relance por error sobre el servidor sin
+revisar antes el volumen y la configuración.</p>
+</section>
+
+<section>
+<h3>12.3. Evidencias del funcionamiento</h3>
+<p>Las comprobaciones se hicieron el 19 de noviembre de 2026 desde un segundo equipo conectado a la misma red que el servidor.</p>
+<div class="figuras-2">
+  <figure><img src="capturas/despliegue-servidor-consola.jpg" alt=""><figcaption>Figura 15. Consola del servidor: Ubuntu 26.04.1 LTS, usuario <code>kalmasnkrs</code> e IP 192.168.137.210.</figcaption></figure>
+  <figure><img src="capturas/despliegue-cliente-red.jpg" alt=""><figcaption>Figura 16. Desde el segundo equipo: ping, puerto 8443 abierto (<code>TcpTestSucceeded: True</code>) y <code>/health</code> con la aplicación y la base de datos disponibles.</figcaption></figure>
+</div>
+<div class="figuras-2">
+  <figure><img src="capturas/despliegue-panel.jpg" alt=""><figcaption>Figura 17. Panel de administración abierto desde el segundo equipo en <code>https://192.168.137.210:8443/panel</code>, con los 24 pedidos de demostración.</figcaption></figure>
+  <figure><img src="capturas/despliegue-sobre-nosotros.jpg" alt=""><figcaption>Figura 18. Página «Sobre nosotros» servida por HTTPS desde el servidor, con la sesión de administración iniciada.</figcaption></figure>
+</div>
+</section>
+
+<!-- ======================================================================= 13 -->
+<section id="s13">
+<h2>13. HTTPS y acceso desde otros equipos</h2>
+<p>Nginx escucha en HTTP solo para redirigir: responde <code>301</code> hacia <code>KALMA_ORIGEN</code> conservando la ruta y los
+parámetros. Por ejemplo, <code>http://localhost:9080/catalogo?talla=42</code> redirige a <code>https://localhost:9443/catalogo?talla=42</code>
+(comprobado en la pila de pruebas). En HTTPS termina la conexión TLS (versiones 1.2 y 1.3, nombres <code>kalma.local</code> y
+<code>localhost</code>), entrega directamente CSS, JavaScript, imágenes y fuentes con caché de 7 días y reenvía el resto a <code>app:80</code>.</p>
+<ul>
+  <li>Añade <code>X-Real-IP</code>, <code>X-Forwarded-For</code> y <code>X-Forwarded-Proto</code>: la aplicación usa la IP real para los límites
+  y la auditoría (solo la acepta si la petición llega desde una red privada, la del proxy) y marca la cookie como <code>Secure</code> cuando el origen es HTTPS.</li>
+  <li>Limita las peticiones por IP: 20 por segundo en general y 30 por minuto en login y registro. Al superarlas responde
+  <code>429</code> en el mismo formato JSON de error de la API, con <code>Retry-After</code>.</li>
+  <li>Los certificados se montan desde <code>docker/nginx/certs/</code> y no se suben al repositorio. En local se crean con mkcert
+  (de confianza en el propio equipo) o con OpenSSL (autofirmado). Para un dominio definitivo hay que usar un certificado
+  emitido por una autoridad en la que confíen los clientes.</li>
+</ul>
+<p>Para entrar desde otro equipo, ese equipo tiene que llegar a la IP del servidor y al puerto HTTPS publicado (lo que
+se comprobó con <code>Test-NetConnection</code>). Si se usa un nombre como <code>kalma.local</code>, debe resolverse a la IP real
+del servidor (DNS del aula o archivo <code>hosts</code>) y el cliente debe confiar en el certificado público de la autoridad que
+firmó el del servidor; la clave privada de esa autoridad nunca sale del equipo donde se creó.</p>
+</section>
+
+<!-- ======================================================================= 14 -->
+<section id="s14">
+<h2>14. Copias de seguridad y restauración</h2>
+<p>Los scripts hacen copias de PostgreSQL, comprueban su integridad y recuperan los datos en una base aislada.</p>
+<h3>14.1. Creación de copias</h3>
+<p><code>scripts/backup.sh</code> crea una carpeta con la fecha y la hora (<code>backups/AAAAMMDD-HHMM/</code>) con el volcado
+(<code>pg_dump -Fc</code>), su índice, la configuración versionada del commit, el identificador del commit, las imágenes en uso y
+un manifiesto <code>SHA256SUMS</code>. La copia solo se da por completa cuando termina y se crea el indicador <code>.completa</code>, y
+se conservan las cinco últimas copias completas. El script se niega a copiar si hay cambios sin confirmar en Git, para
+que la configuración guardada corresponda exactamente al commit.</p>
+<pre>bash scripts/backup.sh desarrollo
+cd backups/AAAAMMDD-HHMM && sha256sum -c SHA256SUMS</pre>
+<h3>14.2. Programación diaria</h3>
+<p><code>scripts/instalar-cron.sh</code> comprueba que cron esté activo y crea <code>/etc/cron.d/kalma-backup</code> para ejecutar la copia
+cada día a las 03:00 con la ruta absoluta del proyecto y el usuario que puede usar Docker; la salida queda en
+<code>backups/cron.log</code>. En el ensayo en una máquina virtual la copia se ejecutó desde cron y la restauración aislada
+recuperó el primer pedido con la misma huella. En el servidor común la cuenta de despliegue no tiene sudo, así que
+escribir en <code>/etc/cron.d</code> requiere al responsable del servidor o usar el <code>crontab</code> del propio usuario.</p>
+<h3>14.3. Restauración aislada</h3>
+<p><code>scripts/restaurar.sh AAAAMMDD-HHMM</code> comprueba que la copia esté marcada como completa, que el volcado exista y
+que el manifiesto SHA-256 sea correcto, y restaura en una base de ensayo independiente
+(<code>kalma_restauracion_AAAAMMDD_HHMM</code>) sin tocar la principal. Si la restauración falla, elimina solo la base de ensayo
+que creó esa ejecución. La restauración directa sobre producción está bloqueada.</p>
+<h3>14.4. Prueba de restauración realizada</h3>
+<p>En el entorno de desarrollo se creó la copia <code>20261119-0403</code>, se verificaron los hashes de los archivos y se
+restauró en <code>kalma_restauracion_20261119_0403</code>. Los recuentos de las 17 tablas coincidieron con los de la base original:</p>
+<table class="compacta">
+  <thead><tr><th>Tabla</th><th>Filas</th><th>Tabla</th><th>Filas</th><th>Tabla</th><th>Filas</th></tr></thead>
+  <tbody>
+    <tr><td>auditoria</td><td>121</td><td>limites_peticiones</td><td>2</td><td>pedidos</td><td>24</td></tr>
+    <tr><td>categorias</td><td>3</td><td>linea_personalizacion</td><td>12</td><td>productos</td><td>21</td></tr>
+    <tr><td>clientes</td><td>13</td><td>lineas_pedido</td><td>31</td><td>roles</td><td>3</td></tr>
+    <tr><td>colores</td><td>6</td><td>marcas</td><td>1</td><td>usuarios</td><td>16</td></tr>
+    <tr><td>consultas</td><td>3</td><td>movimientos_stock</td><td>160</td><td>variantes</td><td>189</td></tr>
+    <tr><td>historial_estados_pedido</td><td>82</td><td>opciones_personalizacion</td><td>8</td><td></td><td></td></tr>
+  </tbody>
+</table>
+<p>El archivo <code>.env</code> y las claves TLS no forman parte de la configuración guardada con la copia: se aprovisionan por
+separado y deben protegerse con un procedimiento privado.</p>
+</section>
+
+<!-- ======================================================================= 15 -->
+<section id="s15">
+<h2>15. Incidencias, comprobaciones y mantenimiento</h2>
+<h3>15.1. Incidencias encontradas y cómo se resolvieron</h3>
+<table>
+  <thead><tr><th style="width:26%">Incidencia</th><th style="width:30%">Causa</th><th>Solución</th></tr></thead>
+  <tbody>
+    <tr><td>Tras activar HTTPS, el proxy se reiniciaba en bucle y la web no cargaba</td><td>Faltaban el certificado y la clave en <code>docker/nginx/certs/</code>, carpeta que no se sube a Git</td><td>Crear el certificado con mkcert u OpenSSL; el README lo incluye como paso de la instalación.</td></tr>
+    <tr><td>En Windows, <code>docker compose up --build</code> fallaba con «additional privileges requested»</td><td>El constructor compara rutas distinguiendo mayúsculas y la terminal se abría en <code>c:\</code> en minúscula</td><td>Lanzar la orden desde <code>C:\</code> con la letra en mayúscula.</td></tr>
+    <tr><td>El login fallaba en Postman con <code>http://localhost:8081</code></td><td>Nginx responde 301 a HTTPS y el cliente repite el <code>POST</code> como <code>GET</code></td><td>Usar siempre la dirección <code>https://</code> en el entorno de Postman.</td></tr>
+    <tr><td>Error de socket al cargar las semillas durante el despliegue</td><td>Las migraciones se lanzaban antes de que PostgreSQL aceptara conexiones TCP</td><td><code>deploy.sh</code> espera al healthcheck de la base de datos antes de aplicarlas (commit <code>b91ae03</code>).</td></tr>
+    <tr><td>El 80 y el 443 estaban ocupados en el servidor común</td><td>Un Apache del sistema, en un servidor compartido</td><td>Puertos y origen configurables desde <code>.env</code>; KALMA en 8080 y 8443 (commit <code>6a6a53f</code>).</td></tr>
+    <tr><td>No se podían editar <code>/etc/hosts</code>, instalar mkcert ni escribir en <code>/etc/cron.d</code></td><td>La cuenta de despliegue no tiene sudo</td><td>Acceso por IP con un certificado que la incluye; el cron queda pendiente del responsable del servidor.</td></tr>
+    <tr><td>La comprobación de salud fallaba en Windows</td><td><code>comprobar.sh</code> usaba Python para leer el JSON de <code>/health</code></td><td>El JSON se lee con PHP dentro del contenedor <code>app</code> (commit <code>749e480</code>).</td></tr>
+    <tr><td>Cualquiera podía bloquear durante 15 minutos la cuenta de otra persona</td><td>El límite de login contaba los intentos de la cuenta desde cualquier IP</td><td>Bloqueo por cuenta e IP en una sola sentencia atómica (commit <code>814c3a8</code>).</td></tr>
+    <tr><td>Riesgo de arrancar desarrollo con una base de datos vacía</td><td>Compose crea un volumen nuevo si cambia el nombre del proyecto</td><td>Volumen externo con nombre fijo, que se crea una vez (commit <code>d11fd6c</code>).</td></tr>
+  </tbody>
+</table>
+
+<h3>15.2. Comprobaciones del servicio</h3>
+<p>La comprobación se hace en tres niveles con <code>scripts/comprobar.sh</code>: la portada responde por HTTPS con 200,
+<code>/health</code> informa de que la aplicación y la base de datos están disponibles y PostgreSQL ejecuta <code>SELECT 1</code>.</p>
+<figure><img src="capturas/terminal-comprobar.png" alt="" class="ancho-70"><figcaption>Figura 19. <code>comprobar.sh</code> sobre la pila de pruebas: las tres comprobaciones correctas.</figcaption></figure>
+<table>
+  <thead><tr><th style="width:30%">Comprobación</th><th>Comando</th></tr></thead>
+  <tbody>
+    <tr><td>Estado de los servicios</td><td><code>docker compose ps</code></td></tr>
+    <tr><td>Logs del proxy, la aplicación o la BD</td><td><code>docker compose logs --tail=60 proxy</code> (o <code>app</code>, <code>db</code>)</td></tr>
+    <tr><td>Validar la configuración de Compose</td><td><code>docker compose config --quiet</code></td></tr>
+    <tr><td>Disponibilidad de PostgreSQL</td><td><code>docker compose exec -T db pg_isready</code></td></tr>
+    <tr><td>Consola SQL</td><td><code>docker compose exec db psql -U "$DB_USER" -d "$DB_NAME"</code></td></tr>
+    <tr><td>Comprobación completa</td><td><code>bash scripts/comprobar.sh</code></td></tr>
+  </tbody>
+</table>
+<h3>15.3. Problemas habituales</h3>
+<table>
+  <thead><tr><th style="width:30%">Problema</th><th>Qué revisar</th></tr></thead>
+  <tbody>
+    <tr><td>El proxy no arranca</td><td>Puertos ocupados, rutas de los certificados y <code>docker compose logs proxy</code>.</td></tr>
+    <tr><td>La aplicación no conecta con PostgreSQL</td><td>Estado de <code>db</code>, variables de conexión de <code>.env</code> y la red interna.</td></tr>
+    <tr><td>HTTPS no funciona desde el cliente</td><td>IP, resolución del nombre, acceso al puerto HTTPS y confianza del navegador en el certificado.</td></tr>
+    <tr><td><code>429 Too Many Requests</code></td><td>Esperar un minuto (Nginx) o 15 minutos (login de una cuenta).</td></tr>
+    <tr><td>Falla una copia automática</td><td>Cron, permisos del usuario, ruta absoluta del proyecto, Docker y <code>backups/cron.log</code>.</td></tr>
+    <tr><td>La restauración no termina</td><td>El indicador <code>.completa</code>, el volcado y el manifiesto SHA-256.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ======================================================================= 16 -->
+<section id="s16">
+<h2>16. Conclusiones y mejoras futuras</h2>
+<p>KALMA SNKRS reúne las funciones principales de una tienda online de zapatillas: catálogo, cuentas, pedidos con
+personalización, control de inventario y gestión interna con informes y auditoría. Las reglas de negocio están en el
+servidor, los permisos se comprueban en cada petición y PostgreSQL protege la consistencia con restricciones y transacciones.</p>
+<p>La infraestructura separa el proxy, la aplicación y la base de datos en servicios Docker independientes, con la base
+de datos aislada en una red interna. La colección de pruebas cubre 176 casos, con 70 errores esperados, y pasa sin
+fallos sobre una base de datos recién creada. La aplicación se desplegó en el servidor común y se comprobó desde un segundo
+equipo por HTTPS; las copias se verificaron con sus hashes y con una restauración aislada.</p>
+<h3>Mejoras futuras</h3>
+<ul>
+  <li>Verificación de cuentas por correo: servidor SMTP configurado por variables de entorno, token de un solo uso con caducidad (guardado como hash) y login que rechace las cuentas sin confirmar.</li>
+  <li>Entorno de producción definitivo: dominio, certificado de una autoridad de confianza y desbloqueo de los modos de producción de los scripts una vez verificados el volumen, las variables y los puertos.</li>
+  <li>Copias fuera del servidor, con su retención, y programación diaria con un usuario que tenga permisos sobre cron.</li>
+  <li>Prueba de recuperación completa en el servidor donde vaya a funcionar la tienda.</li>
+  <li>Páginas de error con la cabecera y la tipografía de la tienda (ahora son mínimas a propósito).</li>
+</ul>
+</section>
+
+<!-- ======================================================================= ANEXO -->
+<section id="sA" class="nueva-pagina">
+<h2>A. Anexo: puesta en marcha local</h2>
+<p>Resumen del <code>README.md</code>, que es la referencia completa. Requisitos: Docker con Compose, Git y OpenSSL o mkcert.</p>
+<pre># 1. Variables de entorno (la plantilla no lleva contraseñas)
+cp .env.example .env            # rellenar DB_PASSWORD
+
+# 2. Certificado HTTPS (no se sube al repositorio)
+mkdir -p docker/nginx/certs
+MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj "/CN=kalma.local" \
+  -addext "subjectAltName=DNS:kalma.local,DNS:localhost,IP:127.0.0.1" \
+  -keyout docker/nginx/certs/kalma.local-key.pem -out docker/nginx/certs/kalma.local.pem
+
+# 3. Arrancar y comprobar
+docker compose up -d --build
+docker compose ps                       # proxy, app y db en "healthy"
+curl -k https://localhost/health        # {"app":"disponible","base_datos":"disponible"}
+
+# Modo desarrollo (https://localhost:8443), la primera vez crear el volumen
+docker volume create kalma-snkrs-php_datos_postgres_nuevo
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+
+# Pruebas de la API
+npx newman run postman/KALMA-SNKRS.postman_collection.json \
+  -e postman/KALMA-SNKRS.postman_environment.json --insecure</pre>
+<table>
+  <thead><tr><th style="width:26%">Variable de <code>.env</code></th><th>Uso</th></tr></thead>
+  <tbody>
+    <tr><td><code>DB_NAME</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code></td><td>Base de datos, usuario y contraseña de PostgreSQL (obligatorias).</td></tr>
+    <tr><td><code>KALMA_PUERTO_HTTP</code>, <code>KALMA_PUERTO_HTTPS</code></td><td>Puertos publicados si el 80 o el 443 están ocupados.</td></tr>
+    <tr><td><code>KALMA_ORIGEN</code></td><td>Dirección pública a la que Nginx redirige el HTTP.</td></tr>
+  </tbody>
+</table>
+</section>
+
+</body>
+</html>

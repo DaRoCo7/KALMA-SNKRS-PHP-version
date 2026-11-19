@@ -1,0 +1,14 @@
+{
+  "name": "kalma-snkrs-memoria",
+  "private": true,
+  "description": "Genera el PDF de la memoria técnica a partir de memoria.html",
+  "type": "module",
+  "scripts": {
+    "pdf": "node generar-pdf.mjs"
+  },
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "puppeteer-core": "^23.11.1"
+  }
+}
