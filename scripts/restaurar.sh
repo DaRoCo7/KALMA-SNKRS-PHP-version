@@ -18,6 +18,11 @@ case "$modo" in
     *) echo "Modo desconocido: $modo" >&2; exit 2 ;;
 esac
 
+# El Compose actual es exclusivo de desarrollo.
+if [[ "$modo" == '--produccion' ]]; then
+    echo "ERROR: Restauracion de produccion bloqueada en este entorno." >&2
+    exit 1
+fi
 copia="backups/$fecha"
 [[ -f "$copia/.completa" && -s "$copia/base.dump" ]] || {
     echo "Copia incompleta o inexistente: $copia" >&2
@@ -25,7 +30,7 @@ copia="backups/$fecha"
 }
 (cd "$copia" && sha256sum -c SHA256SUMS)
 
-compose=(docker compose)
+compose=(docker compose -f compose.yaml -f compose.dev.yaml)
 if [[ -n "${COMPOSE_PROJECT_NAME:-}" ]]; then
     compose+=(-p "$COMPOSE_PROJECT_NAME")
 fi

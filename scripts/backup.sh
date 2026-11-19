@@ -3,9 +3,30 @@ set -euo pipefail
 umask 077
 cd "$(dirname "$0")/.."
 
+# Evita generar una copia de configuración que no corresponda con HEAD.
+if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+    echo "ERROR: Hay cambios pendientes en Git. Registra y verifica los cambios antes del backup." >&2
+    git status --short --untracked-files=all
+    exit 1
+fi
+
 # En el servidor se usa el nombre de proyecto de compose.yaml.
-# En desarrollo se indica kalma-php-actual al invocar el script.
-compose=(docker compose)
+# Se utiliza el proyecto definido en compose.yaml.
+modo=${1:-desarrollo}
+
+case "$modo" in
+    desarrollo)
+        compose=(docker compose -f compose.yaml -f compose.dev.yaml)
+        ;;
+    produccion)
+        echo "ERROR: Backup de produccion bloqueado hasta verificar su configuracion." >&2
+        exit 1
+        ;;
+    *)
+        echo "Uso: bash scripts/backup.sh [desarrollo|produccion]" >&2
+        exit 2
+        ;;
+esac
 if [[ -n "${COMPOSE_PROJECT_NAME:-}" ]]; then
     compose+=(-p "$COMPOSE_PROJECT_NAME")
 fi

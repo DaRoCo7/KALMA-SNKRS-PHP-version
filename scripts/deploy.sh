@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-modo=${1:-produccion}
+modo=${1:-desarrollo}
 for programa in docker curl; do
     command -v "$programa" >/dev/null || { echo "Falta $programa" >&2; exit 1; }
 done
@@ -15,10 +15,13 @@ export APP_VERSION
 compose=(docker compose -f compose.yaml)
 case "$modo" in
     desarrollo)
-        compose+=(-p "${COMPOSE_PROJECT_NAME:-kalma-php-actual}" -f compose.dev.yaml)
+        # Desarrollo combina la configuracion principal con sus ajustes locales.
+        compose+=(-f compose.dev.yaml)
         origen=https://localhost:8443
         ;;
     produccion)
+        echo "ERROR: Produccion bloqueada hasta verificar su volumen y configuracion definitivos." >&2
+        exit 1
         # Misma variable que comprobar.sh: con puertos propios se comprueba, por ejemplo,
         # https://localhost:8443 cuando el servidor no resuelve kalma.local.
         origen=${KALMA_URL:-https://kalma.local}
