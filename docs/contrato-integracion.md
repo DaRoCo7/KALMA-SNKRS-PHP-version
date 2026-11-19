@@ -17,7 +17,7 @@ Navegador ──HTTPS 443──► proxy (Nginx) ──red front──► app (P
 
 | Servicio | Imagen | Puerto interno | Publicado en el host | Redes |
 |---|---|---|---|---|
-| `proxy` | Propia, basada en `nginx:1.27-alpine`, con `public/` copiado dentro | 80, 443 | **80 y 443** | `front` |
+| `proxy` | Propia, basada en `nginx:1.27-alpine`, con `public/` copiado dentro | 80, 443 | **80 y 443** (o `KALMA_PUERTO_HTTP` / `KALMA_PUERTO_HTTPS`) | `front` |
 | `app` | Propia (`Dockerfile`, 2 etapas, `php:8.3-apache`) | 80 | No | `front`, `back` |
 | `db` | `postgres:17` | 5432 | **Nunca** | `back` |
 
@@ -41,13 +41,25 @@ Se definen en `.env` (fuera de Git y de la imagen). La plantilla es `.env.exampl
 | `DB_NAME` | Sí | — | app, db | Nombre de la base de datos |
 | `DB_USER` | Sí | — | app, db | Usuario de PostgreSQL |
 | `DB_PASSWORD` | Sí | — | app, db | Contraseña de PostgreSQL |
-| `APP_ENTORNO` | No | `produccion` | app | `desarrollo` añade el motivo de los errores 500 a la respuesta |
-| `LIMITE_LOGIN_IP` | No | `20` | app | Intentos de login por IP cada 15 min |
-| `LIMITE_REGISTRO_IP` | No | `5` | app | Registros por IP cada hora |
-| `APP_VERSION` | No | `dev` | compose | Etiqueta de las imágenes propias (permite volver a la anterior) |
-| `DOMINIO` | No | `kalma.local` | proxy | Nombre del servidor y del certificado |
+| `KALMA_PUERTO_HTTP` | No | `80` | compose | Puerto publicado para HTTP (solo redirige a HTTPS) |
+| `KALMA_PUERTO_HTTPS` | No | `443` | compose | Puerto publicado para HTTPS |
+| `KALMA_ORIGEN` | No | `https://kalma.local` | proxy | Dirección pública a la que se redirige el HTTP |
+| `APP_VERSION` | No | `local` | compose | Etiqueta de las imágenes propias (permite volver a la anterior) |
 
 `DB_HOST=db` y `DB_PORT=5432` los fija `compose.yaml`: no se tocan desde `.env`.
+
+Variables de la aplicación que `compose.yaml` no pasa (se usan sus valores por defecto) y que `compose.dev.yaml`
+cambia para desarrollo:
+
+| Variable | Por defecto | En desarrollo | Para qué |
+|---|---|---|---|
+| `APP_ENTORNO` | `produccion` | `desarrollo` | `desarrollo` añade el motivo de los errores 500 a la respuesta |
+| `LIMITE_LOGIN_IP` | `20` | `1000` | Intentos de login por IP cada 15 min |
+| `LIMITE_REGISTRO_IP` | `5` | `1000` | Registros por IP cada hora |
+| `LIMITE_CONSULTA_IP` | `5` | `1000` | Consultas del formulario de contacto por IP cada hora |
+
+El certificado se monta desde `docker/nginx/certs/` (`kalma.local.pem` y `kalma.local-key.pem`) y Nginx atiende
+los nombres `kalma.local` y `localhost`.
 
 ## 3. Reparto de rutas HTTP
 
