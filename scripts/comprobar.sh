@@ -16,7 +16,7 @@ else
     echo "FALLO Portada: $origen/ (HTTP $codigo)" >&2
     errores=1
 fi
-if codigo=$("${peticion[@]}" -o "$temporal" -w "%{http_code}" "$origen/health") && [[ "$codigo" == 200 ]] && python3 -c 'import json, sys; d=json.load(sys.stdin); sys.exit(0 if isinstance(d, dict) and d.get("app") == "disponible" and d.get("base_datos") == "disponible" else 1)' < "$temporal"; then
+if codigo=$("${peticion[@]}" -o "$temporal" -w "%{http_code}" "$origen/health") && [[ "$codigo" == 200 ]] && "${compose[@]}" exec -T app php -r '$d=json_decode(stream_get_contents(STDIN), true); exit(is_array($d) && ($d["app"] ?? "") === "disponible" && ($d["base_datos"] ?? "") === "disponible" ? 0 : 1);' < "$temporal"; then
     echo "OK    /health: PHP y base de datos disponibles"
 else
     echo "FALLO /health: HTTP $codigo; revisa el estado de app y db" >&2
